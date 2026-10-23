@@ -8,6 +8,7 @@ import path from 'node:path';
 import {createServer} from 'node:http';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {PHONE_VERSION} from '../pocket/events.js';
 const require=createRequire(import.meta.url);
 let playwright;try{playwright=require('playwright');}catch{playwright=require(path.join(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||'','playwright'));}
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'), prefix='/scripts/extensions/third-party/tavern-pocket';
@@ -139,8 +140,8 @@ try{
  assert.equal(retained.m.state,'opened');assert(retained.m.source.stale);assert.equal(retained.balance,payment.after);assert(JSON.stringify(retained.backup).includes(retained.m.paymentId));assert(JSON.stringify(retained.backup).includes('source-red'));
  checks.push('settled narrative redpacket survives source deletion as stale without re-credit; backup retains payment/source identity');
  await api(()=>window.qaApi.pocketAction('presets.install',{}));
- const presets=await page.evaluate(version=>({regex:window.qa.context.extensionSettings.regex,book:window.qa.books['Tavern Pocket 手機協定 v'+version]}),version);
- assert(presets.regex?.length);assert(presets.book?.entries);checks.push('bundled v'+version+' regex and worldbook install through host APIs');
+ const presets=await page.evaluate(version=>({regex:window.qa.context.extensionSettings.regex,book:window.qa.books['Tavern Pocket 手機協定 v'+version]}),PHONE_VERSION);
+ assert(presets.regex?.length);assert(presets.book?.entries);checks.push('bundled protocol v'+PHONE_VERSION+' regex and worldbook install through host APIs');
  for(const id of ['instagram','diary','storyshop','pocketsettings']){await go(id);assert(await frame.locator(`.view[data-app="${id}"]`).isVisible());}
  checks.push('all four added apps open via desktop navigation');
  await frame.locator('[data-field="profileId"]').selectOption('main');await frame.locator('[data-worldbook="賽車世界"]').check();await frame.locator('[data-action="settings-save"]').click();

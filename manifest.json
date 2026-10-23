@@ -1,10 +1,10 @@
 {
   "display_name": "Tavern Pocket · iPhonie 私用版",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "author": "ST-iPhonie contributors；Tavern Pocket additions for ben1sn00b0820-cloud",
   "js": "index.js",
   "css": "style.css",
-  "loading_order": 50,
+  "loading_order": 100,
   "minimum_client_version": "1.19.0",
   "auto_update": false,
   "hooks": {

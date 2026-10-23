@@ -165,8 +165,10 @@ export function parsePhoneEvents(text, options = {}) {
   const result = () => options.withPositions === true ? {events,errors,matches} : {events,errors};
   if (typeof text !== 'string') return result();
   if (text.length > PHONE_LIMITS.message) { errors.push({blockIndex:-1,message:'訊息超過手機解析上限。'});return result(); }
+  // A status field may quote phone syntax; it is data, never an action.
+  const source = text.replace(/<CSB_UPDATE>[\s\S]*?(?:<\/CSB_UPDATE>|$)/g, block => block.replace(/[^\r\n]/g, ' '));
   let blockIndex = 0, seen = 0;
-  for (const match of text.matchAll(/<phone>([\s\S]*?)<\/phone>/g)) {
+  for (const match of source.matchAll(/<phone>([\s\S]*?)<\/phone>/g)) {
     const at = blockIndex++;
     if (match[1].length > PHONE_LIMITS.block) { errors.push({blockIndex: at, message: '手機區塊超過長度上限。'}); continue; }
     let parsed;

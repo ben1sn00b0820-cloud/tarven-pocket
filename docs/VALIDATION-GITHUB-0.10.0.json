@@ -1,0 +1,35 @@
+{
+  "version": "0.10.0",
+  "csbVersion": "1.0.1",
+  "protocolVersion": "0.9.0",
+  "target": "https://github.com/ben1sn00b0820-cloud/tarven-pocket",
+  "status": "validated for GitHub release",
+  "node": {
+    "phone": 411,
+    "csb": 47,
+    "total": 458,
+    "fail": 0
+  },
+  "browser": {
+    "phone": 78,
+    "csbIntegration": 13,
+    "total": 91,
+    "pageErrors": []
+  },
+  "modelServices": "Mocked responses only; no paid API calls",
+  "limitations": [
+    "SillyTavern host APIs are mocked; real iframe and Chromium IndexedDB used.",
+    "No physical Android device was available."
+  ],
+  "changes": [
+    "Bundled CSB runtime with standalone ownership guard and lifecycle cleanup",
+    "Current-chat state replay with schema-aware phone profiles and custom fields",
+    "Native editor bridge and latest-state model context",
+    "Mixed phone/status cards and original CSB 1.0.0 compatibility",
+    "Long names, ambiguous aliases, hidden fields, unknown values and stale editor guards"
+  ],
+  "tests": [
+    "tests/artifacts/browser-report.json",
+    "tests/artifacts/browser-csb-report.json"
+  ]
+}

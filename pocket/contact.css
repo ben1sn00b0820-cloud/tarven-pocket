@@ -73,3 +73,22 @@
 .tp-payment-draft>strong{display:flex;align-items:center;gap:7px;font-size:14px}
 .tp-payment-draft p{margin:0;font-size:13px;line-height:1.8;overflow-wrap:anywhere}
 .tp-payment-draft small{font-size:11px;color:var(--ink2)}
+/* CSB schema-driven cards retain custom ranges, groups and text types. */
+.tp-csb-group>summary{display:flex;align-items:center;gap:10px;min-height:28px;cursor:pointer;font-size:14px;font-weight:750;list-style:none;color:var(--ink)}
+.tp-csb-group>summary::-webkit-details-marker{display:none}
+.tp-csb-group>summary>span{min-width:0;overflow-wrap:anywhere}
+.tp-csb-group>summary>small{margin-left:auto;flex:none;font-size:10px;font-weight:400;color:var(--ink2)}
+.tp-csb-group>summary:after{content:"＋";flex:none;font-size:16px;font-weight:400;color:var(--ink2)}
+.tp-csb-group[open]>summary:after{content:"−"}
+.tp-csb-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;margin-top:12px;min-width:0}
+.tp-csb-fields.is-list{grid-template-columns:minmax(0,1fr)}
+.tp-csb-fields>dl{margin:0;min-width:0}
+.tp-csb-fields>dl:has(.tp-csb-wide){grid-column:1/-1}
+.tp-csb-fields .tp-contact-datum{height:100%;box-sizing:border-box}
+.tp-csb-fields dd small{font-size:11px;color:var(--ink2)}
+.tp-csb-meter{align-content:start}
+.tp-csb-meter-track{grid-column:1/-1;height:6px;border-radius:8px;overflow:hidden;background:var(--line)}
+.tp-csb-meter-track>span{display:block;height:100%;border-radius:inherit}
+.tp-csb-meter-track.is-unknown{background:repeating-linear-gradient(90deg,var(--line) 0 6px,transparent 6px 10px)}
+.tp-csb-stage{grid-column:1/-1;font-size:10px;line-height:1.5;color:var(--ink2);overflow-wrap:anywhere}
+@media(max-width:340px){.tp-csb-fields{grid-template-columns:minmax(0,1fr)}}

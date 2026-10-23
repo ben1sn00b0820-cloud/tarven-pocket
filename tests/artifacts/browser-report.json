@@ -1,5 +1,5 @@
 {
-  "passed": 76,
+  "passed": 78,
   "checks": [
     "actual index initializes and a single floating-ball click opens the actual iframe",
     "all twelve upstream apps, four existing additions and the new Me app remain on the desktop",
@@ -15,7 +15,7 @@
     "narrative phone blocks auto-sync WeChat, Instagram and character diary without duplicate replay",
     "main-story edit reconciles message content; native deletion remains hidden after replay",
     "settled narrative redpacket survives source deletion as stale without re-credit; backup retains payment/source identity",
-    "bundled v0.9.0 regex and worldbook install through host APIs",
+    "bundled protocol v0.9.0 regex and worldbook install through host APIs",
     "all four added apps open via desktop navigation",
     "model and worldbook selectors save through actual settings UI",
     "Instagram image-only upload reaches photo storage and renders a decoded image",
@@ -71,8 +71,10 @@
     "main-input button opens searchable profile/item/ability tabs, distinguishes duplicate names, inserts three references at the saved caret without sending/spending, and fits a 390px viewport",
     "the first GENERATION_AFTER_COMMANDS event reads unsent composer references before the user message exists and injects only the selected duplicate ability plus current item/profile",
     "rendered reference chips survive Showdown paragraph formatting; edits resolve by stable ID to current values and deleted items are reported missing without stale ownership or wallet effects",
+    "a compact UUID containing underscores renders as a nested reference chip inside a WeChat card under Showdown while literal HTML/entities/Markdown in the asset label remain harmless text",
     "switching personas immediately refreshes the picker and rejects references owned by the prior persona without leaking its profile or ability description",
     "optional @ keyboard completion resolves the selected ability and does not consume Enter during Chinese IME composition",
+    "CHAT_CHANGED closes an open memory picker without inserting a stale selection or modifying the user draft",
     "turning forum mirroring off archives new records quietly; turning it back on shows subsequent posts without replaying the prior quiet record",
     "390px Showdown-rendered native batch presents incoming/outgoing WeChat, forum post/reply and one confirmed shop receipt without horizontal overflow, duplicate mirrors or duplicate payment",
     "shop preset manager creates and imports real JSON files without model calls, selects the saved preset, respects disabled ST prompt-order segments and includes only active custom text in subsequent product generation",

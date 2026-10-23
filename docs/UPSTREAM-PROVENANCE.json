@@ -2,7 +2,7 @@
   "upstream": "https://github.com/hey8v0/ST-iPhonie",
   "commit": "a1670bb525c6b0e4f64c67fa77ecb1a487d318ba",
   "upstream_manifest_version": "0.6.56",
-  "fork_version": "0.9.1",
+  "fork_version": "0.10.0",
   "upstream_files": [
     {
       "path": "README.md",

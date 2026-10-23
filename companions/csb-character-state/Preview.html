@@ -1,0 +1,580 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>角色狀態工坊 · 互動預覽</title><style>/* CSB is scoped: no global reset, no remote fonts, no external assets. */
+.csb{--csb-bg:#11182b;--csb-card:#1a233b;--csb-line:rgba(174,185,225,.15);--csb-text:#edf0fa;--csb-muted:#98a6c2;--csb-gold:#d7bb83;--csb-purple:#aa9cdb;color:var(--csb-text);font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;font-size:14px;line-height:1.65;text-align:left;box-sizing:border-box;color-scheme:dark;overflow-wrap:anywhere}
+.csb *,.csb *:before,.csb *:after{box-sizing:border-box}
+.csb [hidden]{display:none!important}.csb button,.csb input,.csb textarea,.csb select{font:inherit}.csb button{cursor:pointer}.csb button:disabled{opacity:.5;cursor:not-allowed}.csb button:focus-visible,.csb summary:focus-visible,.csb input:focus-visible,.csb textarea:focus-visible,.csb select:focus-visible{outline:2px solid var(--csb-gold);outline-offset:3px}
+.csb summary{list-style:none;cursor:pointer;user-select:none}.csb summary::-webkit-details-marker{display:none}.csb h2,.csb h3,.csb h4,.csb p{margin:0}.csb h2{font-size:21px;font-weight:700;letter-spacing:.04em}.csb h3{font-size:18px;font-weight:650}.csb h4{font-size:15px;font-weight:650}.csb small{font-size:11px}.csb .csb-muted{color:var(--csb-muted);font-size:12px;font-weight:400;margin:5px 0 12px}.csb .csb-eyebrow{display:block;color:var(--csb-gold);font-size:10px;letter-spacing:.18em;margin-bottom:4px}
+.csb-panel{background:linear-gradient(135deg,#151e34,#11192d);border:1px solid rgba(197,173,125,.28);border-radius:18px;box-shadow:0 10px 26px #0003;margin:12px 0;overflow:hidden;width:100%;max-width:760px}
+.csb-panel-head{display:flex;align-items:center;gap:12px;padding:16px 18px;background:linear-gradient(110deg,#d3b77709,transparent)}
+.csb-panel-head>span:nth-child(2){flex:1;min-width:0}.csb-panel-head strong{display:block;font-size:15px;letter-spacing:.06em}.csb-panel-head small{display:block;color:var(--csb-muted);font-size:10px;letter-spacing:.08em}
+.csb-emblem{display:grid;place-items:center;color:var(--csb-gold);border:1px solid #d3b77735;background:#d3b7770c;border-radius:11px;width:36px;height:36px;font-size:22px;flex-shrink:0}.csb-count{font-size:11px;color:var(--csb-gold);border:1px solid #d3b77726;padding:3px 9px;border-radius:20px;white-space:nowrap}.csb-chevron{font-size:16px;color:var(--csb-muted);transition:transform .15s}.csb details[open]>summary>.csb-chevron,.csb-panel[open]>.csb-panel-head>.csb-chevron{transform:rotate(180deg)}
+.csb-panel-body{padding:0 14px 14px}.csb-scene-line{display:flex;gap:10px;align-items:center;justify-content:space-between;color:var(--csb-muted);font-size:11px;padding:4px 2px 12px}
+.csb-character{background:linear-gradient(150deg,#1a233b,#151e34);border:1px solid var(--csb-line);border-radius:14px;overflow:hidden;margin-bottom:10px;min-width:0}.csb-character:last-child{margin-bottom:0}.csb-character-head{display:flex;align-items:center;gap:11px;padding:16px}
+.csb-avatar{display:grid;place-items:center;flex-shrink:0;width:42px;height:42px;border-radius:12px;color:#e4cba0;background:linear-gradient(145deg,#67564155,#51476e50);border:1px solid #e0c79930;font-family:inherit;font-size:23px}
+.csb-person{min-width:0;flex:1}.csb-person strong{font-size:18px;display:block;letter-spacing:.05em}.csb-person small{display:block;color:var(--csb-muted);font-size:11px;line-height:1.5;margin-top:2px}.csb-presence{font-size:10px;color:#8d98b0;white-space:nowrap;display:flex;gap:5px;align-items:center}.csb-presence:before{content:'';width:5px;height:5px;border-radius:50%;background:#7b859a}.csb-presence.is-present{color:#a9d5bf}.csb-presence.is-present:before{background:#a9d5bf;box-shadow:0 0 8px #9ed2b540}
+.csb-character-body{padding:0 14px 14px}.csb-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px}.csb-group{background:#10182a40;border:1px solid #c4cafa0e;border-radius:11px;margin-top:9px;padding:0 12px}.csb-group>summary{padding:12px 0;color:#c8cee5;font-size:12px;font-weight:650;display:flex;align-items:center;gap:8px}.csb-group-icon{color:var(--csb-purple);font-size:16px}.csb-group-count{margin-left:auto;font-size:10px;color:#7987a5;font-weight:400}.csb-group>summary:after{content:'＋';color:#7e8aa6;font-size:12px}.csb-group[open]>summary:after{content:'−'}
+.csb-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding-bottom:12px}.csb-field-grid.csb-list{grid-template-columns:minmax(0,1fr)}.csb-value-card{background:#a9b7f307;border:1px solid #a5afe508;border-radius:9px;padding:10px 11px;min-width:0;display:flex;flex-direction:column;gap:3px}.csb-value-label{font-size:11px;color:var(--csb-muted)}.csb-value{font-size:13px;color:#e4d0ab;white-space:pre-wrap;overflow-wrap:anywhere}.csb-value.is-empty{color:#626f89}.csb-wide{grid-column:1/-1}
+.csb-gauge{background:#a9b7f305;border:1px solid #a5afe508;border-radius:9px;padding:11px;min-width:0}.csb-gauge-top{display:flex;justify-content:space-between;align-items:baseline;gap:5px;font-size:11px;margin-bottom:10px;color:#bac4db}.csb-gauge-top strong{font-size:10px;font-weight:500;color:#d7ddef;white-space:nowrap;font-variant-numeric:tabular-nums}.csb-bar-track{height:5px;background:#070d1a80;border-radius:6px;overflow:hidden}.csb-bar-fill{height:100%;border-radius:6px;transition:width .2s ease}.csb-bar-unknown{background:repeating-linear-gradient(110deg,#35405955 0px,#35405955 3px,#111929 3px,#111929 7px)}.csb-stage{display:block;color:var(--csb-muted);margin-top:5px;font-size:10px}
+.csb-btn{border:1px solid #a2b0d72d;border-radius:9px;background:#26324b;color:#dce3f5;padding:9px 13px;line-height:1.4;font-size:12px;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;text-decoration:none;box-shadow:none;white-space:normal;transition:background .15s,border-color .15s}.csb-btn:hover{background:#33415e;border-color:#a2b0d75c}.csb-btn.csb-primary{background:#d5b67e;color:#1b2030;border-color:#e6cca0;font-weight:650}.csb-btn.csb-primary:hover{background:#e2c797}.csb-btn.csb-small{font-size:11px;min-height:30px;padding:5px 10px}.csb-btn.csb-icon-btn{padding:5px 10px;min-width:32px}.csb-chip{font-size:10px;color:var(--csb-gold);background:#d5b67e0b;border:1px solid #d5b67e23;border-radius:20px;padding:3px 9px}.csb-empty{padding:26px 15px;text-align:center;color:#a2aec7;font-size:12px;border:1px dashed #aab6dc26;border-radius:12px;line-height:1.8}
+.csb-dialog{background:#11192a;border:1px solid #8b95bd55;border-radius:20px;box-shadow:0 20px 90px #0009;width:min(940px,calc(100vw - 28px));max-width:calc(100vw - 28px);max-height:calc(100dvh - 36px);padding:0;margin:auto;color:var(--csb-text);overflow:auto;overscroll-behavior:contain}.csb-dialog::backdrop{background:#070d1bd9;backdrop-filter:blur(5px)}.csb-dialog-head{position:sticky;top:0;z-index:3;padding:22px 26px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#131c30f7;border-bottom:1px solid var(--csb-line)}.csb-close{flex-shrink:0}.csb-manager-body{padding:0 24px 24px}.csb-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:16px 0 10px;position:sticky;top:91px;z-index:2;background:#11192afa}.csb-tabs .csb-btn{background:transparent;border-color:transparent;color:var(--csb-muted);padding:9px 5px;font-size:12px}.csb-tabs .csb-btn.is-active{background:#b5a0f017;border:1px solid #b5a0f030;color:#ddd4fa}.csb-feedback{font-size:12px;color:#b9ddc8;min-height:20px;margin:4px 0 10px}.csb-feedback.is-error,.csb-error{color:#f5a6a6!important;font-size:12px;white-space:pre-wrap;line-height:1.7;margin:8px 0!important}.csb-tab-body{min-width:0}
+.csb-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin:8px 0 15px}.csb-section-heading>.csb-btn{flex-shrink:0}.csb-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 18px}.csb-toolbar>input{flex:1;min-width:100px}.csb-roster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}.csb-roster>.csb-character{margin:0}.csb-row-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.csb-schema-group{margin:16px 0;background:#19233a88;border:1px solid var(--csb-line);border-radius:12px;padding:14px}.csb-schema-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.csb-schema-head h4{color:#d2c4e9}.csb-schema-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid #afbee40e}.csb-schema-label{flex:1;min-width:0}.csb-schema-label strong{display:block;font-size:13px;font-weight:500}.csb-schema-label small{color:var(--csb-muted);display:block;font-size:10px}.csb-field-type{color:var(--csb-gold)}.csb-schema-row.is-disabled{opacity:.5}
+.csb-form{padding:22px 24px}.csb-tab-body>.csb-form{padding:0}.csb-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.csb-control{display:flex;flex-direction:column;gap:6px;margin-bottom:13px;color:#c5cde1;font-size:12px;min-width:0}.csb-control>span{font-weight:500}.csb-control>.csb-muted{margin:0;font-size:11px}.csb input:not([type=checkbox]):not([type=color]),.csb textarea,.csb select{border:1px solid #9caed430;border-radius:8px;background:#0c1424;color:#e7ecf7;padding:10px 11px;outline-offset:2px;width:100%;max-width:100%;min-width:0;box-shadow:none;line-height:1.5;font-size:13px}.csb select{min-height:40px}.csb textarea{resize:vertical}.csb input[type=checkbox]{width:18px;height:18px;accent-color:#d7bb83;flex-shrink:0;margin:0}.csb input[type=color]{width:100%;height:42px;border:1px solid #9caed430;background:#0c1424;border-radius:8px;padding:4px}.csb-editor-row{display:flex;gap:8px;align-items:flex-start;min-width:0}.csb-editor-row>.csb-control{flex:1;min-width:0}.csb-lock{display:flex;gap:4px;align-items:center;flex-direction:column;padding-top:22px;color:#93a1bd;font-size:10px}.csb-edit-group{margin:12px 0;border:1px solid var(--csb-line);border-radius:10px;padding:0 14px}.csb-edit-group>summary{padding:12px 0;color:#c8b8e0;font-size:13px}.csb-edit-group[open]>summary{margin-bottom:6px}.csb-form-footer{position:sticky;bottom:0;background:#11192af5;padding:14px 0 0;text-align:right;border-top:1px solid var(--csb-line)}.csb-data-section{margin-top:24px;padding-top:18px;border-top:1px solid var(--csb-line)}.csb-data-section h4{margin-bottom:8px}.csb-history{display:grid;gap:7px;margin:12px 0}.csb-history>div{padding:10px 12px;background:#9da9da08;border:1px solid #9da9da12;border-radius:8px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 10px;font-size:12px}.csb-history strong{font-weight:500}.csb-history span{text-align:right;color:var(--csb-gold)}.csb-history small{grid-column:1/-1;color:var(--csb-muted)}
+.csb-launcher{padding:10px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.csb-message-card{clear:both;margin:8px 0 4px}.csb-message-error{color:#e7ad91;padding:8px 12px;font-size:12px;border:1px solid #e7ad9133;border-radius:8px;background:#2a192055}
+@media(max-width:650px){.csb-dialog{width:calc(100vw - 12px);max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px);border-radius:15px}.csb-dialog-head{padding:16px}.csb-manager-body{padding:0 13px 18px}.csb-tabs{top:79px}.csb-roster{grid-template-columns:minmax(0,1fr)}.csb-section-heading{display:block}.csb-section-heading>.csb-btn{margin:2px 0 5px}.csb-form{padding:16px 13px}.csb-form-grid{gap:10px}.csb-schema-group{padding:12px 9px}.csb-schema-row{gap:7px;flex-wrap:wrap}.csb-schema-row>.csb-row-actions{margin-left:auto}.csb-schema-head{flex-wrap:wrap}.csb-character-head{padding:14px 11px}.csb-person strong{font-size:17px}.csb-presence{font-size:9px}.csb-character-body{padding:0 10px 11px}.csb-panel-body{padding:0 8px 10px}.csb-panel-head{padding:14px 12px}.csb-gauge{padding:10px 9px}.csb-group{padding:0 10px}.csb-gauge-top{flex-wrap:wrap;gap:3px}.csb-field-grid{gap:7px}.csb-dialog h2{font-size:19px}}
+@media(max-width:360px){.csb-form-grid{grid-template-columns:minmax(0,1fr)}.csb-avatar{width:34px;height:36px;font-size:20px}.csb-character-head{gap:7px}.csb-group{padding:0 8px}.csb-gauge{padding:9px 7px}.csb-tabs .csb-btn{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.csb *{transition:none!important}}
+
+body{margin:0;background:#0c1220;color:#edf0fa;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif}body:before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 12% 10%,#504a7825,transparent 55%),radial-gradient(ellipse at 90% 75%,#a0865420,transparent 45%);pointer-events:none}.preview-wrap{max-width:1180px;margin:auto;padding:38px 38px 70px;position:relative}.preview-top{display:flex;justify-content:space-between;align-items:center;padding-bottom:23px;border-bottom:1px solid #a7b7da20}.preview-brand{font-size:14px;letter-spacing:.15em;color:#d8c291}.preview-tag{color:#95a1b9;font-size:11px}.preview-layout{display:grid;grid-template-columns:330px minmax(0,1fr);gap:60px;margin-top:52px;align-items:start}.preview-intro{position:sticky;top:40px}.preview-intro h1{font-size:40px;font-weight:500;line-height:1.5;letter-spacing:.03em;margin:14px 0 22px}.preview-intro h1 span{color:#d7bb83}.preview-intro p{color:#a1aec7;font-size:14px;line-height:1.9;max-width:300px}.preview-buttons{display:flex;flex-wrap:wrap;gap:9px;margin:27px 0 35px}.preview-notes{border-top:1px solid #a7b7da20;padding-top:22px;font-size:12px;color:#a9b5cd;line-height:2}.preview-notes strong{font-weight:500;color:#dcd2ed}.preview-demo{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.preview-counter{font-size:11px;color:#7d8da8;margin-bottom:8px;letter-spacing:.04em}.preview-footer{font-size:11px;color:#70809b;margin-top:18px;line-height:1.8}#preview-stage{min-width:0}#preview-stage>.csb-panel{margin:0}.preview-buttons .csb-btn{padding:12px 18px}.preview-tag:before{content:'●';color:#c8b384;margin-right:8px;font-size:8px}@media(max-width:850px){.preview-layout{grid-template-columns:minmax(0,1fr);gap:25px;margin-top:28px}.preview-intro{position:static}.preview-intro h1{font-size:31px;margin:10px 0}.preview-intro p{max-width:none;font-size:13px}.preview-notes{display:none}.preview-buttons{margin:18px 0 8px}.preview-wrap{max-width:650px;padding:23px 18px 45px}.preview-top{padding-bottom:17px}.preview-tag{font-size:10px}.preview-brand{font-size:12px}.preview-footer{margin-top:14px}}@media(max-width:360px){.preview-wrap{padding-left:10px;padding-right:10px}.preview-intro h1{font-size:28px}.preview-top{gap:8px}.preview-tag{font-size:9px}}
+</style></head><body><main class="preview-wrap csb"><header class="preview-top"><div class="preview-brand">◈ &nbsp; 角色狀態工坊</div><div class="preview-tag">互動預覽 · v1.0.0</div></header><div class="preview-layout"><aside class="preview-intro"><small class="csb-eyebrow">CHARACTERS. REMEMBERED.</small><h1>每一個角色，<br>都有<span>延續的故事。</span></h1><p>欄位由你定義，資料各自保存。角色暫時離場，記憶也不會離開。</p><div class="preview-buttons"><button class="csb-btn csb-primary" id="open-manager">開啟角色工坊</button><button class="csb-btn" id="open-fields">自訂欄位</button></div><div class="preview-notes"><strong>01 &nbsp; 一份共用模板</strong><br>身體特徵、身體部位、服裝、條狀狀態。<br><br><strong>02 &nbsp; 各自獨立的角色資料</strong><br>當前狀態與重要經歷，隨劇情延續。<br><br><strong>03 &nbsp; 自動生成狀態卡片</strong><br>展開姓名，查看每一項細節。</div></aside><section><div class="preview-counter" id="demo-count"></div><div class="preview-demo"><button class="csb-btn csb-small" id="simulate-rest">☕ 模擬休息</button><button class="csb-btn csb-small" id="simulate-leave">↗ 離場／重返</button><button class="csb-btn csb-small" id="reset-preview">重設預覽</button></div><div id="preview-stage"></div><p class="preview-footer">此頁使用示例角色與本機瀏覽器儲存，可實際編輯與匯出。模擬按鈕不會呼叫模型；安裝插件後才會接上酒館劇情。</p></section></div></main><script>const VERSION = 1;
+const TYPES = {text:'短文字',longtext:'長文字',number:'數字',bar:'進度條',select:'單選',multiselect:'多選',boolean:'是／否'};
+const POLICIES = {dynamic:'隨劇情更新',static:'初始化後固定',manual:'僅手動修改'};
+const clone = value => JSON.parse(JSON.stringify(value));
+const uid = (prefix='f') => `${prefix}_${globalThis.crypto?.randomUUID?.().replaceAll('-','') || (Date.now().toString(36)+Math.random().toString(36).slice(2))}`;
+function field(id,label,group,type='text',options={}) {
+  return {id,label,group,type,unit:'',default:null,policy:'dynamic',hidden:false,hideEmpty:false,color:'#c7ab73',icon:'',min:0,max:100,maxDelta:null,display:'value',direction:'neutral',options:[],thresholds:[],description:'',...options};
+}
+function defaultSchema() {
+  const fields = [
+    field('age','年齡','basic','text',{unit:'歲',policy:'static'}),
+    field('gender','性別','basic','text',{policy:'static'}),
+    field('identity','身分','basic'),field('relation','與你的關係','basic'),
+    field('personality','性格與背景','basic','longtext',{policy:'static'}),
+    field('affection','好感度','gauges','bar',{color:'#e989a8',description:'角色對使用者的好感；依互動更新。'}),
+    field('trust','信任值','gauges','bar',{color:'#ac9bf3',description:'角色對使用者的信任；不等同好感。'}),
+    field('energy','精力值','gauges','bar',{color:'#d7b775',description:'越高越有活力；依休息、活動更新。'}),
+    field('fatigue','疲倦值','gauges','bar',{color:'#a0aeca',direction:'negative'}),
+    field('stress','壓力值','gauges','bar',{color:'#e89b7f',direction:'negative'}),
+    field('satiety','飽食度','gauges','bar',{color:'#9fcda4',description:'越高越飽足；有進食或合理時間推移才更新。'}),
+    field('hydration','飲水度','gauges','bar',{color:'#8acbdc',description:'水分充足程度，越高越充足。'}),
+    field('lewdness','淫蕩值','gauges','bar',{color:'#c69de0',description:'成人虛構角色的性開放設定。只依明確設定或自述，不從衣著、外貌或友善推斷，未設定保持未知。'}),
+    field('height','身高','features','number',{unit:'cm',min:0,max:10000,policy:'static'}),
+    field('weight','體重','features','number',{unit:'kg',min:0,max:100000}),
+    field('hair','髮色／髮型','features'),field('eyes','瞳色','features','text',{policy:'static'}),field('build','體型','features'),
+    ...['頭部','面部','頸肩','胸部','背部','腹部','腰部','手臂','手部','腿部','足部','皮膚'].map((label,i)=>field(`part_${i}`,label,'body')),
+    ...['上衣','下裝','鞋襪','配件'].map((label,i)=>field(`outfit_${i}`,label,'outfit')),
+    field('outfit','整體衣著','outfit'),
+    field('mood','心情','scene'),field('location','位置','scene'),field('action','行動','scene'),
+    field('condition','身體狀況','scene'),field('thought','當前所想','scene','longtext',{description:'只記已表露或敘事視角允許得知的想法。'}),
+    field('items','持有物品','scene','longtext'),field('note','近期變化','scene','longtext'),
+    field('memory','重要經歷與約定','memory','longtext',{description:'保存仍有效的重要事件、承諾與關係背景；新增事件時保留既有重要事實，不以無關細節覆蓋。'})
+  ];
+  return {version:VERSION,groups:[
+    {id:'basic',label:'基本資料',icon:'◇',layout:'grid',collapsed:false},
+    {id:'gauges',label:'狀態數值',icon:'◈',layout:'grid',collapsed:false},
+    {id:'features',label:'身體特徵',icon:'⌁',layout:'grid',collapsed:false},
+    {id:'body',label:'身體部位',icon:'✧',layout:'grid',collapsed:true},
+    {id:'outfit',label:'當前服裝',icon:'♧',layout:'grid',collapsed:true},
+    {id:'scene',label:'當前狀態',icon:'☽',layout:'list',collapsed:false},
+    {id:'memory',label:'角色記憶',icon:'▤',layout:'list',collapsed:true}
+  ],fields};
+}
+function defaultSettings() {return {enabled:true,autoUpdate:true,allowNew:true,showAbsent:false,inlineCards:true,mvuSync:false,promptBudget:42000,template:defaultSchema()};}
+function emptyState() {return {characters:{},scene:{time:'',location:''}};}
+function newDatabase(template=defaultSchema()) {return {version:VERSION,schema:clone(template),seed:emptyState(),manual:[],processed:{},locks:{},pinned:[],enabled:true};}
+function valueOf(character,field) {return Object.hasOwn(character.values,field.id) ? character.values[field.id] : field.default;}
+
+
+const MAX_TEXT=12000;
+const forbidden = new Set(['__proto__','prototype','constructor']);
+function safeId(id) {return typeof id==='string' && /^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(id) && !forbidden.has(id);}
+function assertSafe(value,depth=0) {
+  if(depth>30) throw Error('資料巢狀過深');
+  if(value && typeof value==='object') for(const [k,v] of Object.entries(value)) {
+    if(forbidden.has(k)) throw Error('資料包含不允許的鍵名');
+    assertSafe(v,depth+1);
+  }
+}
+function object(v,label) {if(!v || typeof v!=='object'||Array.isArray(v)) throw Error(`${label} 必須是物件`);assertSafe(v);return v;}
+function text(v,label,max=MAX_TEXT) {if(typeof v!=='string'||v.length>max) throw Error(`${label} 必須是 ${max} 字以內的文字`);return v;}
+function parseJSON(s) {if(typeof s!=='string'||s.length>10_000_000)throw Error('檔案超過 10 MB 或格式錯誤');const v=JSON.parse(s);assertSafe(v);return v;}
+function validateSchema(input) {
+  object(input,'模板');
+  if(!Array.isArray(input.groups)||!input.groups.length||!Array.isArray(input.fields)) throw Error('模板必須包含 groups 與 fields');
+  if(input.groups.length>200||input.fields.length>2000) throw Error('模板超過 200 分區或 2000 欄位');
+  const schema=clone(input),groups=new Set(),ids=new Set();
+  for(const g of schema.groups){
+    if(!safeId(g.id)||groups.has(g.id))throw Error('分區 ID 重複或不合法');groups.add(g.id);
+    text(g.label,'分區名稱',80);if(!g.label.trim())throw Error('分區名稱不能空白');
+    g.icon=String(g.icon||'◇').slice(0,8);g.layout=g.layout==='list'?'list':'grid';g.collapsed=!!g.collapsed;
+  }
+  schema.fields=schema.fields.map(f=>{
+    if(!safeId(f.id)||ids.has(f.id))throw Error('欄位 ID 重複或不合法');ids.add(f.id);
+    if(!groups.has(f.group))throw Error(`欄位 ${f.label} 的分區不存在`);
+    const v=field(f.id,text(f.label,'欄位名稱',80),f.group,f.type,f);
+    if(!v.label.trim())throw Error('欄位名稱不能空白');
+    if(!['text','longtext','number','bar','select','multiselect','boolean'].includes(v.type))throw Error('不支援的欄位類型');
+    if(!['dynamic','static','manual'].includes(v.policy))throw Error('不支援的更新方式');
+    text(v.description,'欄位說明',2000);text(v.unit,'單位',30);text(v.icon,'圖示',8);
+    if(!/^#[0-9a-fA-F]{6}$/.test(v.color))throw Error('顏色必須是六位十六進位色碼');
+    if(['bar','number'].includes(v.type)){
+      if(!Number.isFinite(v.min)||!Number.isFinite(v.max)||v.max<=v.min)throw Error('最大值必須大於最小值');
+      if(v.maxDelta!==null&&(!Number.isFinite(v.maxDelta)||v.maxDelta<0))throw Error('單次變動上限必須是非負數或留空');
+    }
+    if(!Array.isArray(v.options)||v.options.some(x=>typeof x!=='string'||x.length>200))throw Error('選項格式錯誤');
+    if(['select','multiselect'].includes(v.type)&&!v.options.length)throw Error('選單至少需要一個選項');
+    if(!Array.isArray(v.thresholds)||v.thresholds.some(t=>!Number.isFinite(t.at)||typeof t.label!=='string'||t.label.length>80))throw Error('分段標籤格式錯誤');
+    v.thresholds.sort((a,b)=>a.at-b.at);
+    if(v.default!==null)v.default=normalizeValue(v,v.default,false);
+    return v;
+  });
+  schema.version=VERSION;return schema;
+}
+function normalizeValue(f,v,clamp=false) {
+  if(v===null||v===undefined||v==='')return null;
+  if(f.type==='text'||f.type==='longtext') return text(v,f.label,f.type==='text'?1000:MAX_TEXT);
+  if(f.type==='number'||f.type==='bar'){
+    if(typeof v!=='number'||!Number.isFinite(v))throw Error(`${f.label} 必須是數字或 null`);
+    if(!clamp&&(v<f.min||v>f.max))throw Error(`${f.label} 必須介於 ${f.min}～${f.max}`);
+    return Math.min(f.max,Math.max(f.min,v));
+  }
+  if(f.type==='boolean'){if(typeof v!=='boolean')throw Error(`${f.label} 必須是 true、false 或 null`);return v;}
+  if(f.type==='select'){if(!f.options.includes(v))throw Error(`${f.label} 不在選項內`);return v;}
+  if(f.type==='multiselect'){if(!Array.isArray(v)||v.some(x=>!f.options.includes(x)))throw Error(`${f.label} 選項格式錯誤`);return [...new Set(v)];}
+  throw Error('未知欄位類型');
+}
+function validateState(input,schema) {
+  object(input,'角色資料');object(input.characters,'characters');object(input.scene,'scene');
+  const state=emptyState();
+  state.scene={time:text(input.scene.time??'','劇情時間',200),location:text(input.scene.location??'','場景位置',1000)};
+  if(Object.keys(input.characters).length>5000)throw Error('角色超過 5000 名');
+  for(const [id,c] of Object.entries(input.characters)){
+    if(!safeId(id))throw Error('角色 ID 不合法');object(c,'角色');object(c.values,'角色欄位');
+    const name=text(c.name,'姓名',100);if(!name.trim())throw Error('姓名不能空白');
+    const aliases=c.aliases??[];if(!Array.isArray(aliases)||aliases.length>30||aliases.some(a=>typeof a!=='string'||a.length>100))throw Error('別名格式錯誤');
+    const values={};
+    for(const f of schema.fields)if(Object.hasOwn(c.values,f.id))values[f.id]=normalizeValue(f,c.values[f.id],true);
+    // Unknown fields are rejected on backup import, not executed or silently discarded.
+    for(const key of Object.keys(c.values))if(!schema.fields.some(f=>f.id===key))throw Error(`角色欄位 ${key} 不在模板中`);
+    state.characters[id]={id,name,aliases:clone(aliases),present:!!c.present,values};
+  }
+  return state;
+}
+function applyUpdate(before,schema,payload,{manual=false,locks={},allowNew=true,historical=false}={}) {
+  object(payload,'更新');if(payload.version!==1)throw Error('更新 version 必須是 1');
+  if(!Array.isArray(payload.characters)||payload.characters.length>300)throw Error('characters 必須是陣列（單次最多 300 名）');
+  const next=clone(before),changes=[],warnings=[],seen=new Set();
+  const fmap=new Map(schema.fields.filter(f=>historical||!f.hidden).map(f=>[f.id,f]));
+  for(const update of payload.characters){
+    object(update,'角色更新');const id=update.id;
+    if(!safeId(id)||seen.has(id))throw Error('角色 ID 不合法或重複');seen.add(id);
+    let c=next.characters[id];const fresh=!c;
+    if(fresh){
+      if(!allowNew&&!manual)throw Error('已關閉模型新增角色');
+      const name=text(update.name,'新角色姓名',100).trim();if(!name)throw Error('新角色必須有姓名');
+      if(!manual&&Object.values(next.characters).some(x=>x.name===name))throw Error(`「${name}」已存在，請沿用原 ID；同名新角色需手動建立`);
+      c={id,name,aliases:[],present:false,values:{}};next.characters[id]=c;
+    }
+    if(!manual&&Object.keys(update.set??{}).length&&!String(update.reason??'').trim())throw Error('角色更新缺少 reason 變化依據');
+    if(update.name!==undefined){const n=text(update.name,'姓名',100).trim();if(!n)throw Error('姓名不能空白');if(manual||fresh)c.name=n;}
+    if(update.aliases!==undefined){if(!Array.isArray(update.aliases)||update.aliases.length>30)throw Error('別名格式錯誤');c.aliases=update.aliases.map(a=>text(a,'別名',100));}
+    object(update.set??{},'set');
+    for(const [key,raw] of Object.entries(update.set??{})){
+      const f=fmap.get(key);if(!f)throw Error(`未知／停用欄位 ${key}，請先在欄位設定新增`);
+      const old=valueOf(c,f);
+      if(!manual&&(locks[id]?.[key]!==undefined||f.policy==='manual'||(f.policy==='static'&&old!==null&&old!==''))){warnings.push(`${c.name} · ${f.label} 已固定，略過更新`);continue;}
+      let value=normalizeValue(f,raw,!manual||historical);
+      if(!manual&&typeof value==='number'&&value!==raw)warnings.push(`${c.name} · ${f.label} 已限制到範圍內`);
+      if(!manual&&typeof old==='number'&&typeof value==='number'&&f.maxDelta!==null&&Math.abs(value-old)>f.maxDelta){value=old+Math.sign(value-old)*f.maxDelta;warnings.push(`${c.name} · ${f.label} 已套用單次變動上限`);}
+      if(JSON.stringify(old)!==JSON.stringify(value))changes.push({id,name:c.name,field:key,label:f.label,old,value,reason:String(update.reason||'手動修改').slice(0,1000)});
+      c.values[key]=value;
+    }
+    if(manual&&update.present!==undefined)c.present=!!update.present;
+  }
+  if(payload.present!==undefined){
+    if(!Array.isArray(payload.present)||payload.present.some(id=>!safeId(id)||!next.characters[id]))throw Error('present 包含不存在的角色 ID');
+    const active=new Set(payload.present);for(const c of Object.values(next.characters))c.present=active.has(c.id);
+  }
+  if(payload.scene!==undefined){object(payload.scene,'場景');for(const key of ['time','location'])if(payload.scene[key]!==undefined)next.scene[key]=text(payload.scene[key],key,1000);}
+  return {state:next,changes,warnings};
+}
+function extractUpdate(message) {
+  const s=String(message??''), matches=[...s.matchAll(/<CSB_UPDATE>\s*([\s\S]*?)\s*<\/CSB_UPDATE>/g)];
+  if(matches.length>1)throw Error('每則回覆只能有一個 CSB_UPDATE 區塊');
+  if(!matches.length){if(s.includes('<CSB_UPDATE>'))throw Error('狀態區塊尚未閉合，未套用變更');return null;}
+  let data=matches[0][1].trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');
+  return parseJSON(data);
+}
+function stripUpdate(message) {return String(message??'').replace(/<CSB_UPDATE>[\s\S]*?<\/CSB_UPDATE>/g,'').trimEnd();}
+function hashText(s) {let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}
+function anchorFor(message) {return message?.extra?.csb_uid?`${message.extra.csb_uid}:${message.swipe_id??0}:${hashText(String(message.mes??''))}`:null;}
+function replay(db,messages,options={}) {
+  let state=clone(db.seed);const frames=[],errors=[],changes=[],warnings=[];
+  // Branch-local manual edits only replay on the same message, swipe and text.
+  const edits=new Map();for(const event of db.manual){if(!edits.has(event.anchor))edits.set(event.anchor,[]);edits.get(event.anchor).push(event);}
+  const apply=(payload,index,manual=false,record=null)=>{
+    try{const r=applyUpdate(state,db.schema,payload,{manual:manual||!!record,historical:manual||!!record,locks:record?{}:(options.capture?db.locks:{}),allowNew:options.capture?(options.allowNew??true):true});
+      if(options.capture&&!manual&&!record){
+        const key=anchorFor(messages[index]);
+        if(key){db.processed??={};db.processed[key]={payload:{version:1,...(payload.scene?{scene:clone(payload.scene)}:{}),...(payload.present?{present:clone(payload.present)}:{}),characters:payload.characters.map(u=>({id:u.id,...(!state.characters[u.id]?{name:r.state.characters[u.id].name}:{}),...(u.aliases?{aliases:clone(u.aliases)}:{}),set:Object.fromEntries(r.changes.filter(c=>c.id===u.id).map(c=>[c.field,c.value])),reason:u.reason??'角色更新'}))},warnings:r.warnings};}
+      }
+      state=r.state;
+      changes.push(...r.changes.map(c=>({...c,index,manual})));warnings.push(...r.warnings.map(message=>({index,message})));
+    }catch(error){errors.push({index,message:error.message});}
+  };
+  for(const event of edits.get('start')??[])apply(event.payload,-1,true);
+  for(let index=0;index<messages.length;index++){
+    const message=messages[index];
+    const skipped=(db.ignoredIds??[]).includes(message.extra?.csb_uid);
+    if(!skipped&&!message.is_user&&!message.is_system){try{const record=db.processed?.[anchorFor(message)];if(record){apply(record.payload,index,false,record);warnings.push(...record.warnings.map(message=>({index,message})));}else{const payload=extractUpdate(message.mes);if(payload)apply(payload,index);}}catch(error){errors.push({index,message:error.message});}}
+    for(const event of edits.get(anchorFor(message))??[])apply(event.payload,index,true);
+    // Store only rendered assistant frames; state objects are immutable across applyUpdate.
+    frames.push(skipped?null:state);
+  }
+  const applyLocks=s=>{const out=clone(s);for(const [id,locks]of Object.entries(db.locks)){if(!out.characters[id])continue;for(const [key,value]of Object.entries(locks))out.characters[id].values[key]=clone(value);}return out;};
+  state=applyLocks(state);
+  return {state,frames,errors,changes,warnings,inactiveEdits:db.manual.filter(e=>e.anchor!=='start'&&!messages.some(m=>anchorFor(m)===e.anchor)).length};
+}
+function parseCSB21(source,schema=defaultSchema(),known=emptyState()) {
+  const resultSchema=clone(schema),characters=[],present=[],seen=new Set();
+  const blocks=[...String(source).matchAll(/\[CSB21_ROLE\]([\s\S]*?)\[\/CSB21_ROLE\]/g)];
+  if(!blocks.length)throw Error('找不到完整的 [CSB21_ROLE] 區塊');
+  for(const b of blocks){
+    const values={};for(const line of b[1].split(/\r?\n/)){const m=line.match(/^([a-z_]+)\s*:\s*(.*)$/);if(m)values[m[1]]=m[2].trim();}
+    if(!values.name||values.name==='角色姓名')continue;
+    let id=Object.values(known.characters).find(c=>c.name===values.name)?.id;
+    if(!id)id=`c_legacy_${hashText(values.name)}`;
+    const set={};
+    for(const [k,v]of Object.entries(values)){
+      if(['name','body','hygiene'].includes(k))continue;
+      const f=resultSchema.fields.find(f=>f.id===k&&!f.hidden);if(!f)continue;
+      set[k]=['未知','未交代',''].includes(v)?null:['bar','number'].includes(f.type)?Number(v):v;
+      if(typeof set[k]==='number'&&!Number.isFinite(set[k]))set[k]=null;
+    }
+    for(const match of b[1].matchAll(/\[CSB21_PART\|([^|\]\r\n]+)\|([^\]\r\n]*)\]/g)){
+      const name=match[1].trim();let f=resultSchema.fields.find(f=>f.group==='body'&&f.label===name);
+      if(!resultSchema.groups.some(g=>g.id==='body'))resultSchema.groups.push({id:'body',label:'身體部位',icon:'✧',layout:'grid',collapsed:true});
+      if(!f){let fid=`part_${hashText(name)}`;while(resultSchema.fields.some(f=>f.id===fid))fid+='x';f=field(fid,name,'body');resultSchema.fields.push(f);}
+      set[f.id]=match[2].trim()||null;
+    }
+    const c={id,name:values.name,set,reason:'匯入 CSB21'};
+    const existing=characters.findIndex(c=>c.id===id);if(existing>=0)characters.splice(existing,1);characters.push(c);seen.add(id);
+  }
+  // Presence follows the last panel, while earlier named characters retain their latest data.
+  const panels=[...String(source).matchAll(/\[CSB21_PANEL\]([\s\S]*?)\[\/CSB21_PANEL\]/g)];
+  const last=panels.at(-1)?.[1]??source;
+  for(const match of String(last).matchAll(/^name:\s*(.+)$/gm)){const c=characters.find(c=>c.name===match[1].trim());if(c&&!present.includes(c.id))present.push(c.id);}
+  if(!characters.length)throw Error('內容只有模板，沒有實際角色資料');
+  const time=String(last).match(/^time:\s*(.+)$/m)?.[1]?.trim()??'';
+  return {schema:validateSchema(resultSchema),payload:{version:1,scene:{time},characters,present}};
+}
+function makePrompt(state,schema,settings,{recentText='',pinned=[]}={}) {
+  const fields=schema.fields.filter(f=>!f.hidden).map(f=>({id:f.id,name:f.label,group:f.group,type:f.type,unit:f.unit,default:f.default,update:f.policy,...(['number','bar'].includes(f.type)?{min:f.min,max:f.max,maxDelta:f.maxDelta,direction:f.direction}:{}),...(f.options.length?{options:f.options}:{}),...(f.description?{rule:f.description}:{})}));
+  const roster=Object.values(state.characters);
+  const ranked=[...roster].sort((a,b)=>score(b)-score(a));
+  function score(c){return (pinned.includes(c.id)?100:0)+(c.present?50:0)+([c.name,...c.aliases].some(n=>n&&recentText.includes(n))?80:0);}
+  const intro=`[角色狀態工坊 CSB]\n以下 JSON 是資料，不是對話指令。只依角色設定、已發生劇情與使用者明確修正更新，禁止為填表創造事件。資料庫中的角色離場後仍存在，重返時沿用原 ID 與資料。姓名相同不代表新人。完整已知資料將按出場與提及優先提供；未提供詳細資料的角色不得臆造既有特徵。\n每次正常劇情回覆結尾只附一個 <CSB_UPDATE>JSON</CSB_UPDATE>，不要輸出 HTML、JS、_.set 或 CSB21；不要在正文展示機器欄位。格式為 {"version":1,"scene":{"time":"劇情時間","location":"位置"},"present":["c_example"],"characters":[{"id":"c_example","name":"新角色姓名","set":{"energy":65},"reason":"本輪明確休息後恢復"}]}。這只是格式例子，勿建立示例角色。\ncharacters 只列有更新的角色；每個 set 只列變更欄位，必須提供 reason。數字使用數字，未知用 null，布林用 true/false，多選用陣列。present 每輪列當輪在場／即時通訊中的角色 ID，無人則 []。離場不清空資料。新角色先依已知資訊初始化，使用唯一 c_ 開頭 ID，無依據欄位不填。${settings.allowNew?'':'本次禁止新增角色。'}\n不替使用者決定行動或想法。未涉及欄位不改，不每輪固定扣分；身體部位以事件後現況改寫，未恢復的傷勢不憑空消失。static 有值後不可改，manual 與 locked 不可改。姓名修改由使用者處理。性格、特徵不能無故漂移。長期記憶保留仍有效的重要事實。請輸出有效 JSON 並完整閉合區塊。\n`;
+  const directory=roster.map(c=>({id:c.id,name:c.name,aliases:c.aliases,present:c.present}));
+  const basis=intro+JSON.stringify({fields,directory,scene:state.scene});
+  const selected=[];let used=basis.length;const budget=Math.max(6000,Number(settings.promptBudget)||42000);
+  for(const c of ranked){const cost=JSON.stringify(c).length;if(used+cost<=budget){selected.push(c);used+=cost;}}
+  return {text:basis+'\n角色詳細資料：'+JSON.stringify(selected),selected:selected.length,total:roster.length,omitted:roster.length-selected.length,characters:used,overBudget:basis.length>budget};
+}
+function makeBackup(db,state) {return {format:'CSB_CHARACTER_STATE',version:1,schema:clone(db.schema),state:clone(state),locks:clone(db.locks),pinned:clone(db.pinned),exportedAt:new Date().toISOString()};}
+function validateBackup(input) {
+  object(input,'備份');if(input.format!=='CSB_CHARACTER_STATE'||input.version!==1)throw Error('不是支援的 CSB 角色備份');
+  const schema=validateSchema(input.schema),state=validateState(input.state,schema),locks={};
+  object(input.locks??{},'鎖定資料');
+  for(const [id,items]of Object.entries(input.locks??{})){
+    if(!state.characters[id])continue;locks[id]={};object(items,'欄位鎖');
+    for(const [key,value]of Object.entries(items)){const f=schema.fields.find(f=>f.id===key);if(f)locks[id][key]=normalizeValue(f,value,false);}
+  }
+  return {schema,state,locks,pinned:(Array.isArray(input.pinned)?input.pinned:[]).filter(id=>state.characters[id])};
+}
+
+const KEY='csb_character_state_v1';
+
+class StateController {
+  constructor(adapter){this.adapter=adapter;this.onChange=()=>{};this.mvuMessage='尚未同步';this.pendingChats=new WeakSet();}
+  context(){const c=this.adapter.context();if(!c?.chatMetadata||!Array.isArray(c.chat))throw Error('請先開啟一個聊天');return c;}
+  settings(){const c=this.context();if(!c.extensionSettings[KEY])c.extensionSettings[KEY]=defaultSettings();return c.extensionSettings[KEY];}
+  db(){const c=this.context();if(!c.chatMetadata[KEY])c.chatMetadata[KEY]=newDatabase(this.settings().template);return c.chatMetadata[KEY];}
+  getSnapshot(){const c=this.context(),db=this.db(),settings=this.settings();if(this.ensureIds(c))this.pendingChats.add(c.chatMetadata);const result=replay(db,c.chat,{capture:true,allowNew:settings.allowNew});return {db,settings,result,state:result.state};}
+  assertContext(c){if(this.context().chatMetadata!==c.chatMetadata)throw Error('聊天已切換，取消對原聊天的操作');}
+  async flush(c=this.context(),messagesChanged=false){this.assertContext(c);if(messagesChanged||this.pendingChats.has(c.chatMetadata)){await c.saveChat();this.pendingChats.delete(c.chatMetadata);}this.assertContext(c);await c.saveMetadata();this.assertContext(c);}
+  async persist(c=this.context(),messagesChanged=false){await this.flush(c,messagesChanged);this.onChange();}
+  ensureIds(c){let changed=false;for(const m of c.chat){m.extra??={};if(!m.extra.csb_uid){m.extra.csb_uid=uid('m');changed=true;}}return changed;}
+  addManual(payload){const c=this.context(),db=this.db();const changed=this.ensureIds(c);const anchor=c.chat.length?anchorFor(c.chat.at(-1)):'start';db.manual.push({id:uid('e'),anchor,payload:clone(payload),createdAt:Date.now()});return changed;}
+  async saveCharacter(update,locks,pinned,isNew){
+    const c=this.context(),{db,state}=this.getSnapshot();
+    // Validate the entire transaction before touching persisted data.
+    const verified=applyUpdate(state,db.schema,{version:1,characters:[update]},{manual:true});
+    if(isNew&&Object.hasOwn(state.characters,update.id))throw Error('角色 ID 已存在');
+    for(const [key,val]of Object.entries(locks))if(!db.schema.fields.some(f=>f.id===key))throw Error('鎖定欄位不存在');
+    if(isNew){db.seed.characters[update.id]=clone(verified.state.characters[update.id]);db.seed.characters[update.id].present=false;}
+    const changed=this.addManual({version:1,characters:[update]});db.locks[update.id]=clone(locks);
+    db.pinned=db.pinned.filter(id=>id!==update.id);if(pinned)db.pinned.push(update.id);
+    await this.persist(c,changed);
+  }
+  async saveSchema(schema){const c=this.context(),next=validateSchema(schema),db=this.db();
+    // Configuration edits do not rewrite stored snapshots. Validate conversions against live data.
+    const old=this.getSnapshot().state;
+    for(const f of next.fields){const prev=db.schema.fields.find(p=>p.id===f.id);if(prev&&prev.type!==f.type)throw Error('不能直接變更既有欄位類型，請新增欄位');}
+    for(const f of db.schema.fields)if(!next.fields.some(n=>n.id===f.id))throw Error('請使用停用欄位保留資料，不能直接刪除欄位 ID');
+    validateState(old,next);db.schema=next;await this.persist(c);
+  }
+  async saveTemplate(schema){const c=this.context();this.settings().template=validateSchema(schema);await c.saveSettingsDebounced();this.onChange();}
+  async saveSettings(settings){const c=this.context();this.getSnapshot();if(!Number.isFinite(settings.promptBudget)||settings.promptBudget<6000||settings.promptBudget>500000)throw Error('提示預算需介於 6000～500000 字元');c.extensionSettings[KEY]=clone(settings);await c.saveSettingsDebounced();await this.persist(c);}
+  async importTemplate(schema){const next=validateSchema(schema),old=this.db().schema,merged=clone(old);
+    for(const g of next.groups){const i=merged.groups.findIndex(x=>x.id===g.id);if(i<0)merged.groups.push(g);else merged.groups[i]=g;}
+    for(const f of next.fields){const i=merged.fields.findIndex(x=>x.id===f.id);if(i<0)merged.fields.push(f);else merged.fields[i]=f;}
+    await this.saveSchema(merged);
+  }
+  exportBackup(){const {db,state}=this.getSnapshot();return makeBackup(db,state);}
+  validateImport(data){return validateBackup(data);}
+  async importBackup(data){const valid=validateBackup(data),c=this.context();const changed=this.ensureIds(c),db=newDatabase(valid.schema);
+    db.seed=valid.state;db.locks=valid.locks;db.pinned=valid.pinned;db.ignoredIds=c.chat.map(m=>m.extra.csb_uid);
+    c.chatMetadata[KEY]=db;await this.persist(c,changed);
+  }
+  async importLegacy(source){const c=this.context(),s=this.getSnapshot(),converted=parseCSB21(source,s.db.schema,s.state);
+    // Validate before schema or journal mutation, preserving existing data on malformed imports.
+    applyUpdate(s.state,converted.schema,converted.payload,{manual:true});s.db.schema=converted.schema;
+    const changed=this.addManual(converted.payload);await this.persist(c,changed);
+  }
+  legacyFromChat(){return this.context().chat.filter(m=>!m.is_user).map(m=>m.mes).join('\n');}
+  promptInfo(){const {db,state,settings}=this.getSnapshot();const copy=clone(state);for(const c of Object.values(copy.characters))c.locked=Object.keys(db.locks[c.id]??{});
+    return makePrompt(copy,db.schema,settings,{recentText:this.context().chat.slice(-4).map(m=>m.mes).join('\n'),pinned:db.pinned});
+  }
+  async rebuild(){await this.persist();}
+  mvu(){const m=this.adapter.getMvu?.();return m&&typeof m.getMvuData==='function'&&typeof m.replaceMvuData==='function'?m:null;}
+  mvuStatus(){return this.mvu()?`已偵測到 MVU · ${this.mvuMessage}`:'未偵測到 MVU；內建變量功能可獨立使用。';}
+  async pushMvu(){
+    const m=this.mvu();if(!m)throw Error('未偵測到已啟動的 MVU');const c=this.context();if(!c.chat.length)throw Error('至少需要一則訊息才能同步到 MVU');
+    const index=c.chat.length-1,swipe=c.chat[index].swipe_id??0,mes=c.chat[index].mes;
+    const opts={type:'message',message_id:index};const previous=await m.getMvuData(opts);this.assertContext(c);
+    if((c.chat[index]?.swipe_id??0)!==swipe||c.chat[index]?.mes!==mes)throw Error('回覆已變更，取消 MVU 同步');
+    if(!previous||typeof previous!=='object'||!previous.stat_data||typeof previous.stat_data!=='object')throw Error('MVU 尚未初始化此訊息的 stat_data');
+    const data=clone(previous);data.stat_data.csb=this.exportBackup();
+    await m.replaceMvuData(data,opts);this.assertContext(c);this.mvuMessage='已同步角色資料';
+  }
+  async pullMvu(){
+    const m=this.mvu();if(!m)throw Error('未偵測到已啟動的 MVU');const c=this.context();if(!c.chat.length)throw Error('沒有可讀取的 MVU 訊息');
+    const data=await m.getMvuData({type:'message',message_id:c.chat.length-1});this.assertContext(c);
+    const valid=validateBackup(data?.stat_data?.csb);
+    // Pull as a manual, branch-local update; no unrelated MVU namespace is consumed.
+    const merged=clone(this.db().schema);
+    for(const g of valid.schema.groups)if(!merged.groups.some(x=>x.id===g.id))merged.groups.push(g);
+    for(const f of valid.schema.fields){const old=merged.fields.find(x=>x.id===f.id);if(old&&old.type!==f.type)throw Error('MVU 模板與本地欄位類型衝突');if(!old)merged.fields.push(f);}
+    const payload={version:1,scene:valid.state.scene,present:Object.values(valid.state.characters).filter(c=>c.present).map(c=>c.id),characters:Object.values(valid.state.characters).map(c=>({id:c.id,name:c.name,aliases:c.aliases,set:Object.fromEntries(Object.entries(c.values).filter(([key])=>!merged.fields.find(f=>f.id===key)?.hidden)),reason:'從 MVU 讀回'}))};
+    applyUpdate(this.getSnapshot().state,merged,payload,{manual:true});this.db().schema=validateSchema(merged);const changed=this.addManual(payload);await this.persist(c,changed);this.mvuMessage='已讀回角色資料（本地鎖定優先）';
+  }
+}
+
+
+function el(tag,attrs={},...children){
+  const node=document.createElement(tag);
+  for(const [k,v]of Object.entries(attrs)){
+    if(v===null||v===undefined||v===false)continue;
+    if(k==='class')node.className=v;
+    else if(k==='text')node.textContent=v;
+    else if(k.startsWith('on'))node.addEventListener(k.slice(2).toLowerCase(),v);
+    else if(k==='checked'||k==='disabled'||k==='open'||k==='multiple')node[k]=!!v;
+    else if(k==='value')node.value=v;
+    else node.setAttribute(k,v===true?'':String(v));
+  }
+  for(const child of children.flat(Infinity)){if(child!==null&&child!==undefined&&child!==false)node.append(child instanceof Node?child:document.createTextNode(String(child)));}
+  return node;
+}
+const btn=(label,fn,cls='')=>el('button',{type:'button',class:`csb-btn ${cls}`,onclick:fn},label);
+const note=t=>el('p',{class:'csb-muted'},t);
+const empty=t=>el('div',{class:'csb-empty'},t);
+const format=(v,f)=>v===null||v===undefined||v===''?'未設定':Array.isArray(v)?v.join('、'):typeof v==='boolean'?(v?'是':'否'):`${v}${f.unit?' '+f.unit:''}`;
+function barView(f,v){
+  const known=typeof v==='number'&&Number.isFinite(v),pct=known?Math.max(0,Math.min(100,(v-f.min)/(f.max-f.min)*100)):0;
+  let label='未知';if(known)label=f.display==='percent'?`${Math.round(pct)}%`:f.display==='none'?'':`${v}${f.unit?` ${f.unit}`:''} / ${f.max}`;
+  const stage=known?[...(f.thresholds||[])].reverse().find(t=>v>=t.at)?.label:null;
+  const fill=el('div',{class:'csb-bar-fill'});fill.style.width=`${pct}%`;fill.style.background=f.color;
+  const bar=el('div',{class:`csb-bar-track ${known?'':'csb-bar-unknown'}`,role:'progressbar','aria-label':f.label,'aria-valuemin':f.min,'aria-valuemax':f.max,...(known?{'aria-valuenow':v}:{'aria-valuetext':'未知'})},fill);
+  return el('div',{class:'csb-gauge'},el('div',{class:'csb-gauge-top'},el('span',{},f.icon?`${f.icon} `:'',f.label),el('strong',{},label)),bar,stage?el('small',{class:'csb-stage'},stage):null);
+}
+function characterCard(c,schema,{expanded=false,onEdit=null,pinned=false}={}){
+  const overview=[c.values.age?`${c.values.age} 歲`:null,c.values.identity,c.values.relation].filter(Boolean).join(' · ');
+  const card=el('details',{class:'csb-character',open:expanded,'data-char':c.id});
+  const summary=el('summary',{class:'csb-character-head'},el('span',{class:'csb-avatar'},Array.from(c.name)[0]||'◇'),
+    el('span',{class:'csb-person'},el('strong',{},c.name),el('small',{},overview||'人物資料待補充')),
+    el('span',{class:`csb-presence ${c.present?'is-present':''}`},c.present?'在場':'離場'),el('span',{class:'csb-chevron'},'⌄'));
+  card.append(summary);
+  const body=el('div',{class:'csb-character-body'});
+  if(onEdit)body.append(el('div',{class:'csb-card-actions'},pinned?el('span',{class:'csb-chip'},'已優先載入'):null,btn('編輯角色',()=>onEdit(c.id),'csb-small')));
+  for(const group of schema.groups){
+    const fields=schema.fields.filter(f=>f.group===group.id&&!f.hidden&&(!f.hideEmpty||![null,undefined,''].includes(valueOf(c,f))));
+    if(!fields.length)continue;
+    const content=el('div',{class:`csb-field-grid ${group.layout==='list'?'csb-list':''}`});
+    for(const f of fields){
+      const v=valueOf(c,f);
+      if(f.type==='bar')content.append(barView(f,v));
+      else content.append(el('div',{class:`csb-value-card ${f.type==='longtext'?'csb-wide':''}`},el('span',{class:'csb-value-label'},f.icon?`${f.icon} `:'',f.label),el('span',{class:`csb-value ${v===null||v===''?'is-empty':''}`},format(v,f))));
+    }
+    body.append(el('details',{class:'csb-group',open:!group.collapsed},el('summary',{},el('span',{class:'csb-group-icon'},group.icon),group.label,el('span',{class:'csb-group-count'},fields.length)),content));
+  }
+  card.append(body);return card;
+}
+function statusPanel(state,schema,{showAbsent=false,expanded=false,onManage=null,onEdit=null,pinned=[]}={}){
+  const all=Object.values(state.characters),shown=all.filter(c=>showAbsent||c.present);
+  const panel=el('details',{class:'csb csb-panel',open:expanded});
+  panel.append(el('summary',{class:'csb-panel-head'},el('span',{class:'csb-emblem'},'◈'),el('span',{},el('strong',{},'角色狀態'),el('small',{},state.scene.location||'CHARACTER ARCHIVE')),el('span',{class:'csb-count'},`${shown.length} 人`),el('span',{class:'csb-chevron'},'⌄')));
+  const content=el('div',{class:'csb-panel-body'});
+  content.append(el('div',{class:'csb-scene-line'},el('span',{},state.scene.time||'劇情時間未設定'),onManage?btn('管理',onManage,'csb-small'):null));
+  if(!shown.length)content.append(empty(all.length?'目前沒有在場角色；完整資料保留於角色庫。':'尚未建立角色。可手動新增、匯入 CSB21，或由下一則劇情建立。'));
+  shown.forEach(c=>content.append(characterCard(c,schema,{onEdit,pinned:pinned.includes(c.id)})));
+  panel.append(content);return panel;
+}
+function control(label,input,hint='') {input.setAttribute('aria-label',label);return el('label',{class:'csb-control'},el('span',{},label),input,hint?el('small',{class:'csb-muted'},hint):null);}
+function select(options,value){const s=el('select',{});for(const [v,label]of options)s.append(el('option',{value:v},label));s.value=value;return s;}
+function checkbox(checked){return el('input',{type:'checkbox',checked});}
+function input(type,value,attrs={}){return el('input',{type,value:value??'',...attrs});}
+function modal(title,body,onClose=()=>{}){
+  const d=el('dialog',{class:'csb csb-dialog','aria-label':title});
+  const close=btn('關閉',()=>d.close(),'csb-close');
+  d.append(el('header',{class:'csb-dialog-head'},el('div',{},el('small',{class:'csb-eyebrow'},'CSB / CHARACTER STATE'),el('h2',{},title)),close),body);
+  d.addEventListener('close',()=>{d.remove();onClose();},{once:true});document.body.append(d);d.showModal();return d;
+}
+async function readFile(accept='.json,.txt'){
+  return new Promise((resolve,reject)=>{
+    const f=input('file','',{accept});f.addEventListener('change',async()=>{try{const file=f.files?.[0];if(!file)return resolve(null);if(file.size>10_000_000)throw Error('檔案超過 10 MB');resolve(await file.text());}catch(e){reject(e);}finally{f.remove();}},{once:true});
+    f.addEventListener('cancel',()=>{f.remove();resolve(null);},{once:true});f.style.display='none';document.body.append(f);f.click();
+  });
+}
+function downloadJson(name,data){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=el('a',{href:url,download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+
+// Host contract: all mutations stay in host; the same UI is used by ST and the offline preview.
+function openManager(host,initialTab='characters'){
+  let tab=initialTab,search='',filter='all',legacyDraft='';const body=el('div',{class:'csb-manager-body'}),tabs=el('nav',{class:'csb-tabs','aria-label':'角色工坊功能'}),area=el('div',{class:'csb-tab-body'}),feedback=el('div',{class:'csb-feedback',role:'status','aria-live':'polite'});
+  let dialog;
+  const status=(message,error=false)=>{feedback.textContent=message;feedback.classList.toggle('is-error',error);};
+  const run=async(fn,success='已儲存')=>{try{await fn();status(success);render();}catch(e){status(e.message,true);}};
+  const tabspec=[['characters','角色庫'],['schema','欄位模板'],['data','匯入／備份'],['settings','設定／紀錄']];
+  function render(){
+    tabs.replaceChildren(...tabspec.map(([id,label])=>btn(label,()=>{tab=id;render();},tab===id?'is-active':'')));
+    area.replaceChildren();const snap=host.getSnapshot();
+    if(tab==='characters')renderCharacters(snap);
+    if(tab==='schema')renderSchema(snap);
+    if(tab==='data')renderData(snap);
+    if(tab==='settings')renderSettings(snap);
+  }
+  function renderCharacters(s){
+    const chars=Object.values(s.state.characters),q=input('search',search,{placeholder:'搜尋姓名、身分、別名','aria-label':'搜尋角色'}),which=select([['all','全部角色'],['present','只看在場'],['absent','只看離場']],filter),grid=el('div',{class:'csb-roster'});
+    const refresh=()=>{const found=chars.filter(c=>(filter==='all'||(filter==='present')===c.present)&&[c.name,...c.aliases,String(c.values.identity??'')].some(x=>x.toLowerCase().includes(search.toLowerCase())));
+      grid.replaceChildren(...found.map(c=>characterCard(c,s.db.schema,{onEdit:id=>editCharacter(id),pinned:s.db.pinned.includes(c.id)})));if(!found.length)grid.append(empty('沒有符合條件的角色。'));
+    };
+    q.addEventListener('input',()=>{search=q.value;refresh();});which.addEventListener('change',()=>{filter=which.value;refresh();});
+    area.append(el('div',{class:'csb-section-heading'},el('div',{},el('h3',{},'每個角色，都有自己的故事。'),note(`${chars.filter(c=>c.present).length} 人在場 · ${chars.length} 份角色檔案`)),btn('＋ 新增角色',()=>editCharacter(null),'csb-primary')),
+      el('div',{class:'csb-toolbar'},q,which),grid);refresh();
+  }
+  function editCharacter(id){
+    const s=host.getSnapshot(),c=id?s.state.characters[id]:{id:uid('c'),name:'',aliases:[],present:true,values:{}},form=el('form',{class:'csb-form'}),error=el('p',{class:'csb-error',role:'alert'});
+    const name=input('text',c.name,{required:true,maxlength:100}),aliases=input('text',c.aliases.join('、')),present=checkbox(c.present),pin=checkbox(s.db.pinned.includes(c.id));
+    form.append(note('修改隨目前回覆保存；切換回覆時可能不同。勾選「鎖定」可在此聊天中固定欄位。'),el('div',{class:'csb-form-grid'},control('姓名',name),control('別名（以頓號分隔）',aliases),control('目前在場',present),control('優先載入模型',pin,'角色未出場時，也優先提供詳細資料。')));
+    const editors=[];
+    for(const g of s.db.schema.groups){
+      const fields=s.db.schema.fields.filter(f=>f.group===g.id&&!f.hidden);if(!fields.length)continue;
+      const rows=el('div',{class:'csb-form-grid'});
+      for(const f of fields){const v=valueOf(c,f);let widget;
+        if(f.type==='longtext')widget=el('textarea',{rows:3,value:v??'',maxlength:12000});
+        else if(f.type==='boolean')widget=select([['','未設定'],['true','是'],['false','否']],v===null?'':String(v));
+        else if(f.type==='select')widget=select([['','未設定'],...f.options.map(v=>[v,v])],v??'');
+        else if(f.type==='multiselect'){widget=el('select',{multiple:true,size:Math.min(5,f.options.length)});for(const o of f.options){const op=el('option',{value:o},o);op.selected=Array.isArray(v)&&v.includes(o);widget.append(op);}}
+        else widget=input(['number','bar'].includes(f.type)?'number':'text',v,{...(['number','bar'].includes(f.type)?{min:f.min,max:f.max,step:'any'}:{maxlength:1000})});
+        const lock=checkbox(Object.hasOwn(s.db.locks[c.id]??{},f.id));
+        rows.append(el('div',{class:`csb-editor-row ${f.type==='longtext'?'csb-wide':''}`},control(f.label+(f.unit?` · ${f.unit}`:''),widget),el('label',{class:'csb-lock'},lock,'鎖定')));
+        editors.push({f,widget,lock,old:v});
+      }
+      form.append(el('details',{class:'csb-edit-group',open:!g.collapsed},el('summary',{},g.icon,' ',g.label),rows));
+    }
+    const submit=el('button',{type:'submit',class:'csb-btn csb-primary'},'儲存角色');form.append(error,el('div',{class:'csb-form-footer'},submit));
+    const d=modal(id?'編輯角色':'新增角色',form);
+    form.addEventListener('submit',async event=>{event.preventDefault();submit.disabled=true;try{
+      const set={},locks={};
+      for(const {f,widget,lock,old}of editors){let value=widget.value;
+        if(f.type==='multiselect')value=[...widget.selectedOptions].map(o=>o.value);
+        else if(value==='')value=null;
+        else if(['number','bar'].includes(f.type))value=Number(value);
+        else if(f.type==='boolean')value=value==='true';
+        value=normalizeValue(f,value,false);if(!id||JSON.stringify(value)!==JSON.stringify(old))set[f.id]=value;
+        if(lock.checked)locks[f.id]=value;
+      }
+      await host.saveCharacter({id:c.id,name:name.value.trim(),aliases:aliases.value.split(/[、,，]/).map(s=>s.trim()).filter(Boolean),set,present:present.checked,reason:'使用者手動設定'},locks,pin.checked,!id);
+      d.close();status('角色資料已儲存');render();
+    }catch(e){error.textContent=e.message;}finally{submit.disabled=false;}});
+  }
+  function renderSchema(s){
+    const schema=s.db.schema;
+    area.append(el('div',{class:'csb-section-heading'},el('div',{},el('h3',{},'一份模板，套用所有角色。'),note('改名保留資料；新增欄位依預設值顯示。停用欄位會保留已存內容。')),btn('＋ 新增分區',()=>editGroup(null),'csb-primary')));
+    area.append(el('div',{class:'csb-toolbar'},btn('設為新聊天預設',()=>run(()=>host.saveTemplate(schema),'已設為新聊天預設；現有其他聊天不受影響')),btn('匯出模板',()=>downloadJson('CSB_Template.json',{format:'CSB_TEMPLATE',version:1,schema}))));
+    for(const g of schema.groups){
+      const list=el('div',{class:'csb-schema-list'}),head=el('div',{class:'csb-schema-head'},el('h4',{},g.icon,' ',g.label),el('div',{class:'csb-row-actions'},btn('新增欄位',()=>editField(null,g.id),'csb-small'),btn('編輯',()=>editGroup(g.id),'csb-small')));
+      for(const f of schema.fields.filter(f=>f.group===g.id)){
+        const move=direction=>run(async()=>{const next=clone(schema),peers=next.fields.filter(x=>x.group===g.id),p=peers.findIndex(x=>x.id===f.id),other=peers[p+direction];if(!other)return;const a=next.fields.findIndex(x=>x.id===f.id),b=next.fields.findIndex(x=>x.id===other.id);[next.fields[a],next.fields[b]]=[next.fields[b],next.fields[a]];await host.saveSchema(next);});
+        list.append(el('div',{class:`csb-schema-row ${f.hidden?'is-disabled':''}`},el('span',{class:'csb-field-type'},f.type==='bar'?'▰':'◇'),el('div',{class:'csb-schema-label'},el('strong',{},f.label),el('small',{},`${TYPES[f.type]} · ${POLICIES[f.policy]}${f.hidden?' · 已停用':''}`)),el('div',{class:'csb-row-actions'},btn('↑',()=>move(-1),'csb-icon-btn'),btn('↓',()=>move(1),'csb-icon-btn'),btn('編輯',()=>editField(f.id,g.id),'csb-small'))));
+      }
+      area.append(el('section',{class:'csb-schema-group'},head,list));
+    }
+  }
+  function editGroup(id){
+    const schema=clone(host.getSnapshot().db.schema),g=id?schema.groups.find(x=>x.id===id):{id:uid('g'),label:'',icon:'◇',layout:'grid',collapsed:false};
+    const name=input('text',g.label,{required:true,maxlength:80}),icon=input('text',g.icon,{maxlength:8}),layout=select([['grid','雙欄小卡'],['list','單欄列表']],g.layout),fold=checkbox(g.collapsed),form=el('form',{class:'csb-form'}),error=el('p',{class:'csb-error'});
+    const move=direction=>{const i=schema.groups.findIndex(x=>x.id===id);if(i+direction<0||i+direction>=schema.groups.length)return;[schema.groups[i],schema.groups[i+direction]]=[schema.groups[i+direction],schema.groups[i]];status('儲存後套用排序');};
+    form.append(control('分區名稱',name),control('圖示',icon),control('版式',layout),control('預設收合',fold),id?el('div',{class:'csb-toolbar'},btn('分區上移',()=>move(-1)),btn('分區下移',()=>move(1)),btn('刪除空分區',()=>run(async()=>{if(schema.fields.some(f=>f.group===id))throw Error('請先將此分區的欄位移至其他分區');if(schema.groups.length===1)throw Error('至少保留一個分區');schema.groups=schema.groups.filter(x=>x.id!==id);await host.saveSchema(schema);d.close();}))):null,error,el('button',{type:'submit',class:'csb-btn csb-primary'},'儲存分區'));
+    const d=modal('分區設定',form);form.addEventListener('submit',async e=>{e.preventDefault();try{Object.assign(g,{label:name.value.trim(),icon:icon.value,layout:layout.value,collapsed:fold.checked});if(!id)schema.groups.push(g);await host.saveSchema(validateSchema(schema));d.close();render();status('分區已儲存');}catch(e){error.textContent=e.message;}});
+  }
+  function editField(id,group){
+    const s=host.getSnapshot(),schema=clone(s.db.schema),f=id?schema.fields.find(x=>x.id===id):field(uid('f'),'新欄位',group);
+    const name=input('text',f.label,{required:true,maxlength:80}),kind=select(Object.entries(TYPES),f.type),section=select(schema.groups.map(g=>[g.id,g.label]),f.group),policy=select(Object.entries(POLICIES),f.policy),unit=input('text',f.unit,{maxlength:30}),icon=input('text',f.icon,{maxlength:8}),color=input('color',f.color),min=input('number',f.min,{step:'any'}),max=input('number',f.max,{step:'any'}),delta=input('number',f.maxDelta,{min:0,step:'any'}),display=select([['value','數值／上限'],['percent','百分比'],['none','只顯示條狀']],f.display),direction=select([['neutral','中性變化'],['positive','增加代表改善'],['negative','增加代表惡化']],f.direction),opts=el('textarea',{rows:3,value:f.options.join('\n')}),stages=el('textarea',{rows:3,value:f.thresholds.map(t=>`${t.at}: ${t.label}`).join('\n')}),description=el('textarea',{rows:3,value:f.description,maxlength:2000}),def=input('text',f.default===null?'':Array.isArray(f.default)?JSON.stringify(f.default):String(f.default)),hideEmpty=checkbox(f.hideEmpty),hidden=checkbox(f.hidden),form=el('form',{class:'csb-form'}),error=el('p',{class:'csb-error',role:'alert'});
+    // An existing type remains fixed to preserve all prior messages; create another field for a type migration.
+    if(id)kind.disabled=true;
+    const numeric=el('div',{class:'csb-form-grid'},control('最小值',min),control('最大值',max),control('單次變動上限',delta,'留空表示不限；只限制模型更新。'),control('數值顯示',display),control('增加時的意義',direction),control('進度條顏色',color),control('分段標籤',stages,'每行：最低值: 標籤，例如 0: 疲憊'));
+    const optionsBox=control('選項（每行一項）',opts);
+    const refresh=()=>{numeric.hidden=!['number','bar'].includes(kind.value);optionsBox.hidden=!['select','multiselect'].includes(kind.value);};kind.addEventListener('change',refresh);refresh();
+    form.append(el('div',{class:'csb-form-grid'},control('欄位名稱',name),control('所屬分區',section),control('欄位類型',kind,id?'既有欄位類型固定；變更類型請新增欄位。':''),control('更新方式',policy),control('單位',unit),control('圖示',icon)),numeric,optionsBox,control('初始值',def,'留空＝未知。多選輸入 JSON 陣列；是／否輸入 true 或 false。'),control('模型更新說明',description,'定義何時改變、如何保留。'),el('div',{class:'csb-form-grid'},control('空值隱藏',hideEmpty),control('停用此欄位',hidden,'停用後不顯示、不供模型更新，資料保留。')),note(`固定 ID：${f.id}`),error,el('button',{type:'submit',class:'csb-btn csb-primary'},'儲存欄位'));
+    const d=modal(id?'編輯欄位':'新增欄位',form);form.addEventListener('submit',async e=>{e.preventDefault();try{
+      let defaultValue=def.value.trim()||null;if(defaultValue!==null){if(['number','bar'].includes(kind.value))defaultValue=Number(defaultValue);if(['boolean','multiselect'].includes(kind.value))defaultValue=parseJSON(defaultValue);}
+      const thresholds=stages.value.split('\n').filter(l=>l.trim()).map(l=>{const m=l.match(/^\s*(-?\d+(?:\.\d+)?)\s*[:：]\s*(.+)$/);if(!m)throw Error('分段標籤請使用「數字: 名稱」');return {at:Number(m[1]),label:m[2].trim()};});
+      Object.assign(f,{label:name.value.trim(),group:section.value,type:kind.value,policy:policy.value,unit:unit.value,icon:icon.value,color:color.value,min:Number(min.value),max:Number(max.value),maxDelta:delta.value===''?null:Number(delta.value),display:display.value,direction:direction.value,options:opts.value.split('\n').map(s=>s.trim()).filter(Boolean),thresholds,description:description.value,default:defaultValue,hideEmpty:hideEmpty.checked,hidden:hidden.checked});
+      if(!id)schema.fields.push(f);await host.saveSchema(validateSchema(schema));d.close();render();status('欄位已套用所有角色');
+    }catch(e){error.textContent=e.message;}});
+  }
+  function renderData(s){
+    const legacy=el('textarea',{rows:7,value:legacyDraft,placeholder:'貼上包含 [CSB21_PANEL]／[CSB21_ROLE] 的原始訊息','aria-label':'CSB21 資料',oninput:e=>{legacyDraft=e.target.value;}});
+    area.append(el('h3',{},'帶著角色資料，繼續故事。'),note('完整備份包含模板、角色現況、鎖定與優先載入設定。匯入備份會建立新的狀態起點；原始對話不變。'),
+      el('div',{class:'csb-toolbar'},btn('匯出完整備份',()=>downloadJson('CSB_Characters_Backup.json',host.exportBackup()),'csb-primary'),btn('匯入完整備份',()=>run(async()=>{const t=await readFile('.json');if(t===null)return;if(!confirm('以這份備份建立新的角色狀態起點？目前資料會先下載備份。'))return;const data=parseJSON(t);host.validateImport(data);downloadJson('CSB_Before_Import.json',host.exportBackup());await host.importBackup(data);},'備份匯入完成')),btn('匯入欄位模板',()=>run(async()=>{const t=await readFile('.json');if(t===null)return;const v=parseJSON(t);await host.importTemplate(v.schema??v);},'模板已合併，原有欄位保留'))),
+      el('section',{class:'csb-data-section'},el('h4',{},'從 CSB21 升級'),note('保留自訂部位名稱；清潔度不會轉成淫蕩值。'),legacy,el('div',{class:'csb-toolbar'},btn('匯入貼上的資料',()=>run(()=>host.importLegacy(legacy.value),'CSB21 已合併到角色庫')),btn('讀取文字檔',()=>run(async()=>{const t=await readFile('.txt,.json');if(t!==null){legacy.value=t;legacyDraft=t;}},'已讀取，請按「匯入貼上的資料」')),host.legacyFromChat?btn('匯入目前聊天 CSB21',()=>run(()=>host.importLegacy(host.legacyFromChat()),'聊天中的 CSB21 已匯入')):null)),
+      el('section',{class:'csb-data-section'},el('h4',{},'MVU 橋接'),note(host.mvuStatus()),note('自動同步將本插件資料寫入 stat_data.csb。讀回同一命名空間可手動執行；其他 MVU 變量不會被取代。'),el('div',{class:'csb-toolbar'},btn('立即寫入 MVU',()=>run(()=>host.pushMvu(),'已寫入 MVU')),btn('從 MVU 讀回',()=>run(()=>host.pullMvu(),'MVU 資料已合併')))));
+  }
+  function renderSettings(s){
+    const form=el('form',{class:'csb-form'}),settings=clone(s.settings),items=[];
+    for(const [key,label,hint]of [['enabled','啟用角色狀態工坊','關閉後停止注入提示與顯示狀態。'],['allowNew','允許模型建立新角色','關閉後只能更新已建立的角色。'],['inlineCards','在 AI 訊息下顯示狀態欄','每則回覆顯示當時快照。'],['showAbsent','狀態欄同時顯示離場角色','角色庫始終保留所有角色。'],['mvuSync','完成更新後同步到 MVU','需要先安裝並啟動 MVU。']]){const c=checkbox(settings[key]);items.push([key,c]);form.append(control(label,c,hint));}
+    const budget=input('number',settings.promptBudget,{min:6000,max:500000,step:1000});form.append(control('角色提示字元預算',budget,'不是 token 數。角色很多時優先載入在場、被提及、已釘選角色；完整資料仍保存。'),el('button',{type:'submit',class:'csb-btn csb-primary'},'儲存設定'));
+    form.addEventListener('submit',e=>{e.preventDefault();run(()=>{for(const[k,c]of items)settings[k]=c.checked;settings.promptBudget=Number(budget.value);return host.saveSettings(settings);});});
+    const prompt=host.promptInfo();
+    area.append(form,el('section',{class:'csb-data-section'},el('h4',{},'目前模型資料'),note(`載入 ${prompt.selected}／${prompt.total} 位角色詳細資料 · 約 ${prompt.characters} 字元${prompt.overBudget?' · 欄位設定已超過預算，請精簡說明':''}`),prompt.omitted?note(`${prompt.omitted} 位角色目前只提供姓名與 ID；可在角色編輯中開啟優先載入。`):null,btn('查看本輪提示',()=>{modal('注入內容',el('div',{class:'csb-form'},el('textarea',{readonly:true,rows:18,value:prompt.text})));})),
+      el('section',{class:'csb-data-section'},el('h4',{},'變化與診斷'),note(`版本 1.0.0 · ${s.result.inactiveEdits||0} 筆手動修改屬於其他回覆分支`),...(s.result.errors||[]).slice(-10).map(e=>el('p',{class:'csb-error'},`第 ${e.index+1} 則：${e.message}`)),...(s.result.warnings||[]).slice(-5).map(e=>note(`第 ${e.index+1} 則：${e.message}`)),el('div',{class:'csb-history'},...(s.result.changes||[]).slice(-30).reverse().map(c=>el('div',{},el('strong',{},`${c.name} · ${c.label}`),el('span',{},`${format(c.old,{})} → ${format(c.value,{})}`),el('small',{},c.reason)))),btn('重新讀取目前對話',()=>run(()=>host.rebuild(),'已依目前訊息重建狀態'))));
+  }
+  body.append(tabs,feedback,area);dialog=modal('角色狀態工坊',body);render();
+  return {dialog,refresh:render,editCharacter};
+}
+
+
+const sample=()=>{
+  const db=newDatabase();db.seed.scene={time:'辰時 · 微雨初歇',location:'青山鎮 · 望雲客棧'};
+  db.seed=applyUpdate(db.seed,db.schema,{version:1,present:['c_zhiwei','c_xingzhou'],characters:[
+    {id:'c_zhiwei',name:'沈知微',aliases:['知微'],reason:'預覽範例',set:{age:'26',gender:'女',identity:'遊歷中的醫師',relation:'同行友人',personality:'沉著敏銳，喜歡記錄旅途見聞。',affection:72,trust:83,energy:58,fatigue:36,stress:21,satiety:64,hydration:45,lewdness:null,height:168,weight:55,hair:'烏黑長髮，以素簪束起',eyes:'深褐色',build:'修長勻稱',part_8:'左手指節有輕微擦傷，已包紮',part_2:'長途行走後略感僵硬',outfit_0:'月白色交領外衫',outfit_1:'靛青長裙',outfit_2:'深色布靴',outfit_3:'素銀髮簪',mood:'放鬆，稍有倦意',location:'客棧二樓 · 臨窗座位',action:'捧著茶盞，聽你安排下一段路程',thought:'雨停之後，山路應該好走些。',items:'藥箱、旅途筆記、銀針包',memory:'與你約定同行前往北嶺。昨日替旅人處理傷勢，左手留下擦傷。'}},
+    {id:'c_xingzhou',name:'陸行舟',aliases:['行舟'],reason:'預覽範例',set:{age:'29',gender:'男',identity:'鏢師',relation:'同行夥伴',affection:61,trust:76,energy:82,fatigue:18,stress:27,satiety:49,hydration:67,height:183,build:'肩背結實',mood:'平靜，留意周圍動靜',location:'客棧一樓 · 櫃檯旁',action:'向掌櫃詢問山路情況',outfit_0:'墨色短褂',outfit_1:'灰色長褲',memory:'熟悉北嶺道路；答應在此行中協助護送藥材。'}}
+  ]},{manual:true}).state;return db;
+};
+let saved;try{saved=JSON.parse(localStorage.getItem('csb_preview_v1')||'null');}catch{}
+const previewContext={chatId:'preview',chat:saved?.chat??[],chatMetadata:{[KEY]:saved?.db??sample()},extensionSettings:{[KEY]:saved?.settings??defaultSettings()},saveMetadata:async()=>persistPreview(),saveChat:async()=>persistPreview(),saveSettingsDebounced:()=>persistPreview()};
+function persistPreview(){try{localStorage.setItem('csb_preview_v1',JSON.stringify({db:previewContext.chatMetadata[KEY],settings:previewContext.extensionSettings[KEY],chat:previewContext.chat}));}catch{}}
+const host=new StateController({context:()=>previewContext,getMvu:()=>null});
+let activeManager;
+function manage(tab='characters'){if(activeManager?.dialog.isConnected)return;activeManager=openManager(host,tab);}
+function paint(){const s=host.getSnapshot(),stage=document.querySelector('#preview-stage');const current=stage.querySelector('.csb-panel'),opened=current?new Set([...current.querySelectorAll('details[open]')].map(d=>d.dataset.char)):new Set(['c_zhiwei']);
+  stage.replaceChildren(statusPanel(s.state,s.db.schema,{expanded:true,showAbsent:s.settings.showAbsent,onManage:()=>manage(),onEdit:id=>{manage();activeManager.editCharacter(id);},pinned:s.db.pinned}));
+  for(const d of stage.querySelectorAll('[data-char]'))if(opened.has(d.dataset.char))d.open=true;
+  document.querySelector('#demo-count').textContent=`${Object.keys(s.state.characters).length} 份角色記憶 · ${s.db.schema.fields.filter(f=>!f.hidden).length} 個共用欄位`;
+}
+host.onChange=paint;
+document.querySelector('#open-manager').onclick=()=>manage();
+document.querySelector('#open-fields').onclick=()=>manage('schema');
+document.querySelector('#simulate-rest').onclick=async()=>{const c=host.getSnapshot().state.characters.c_zhiwei;if(!c)return;const payload={version:1,characters:[{id:c.id,set:{energy:Math.min(100,(c.values.energy??50)+10),hydration:Math.min(100,(c.values.hydration??40)+12),fatigue:Math.max(0,(c.values.fatigue??40)-8),action:'喝過熱茶，靠著窗邊休息',note:'短暫休息並補充水分，精神有所恢復。'},reason:'預覽事件：喝茶與休息'}]};previewContext.chat.push({name:'旁白',mes:`兩人喝過熱茶，在窗邊休息了片刻。\n<CSB_UPDATE>${JSON.stringify(payload)}</CSB_UPDATE>`,is_user:false});await host.rebuild();};
+document.querySelector('#simulate-leave').onclick=async()=>{const state=host.getSnapshot().state,c=state.characters.c_xingzhou;if(!c)return;const present=Object.values(state.characters).filter(x=>x.present&&x.id!==c.id).map(x=>x.id);if(!c.present)present.push(c.id);previewContext.chat.push({name:'旁白',mes:`${c.present?'陸行舟出門查看道路。':'陸行舟回到了客棧。'}\n<CSB_UPDATE>${JSON.stringify({version:1,present,characters:[]})}</CSB_UPDATE>`,is_user:false});await host.rebuild();};
+document.querySelector('#reset-preview').onclick=()=>{if(!confirm('重設預覽中的範例資料與欄位？'))return;previewContext.chat=[];previewContext.chatMetadata={[KEY]:sample()};previewContext.extensionSettings={[KEY]:defaultSettings()};persistPreview();paint();};
+globalThis.csbPreview={host,context:previewContext,paint};paint();
+</script></body></html>

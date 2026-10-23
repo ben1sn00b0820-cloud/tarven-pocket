@@ -12,7 +12,7 @@ const blank = value => value.replace(/[^\r\n]/g, ' ');
 function safeProse(text) {
   let value = text
     .replace(/(`{3,}|~{3,})[^\r\n]*[\s\S]*?(?:\1|$)/g, blank)
-    .replace(/<(?<tag>phone|pre|code)\b[^>]*>[\s\S]*?(?:<\/\k<tag>\s*>|$)/gi, blank)
+    .replace(/<(?<tag>phone|pre|code|CSB_UPDATE)\b[^>]*>[\s\S]*?(?:<\/\k<tag>\s*>|$)/gi, blank)
     .replace(/<!--(?:[\s\S]*?-->|[\s\S]*$)/g, blank)
     .replace(/\[(CSB21|CSB2)_PANEL\][\s\S]*?(?:\[\/\1_PANEL\]|$)/g, blank)
     .replace(/^\s*>[^\r\n]*/gm, blank)

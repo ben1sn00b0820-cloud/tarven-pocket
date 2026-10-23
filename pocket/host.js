@@ -6,6 +6,7 @@ import {asMessages} from '../core/llm.js';
 import {createContactBridge} from './contacts.js';
 import {createPhotoBridge} from './photos.js';
 import {stripStatusPanels} from './status.js';
+import {stripCharacterStateUpdates} from './csb-runtime.js';
 import {createImagePresets} from './image-presets.js';
 import {createShopService} from './shop.js';
 import {createActivityBridge} from './activity.js';
@@ -20,10 +21,10 @@ import {SHOP_PRESET_LIMITS,normalizeShopPresets,listShopPresets,saveShopPreset,s
 const KEY='tavern_pocket_v3', clone=v=>structuredClone(v), uid=()=>crypto.randomUUID();
 const plain=(v,max,label)=>{if(typeof v!=='string'||!v.trim()||v.trim().length>max)throw Error(`${label}須為 1–${max} 字元`);return v.trim();};
 const empty=()=>({version:3,events:[],diaries:[],catalogue:[],worldbooks:[]});
-export function createPocketHost({context,backend,notice=()=>{}}){
+export function createPocketHost({context,backend,notice=()=>{},openStateEditor,openStateManager}){
  let alive=true,sourceEvents=[],sourceKey='',busy=false,actionQueue=Promise.resolve(),photoScope='',photoSyncs=0,renderTimer;
  const emit=()=>{if(alive)backend.emit('pocket',{});};
- const contacts=createContactBridge({context,backend,notice,publishStatus:createStatusPublisher({context,notice})});
+ const contacts=createContactBridge({context,backend,notice,openStateEditor,publishStatus:createStatusPublisher({context,notice})});
  const activity=createActivityBridge({context,backend,notice,getMirrorPolicy:()=>({forum:config().mirrorForum!==false,shop:config().mirrorShop!==false})});
  const memory=createPersonalMemory({context,backend,notice});
  const narrativeMemory=createNarrativeMemory({context,acquire:acquireNarrative,notice});
@@ -48,7 +49,7 @@ export function createPocketHost({context,backend,notice=()=>{}}){
   for(const e of events)if(e.app==='diary'&&e.action==='entry')diaries.push({id:e.id,from:e.from,title:e.title||'角色日記',text:e.text,private:false,at:e.at||0});
   return {instagram:projectInstagram(events,{userName:c.name1||'我',characterName:c.name2||'角色',profiles:contacts.profiles(),contacts:backend.contacts?.()||[]}),diaries:diaries.sort((a,b)=>b.at-a.at)};
  }
- function storyText(c){return (c.chat||[]).filter(m=>!m.is_system&&!m.extra?.tavern_pocket_activity).slice(-20).map(m=>`${m.name||''}: ${stripStatusPanels(stripPhoneBlocks(m.mes||''))}`).join('\n').slice(-8000);}
+ function storyText(c){return (c.chat||[]).filter(m=>!m.is_system&&!m.extra?.tavern_pocket_activity).slice(-20).map(m=>`${m.name||''}: ${stripCharacterStateUpdates(stripStatusPanels(stripPhoneBlocks(m.mes||'')))}`).join('\n').slice(-8000);}
  function memoryQuery(c){return String((c.chat||[]).findLast(m=>m?.is_user&&!m.is_system&&!m.extra?.tavern_pocket_activity&&!m.extra?.tavern_pocket_status)?.mes||'');}
  function referenceFacts(query){return memoryMentionContext(query,memory.state(),{maxChars:12000});}
  function sharedPhoneText(c){
@@ -83,7 +84,7 @@ export function createPocketHost({context,backend,notice=()=>{}}){
   guard();return result;
  };
  function shopPresetState(){const saved=normalizeShopPresets(config().shopPresets);return {presets:listShopPresets(saved),selectedId:saved.selectedId,limits:SHOP_PRESET_LIMITS};}
- async function state(){const c=context(),options=getConnectionOptions(c);return {scope:sourceScope(c),userName:c.name1||'我',characterName:c.name2||'角色',shopPresets:shopPresetState(),...project(c),catalogue:clone(data(c).catalogue),catalogueSource:clone(data(c).catalogueSource||null),settings:{...clone(config()),worldbooks:clone(data(c).worldbooks),worldbookPins:clone(data(c).worldbookPins||[])},connections:options.modelProfiles,worldbooks:options.worldbookNames,sync:{...source.status(),errors:[...source.status().errors,...narrativeMemory.status().errors],memory:narrativeMemory.status(),statusRoles:contacts.profiles().filter(p=>p.body?.length||p.source?.version).length,busy},version:'0.9.1'};}
+ async function state(){const c=context(),options=getConnectionOptions(c);return {scope:sourceScope(c),userName:c.name1||'我',characterName:c.name2||'角色',shopPresets:shopPresetState(),...project(c),catalogue:clone(data(c).catalogue),catalogueSource:clone(data(c).catalogueSource||null),settings:{...clone(config()),worldbooks:clone(data(c).worldbooks),worldbookPins:clone(data(c).worldbookPins||[])},connections:options.modelProfiles,worldbooks:options.worldbookNames,sync:{...source.status(),errors:[...source.status().errors,...narrativeMemory.status().errors],memory:narrativeMemory.status(),statusRoles:contacts.profiles().filter(p=>p.body?.length||p.source?.version).length,busy},version:'0.10.0'};}
  function taskPrompt(c,task,{app}={}){const char=c.characters?.[c.characterId];return `${app==='shop'?'你正在產生虛構商品目錄。只完成本次商城任務，不扮演角色發言，不續寫故事；角色與世界書只作為背景資料。':'你正在虛構手機中扮演角色。'}使用者是 ${c.name1}，目前角色是 ${c.name2}。\n[角色背景]\n${JSON.stringify({name:char?.name,description:char?.description||char?.data?.description,personality:char?.personality||char?.data?.personality,scenario:char?.scenario||char?.data?.scenario}).slice(0,12000)}\n[任務]\n所有面向使用者的商品名稱與說明、貼文、日記、聊天回覆使用繁體中文；繪圖英文標籤與 JSON 欄位名稱保持原格式。\n${task}`;}
 
  async function modelEvents(c,action,payload){
@@ -222,6 +223,7 @@ export function createPocketHost({context,backend,notice=()=>{}}){
   }finally{photoSyncs--;}
  }
  return {api:()=>({pocketState:state,pocketImageState:async()=>imagePresets.state(),...photos.api(),
+  pocketOpenContactState:(name,revision)=>contacts.openEditor(name,revision),pocketOpenStateManager:()=>{if(typeof openStateManager!=='function')throw Error('角色狀態工坊尚未啟用。');return openStateManager();},
   pocketContactProfile:async name=>contacts.profile(name),pocketContactProfiles:async()=>contacts.profiles(),pocketSaveContactProfile:(name,value)=>contacts.save(name,value),
   pocketConfirmPayment:confirmPayment,pocketPurchase:purchase,
   pocketMemoryState:async()=>{await memory.importWallet();return memory.state();},pocketMemoryAction:memoryAction,

@@ -1,0 +1,21 @@
+{
+  "version": "0.10.0",
+  "checks": [
+    "bundled CSB initializes once alongside the actual phone host",
+    "phone profiles preserve custom types, 0/false/null, body facts and exclude hidden fields",
+    "public snapshot is detached from persisted character state",
+    "real phone detail sheet renders arbitrary bar range, custom fields and safely escaped text",
+    "one narrative message retains phone event card and CSB status card while hiding machine update JSON",
+    "phone editor opens native CSB editor; save updates source manual journal without adding legacy chat snapshots",
+    "WeChat model request receives latest CSB custom values and omits disabled fields",
+    "swipe replays current branch; prior manual anchor and stale phone editor revision do not carry over",
+    "deleting the update reverts the phone projection to surviving state",
+    "switching to a different chat does not expose the previous chat CSB values",
+    "disabled CSB contributes neither profile projection nor generation instructions",
+    "external CSB 1.0.0 skips bundled runtime and repeated direct reformatting restores phone cards without altering raw messages or native status cards",
+    "legacy CSB metadata fallback replays the newest update without mutating its source journal"
+  ],
+  "errors": [],
+  "status": "passed",
+  "limitations": "SillyTavern APIs and model responses mocked; actual phone host, iframe, CSB runtime and IndexedDB exercised."
+}

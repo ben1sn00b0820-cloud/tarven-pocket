@@ -1,9 +1,10 @@
 {
   "name": "tavern-pocket-private",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "test:csb": "node --test companions/csb-character-state/tests/*.test.js"
   }
 }
