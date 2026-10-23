@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "minimum": {"sillytavern": "1.19.0", "tavernHelper": null},
+  "requirements": [
+    {"id":"context","owner":"sillytavern","symbol":"SillyTavern.getContext","required":true,"fallback":null},
+    {"id":"prompt","owner":"sillytavern","symbol":"SillyTavern.getContext().setExtensionPrompt","required":true,"fallback":null},
+    {"id":"formatter","owner":"sillytavern","symbol":"SillyTavern.getContext().messageFormatter.addHook","required":true,"fallback":null},
+    {"id":"message-update","owner":"sillytavern","symbol":"SillyTavern.getContext().updateMessageBlock","required":true,"fallback":null},
+    {"id":"events","owner":"sillytavern","symbol":"SillyTavern.getContext().eventSource","required":true,"fallback":null},
+    {"id":"settings","owner":"sillytavern","symbol":"SillyTavern.getContext().saveSettingsDebounced","required":true,"fallback":null}
+  ]
+}

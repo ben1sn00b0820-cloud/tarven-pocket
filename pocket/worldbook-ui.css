@@ -1,0 +1,29 @@
+.pocket-worldbook-browser { min-width:0; }
+.pocket-worldbook-browser .hint { font-size:12px; line-height:1.7; margin:8px 0 14px; }
+.pocket-lore-search { display:grid; gap:10px; margin-bottom:16px; }
+.pocket-lore-search label { font-size:12px; font-weight:650; }
+.pocket-lore-search>div { display:flex; gap:8px; }
+.pocket-lore-search input { flex:1; min-width:0; width:0; font:inherit; font-size:13px; }
+.pocket-lore-search button { flex-shrink:0; font-size:12px; min-height:40px; }
+.pocket-lore-search>button { justify-self:start; }
+.pocket-lore-counts { display:flex; flex-direction:column; gap:5px; padding:14px; border-radius:15px; background:var(--accent-soft); color:var(--accent-ink); }
+.pocket-lore-counts strong { font-size:15px; }
+.pocket-lore-counts span { font-size:11px; }
+.pocket-lore-results { display:grid; gap:10px; }
+.pocket-lore-result { display:grid; gap:8px; padding:14px; border:1px solid var(--line); background:var(--card); border-radius:17px; min-width:0; }
+.pocket-lore-open { display:grid; gap:8px; text-align:left; background:transparent; color:var(--ink); padding:0; border:0; min-width:0; }
+.pocket-lore-open strong { font-size:15px; overflow-wrap:anywhere; }
+.pocket-lore-open small { font-size:10px; color:var(--ink2); overflow-wrap:anywhere; }
+.pocket-lore-open span { font-size:12px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+.pocket-lore-open em { font-size:11px; font-style:normal; color:var(--accent-ink); }
+.pocket-lore-pin { justify-self:end; min-height:34px; font-size:11px; }
+.pocket-lore-pin[aria-pressed=true] { color:var(--accent-ink); background:var(--accent-soft); }
+.pocket-lore-pager,.pocket-lore-reading-tools { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin:15px 0; }
+.pocket-lore-pager span { font-size:11px; color:var(--ink2); }
+.pocket-lore-pager button,.pocket-lore-reading-tools button { min-height:38px; font-size:12px; }
+.pocket-lore-reading { min-width:0; }
+.pocket-lore-reading>small { font-size:11px; color:var(--ink2); overflow-wrap:anywhere; }
+.pocket-lore-reading h3 { font-size:19px; margin:8px 0; overflow-wrap:anywhere; }
+.pocket-lore-content { white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.9; padding:16px; background:var(--card); border:1px solid var(--line); border-radius:15px; }
+.pocket-lore-error { background:color-mix(in srgb,#bd293f 10%,var(--card)); color:var(--ink); border-radius:12px; padding:12px; font-size:12px; line-height:1.6; }
+.pocket-lore-budget { margin-top:18px; }

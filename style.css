@@ -1,0 +1,110 @@
+@import url('./pocket/composer.css');
+@import url('./pocket/cards.css');
+/* ST-iPhonie host styles: the phone dialog, the extension drawer, chat waves and in-text pictures. */
+
+/* ---------- SillyTavern background compatibility ----------
+   #bg1 / #bg_custom are decorative host backgrounds. A few themes lift them above #chat, which can hide the
+   inline voice controls and intercept taps. Keep only these native background nodes behind interactive content. */
+html body > #bg1,
+html body > #bg_custom{z-index:-1!important;pointer-events:none!important}
+
+/* ---------- Phone dialog ---------- */
+#sttts-panel{padding:0;border:0;border-radius:0;width:min(470px,98vw);height:min(940px,98dvh);max-width:100vw;max-height:100dvh;background:transparent;box-shadow:none;overflow:hidden}
+#sttts-panel::backdrop{background:#0d103088;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+/* On a computer: a floating phone beside the story (index.js placePanel) */
+#sttts-panel.floating{position:fixed;inset:auto;margin:0;z-index:9000;max-width:none;max-height:none;filter:drop-shadow(0 22px 34px rgba(0,0,0,.38))}
+#sttts-panel.floating::backdrop{display:none}
+#sttts-panel.floating iframe{transform-origin:0 0;max-width:none}
+/* Follows the system like the phone page's root: with different schemes Chrome paints the frame opaque behind the
+   phone, and the page inside reads 跟随系统 from this element's scheme. */
+#sttts-panel iframe{border:0;width:100%;height:100%;display:block;color-scheme:light dark;background:transparent}
+@media(max-width:540px){#sttts-panel{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border:0;border-radius:0}}
+
+/* ---------- Extension drawer ---------- */
+#sttts-extension-entry{width:100%;flex:0 0 auto;min-width:0;height:auto;min-height:0}
+#sttts-extension-entry .inline-drawer-header{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px}
+#sttts-extension-entry .inline-drawer-header b{white-space:nowrap;word-break:normal}
+#sttts-extension-entry #sttts-open{width:100%;white-space:nowrap;margin:8px 0;display:flex;align-items:center;justify-content:center;padding:9px 12px}
+#sttts-extension-entry .sttts-entry-controls{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#sttts-extension-entry .sttts-entry-controls button{flex:1;white-space:nowrap}
+#sttts-extension-entry .sttts-status{display:block;min-height:1.4em;margin-top:4px;font-size:.8em;opacity:.8}
+[data-sttts-line]{display:inline;position:relative;z-index:1}
+
+/* ---------- Chat waves ----------
+   Every colour comes from the tavern theme:
+   unbound   - no voice yet:   italic colour, faint, dotted bars
+   ungenerated - not generated: body text colour, half strength
+   ready     - generated:      quote colour, with a dot under the wave
+   playing   - playing / generating / paused: quote colour with a soft pill behind
+   played    - finished:       underline colour, with a short line under the wave
+   Shapes back the colours up (faint bars, a dot under ready, a line under played, a pill while playing) for themes
+   whose colours are close to each other. */
+#chat [data-sttts-action="line"]{
+  --sttts-body:var(--SmartThemeBodyColor,currentColor);
+  --sttts-quote:var(--SmartThemeQuoteColor,var(--sttts-body));
+  --sttts-em:var(--SmartThemeEmColor,var(--sttts-body));
+  --sttts-under:var(--SmartThemeUnderlineColor,var(--sttts-em));
+  display:inline-flex;position:relative;z-index:1;align-items:center;justify-content:center;vertical-align:middle;width:34px;height:28px;min-height:28px;margin:0 2px;padding:3px 5px;
+  font:inherit;border:0;border-radius:999px;box-shadow:none;background:transparent;cursor:pointer;touch-action:manipulation;
+  color:color-mix(in srgb,var(--sttts-body) 50%,transparent);transition:color 160ms,background 160ms,box-shadow 160ms}
+#chat [data-sttts-action="line"]:hover{background:color-mix(in srgb,var(--sttts-body) 9%,transparent)}
+#chat [data-sttts-action="line"]:focus-visible{outline:2px solid var(--sttts-quote);outline-offset:2px}
+#chat [data-sttts-state="unbound"]{color:color-mix(in srgb,var(--sttts-em) 60%,transparent);outline:1px dashed color-mix(in srgb,var(--sttts-em) 45%,transparent);outline-offset:-3px}
+#chat [data-sttts-state="unbound"] [data-sttts-bar]{height:3px!important;flex-basis:3px;width:3px;border-radius:50%}
+#chat [data-sttts-state="ungenerated"] [data-sttts-bar]{opacity:.55}
+#chat [data-sttts-state="ready"]{color:var(--sttts-quote);background:radial-gradient(circle,currentColor 0 1.6px,transparent 2px) center bottom 1px/4px 4px no-repeat}
+#chat [data-sttts-state="playing"],#chat [data-sttts-state="generating"],#chat [data-sttts-state="paused"]{color:var(--sttts-quote);background:color-mix(in srgb,var(--sttts-quote) 18%,transparent);box-shadow:0 0 0 1.5px color-mix(in srgb,var(--sttts-quote) 45%,transparent)}
+#chat [data-sttts-state="generating"] [data-sttts-bar]{animation:sttts-think 1s ease-in-out infinite}
+#chat [data-sttts-state="generating"] [data-sttts-bar]:nth-child(2n){animation-delay:-.5s}
+#chat [data-sttts-state="played"]{color:var(--sttts-under);background:linear-gradient(currentColor,currentColor) center bottom 2px/16px 2px no-repeat}
+#chat [data-sttts-state="waiting"]{color:color-mix(in srgb,var(--sttts-quote) 70%,transparent);outline:1.5px dashed var(--sttts-quote);outline-offset:-3px;animation:sttts-wait 1.4s ease-in-out infinite}
+#chat [data-sttts-wave]{display:inline-flex;align-items:center;justify-content:center;gap:3px;width:22px;height:20px;background:none;box-shadow:none;border:0;padding:0;margin:0}
+#chat [data-sttts-bar]{display:block;flex:0 0 2.5px;width:2.5px;height:9px;border-radius:2px;background:currentColor;box-shadow:none;border:0;margin:0;padding:0;transform-origin:center}
+#chat [data-sttts-bar]:nth-child(2){height:15px}#chat [data-sttts-bar]:nth-child(3){height:20px}#chat [data-sttts-bar]:nth-child(4){height:13px}#chat [data-sttts-bar]:nth-child(5){height:7px}
+@keyframes sttts-think{50%{transform:scaleY(.45)}}
+@keyframes sttts-wait{50%{opacity:.55}}
+
+/* ---------- In-text pictures (<img> tags written by the model) ----------
+   The placeholder is matched by [data-sttts-pic]: the tavern prefixes classes inside messages with custom-. */
+#chat [data-sttts-pic]{--sttts-quote:var(--SmartThemeQuoteColor,currentColor);--sttts-body:var(--SmartThemeBodyColor,currentColor);display:block;width:min(100%,300px);margin:8px 0 12px}
+#chat [data-sttts-pic][data-state="done"],#chat [data-sttts-pic][data-state="generating"]{width:min(100%,560px);margin:10px 0 14px}
+#chat [data-sttts-pic][data-state="done"] .sttts-pic-frame{box-shadow:none;background:none}
+#chat .sttts-pic-note{position:absolute;left:8px;right:8px;bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 6px 6px 12px;border-radius:10px;font-size:.8em;color:#fff;background:rgba(10,12,24,.62);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#chat .sttts-pic-note button{font:inherit;color:#fff;background:rgba(255,255,255,.16);border:0;border-radius:999px;padding:3px 10px;cursor:pointer;min-height:26px}
+#chat .sttts-pic-frame{position:relative;display:block;border-radius:12px;overflow:hidden;background:color-mix(in srgb,var(--sttts-body) 8%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--sttts-body) 16%,transparent)}
+#chat .sttts-pic-zoom{all:unset;display:block;width:100%;cursor:zoom-in}
+#chat .sttts-pic-zoom:focus-visible{outline:2px solid var(--sttts-quote);outline-offset:-2px}
+#chat [data-sttts-pic] img{display:block;width:100%;height:auto;cursor:zoom-in}
+#chat .sttts-pic-removed{display:inline-flex;align-items:center;gap:8px;font-size:.8em;color:color-mix(in srgb,var(--sttts-body) 60%,transparent)}
+#chat .sttts-pic-removed button{font:inherit;color:var(--sttts-quote);background:transparent;border:0;padding:2px 4px;cursor:pointer;min-height:24px}
+#chat [data-sttts-pic][data-state="generating"] .sttts-pic-removed{margin-bottom:6px}
+/* Folded: a small thumbnail and a line, so pictures do not fill a phone screen. */
+#chat [data-sttts-pic][data-folded]{width:auto;margin:4px 0 8px}
+#chat .sttts-pic-fold{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:.82em;color:var(--sttts-quote);background:color-mix(in srgb,var(--sttts-body) 7%,transparent);border:0;border-radius:999px;padding:4px 14px 4px 10px;cursor:pointer;min-height:32px;-webkit-user-select:none;user-select:none}
+#chat .sttts-pic-fold-mark{font-size:.8em;opacity:.8}
+/* manipulation: phones must not take the second tap of a double tap for page zoom. */
+#chat .sttts-pic-zoom,#chat .sttts-pic-fold{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+#chat .sttts-pic-pager{display:inline-flex;align-items:center;gap:2px;font-variant-numeric:tabular-nums;color:var(--sttts-quote)}
+#chat .sttts-pic-pager button{font-size:1.2em!important;min-width:28px}
+#chat .sttts-pic-pager button:disabled{opacity:.35;cursor:default}
+#chat .sttts-pic-wait{display:grid;place-items:center;aspect-ratio:832/1216;max-height:420px;padding:16px;text-align:center;font-size:.85em;color:color-mix(in srgb,var(--sttts-body) 75%,transparent);background:linear-gradient(110deg,transparent 30%,color-mix(in srgb,var(--sttts-body) 8%,transparent) 50%,transparent 70%) 0 0/200% 100%}
+#chat [data-sttts-pic][data-state="generating"] .sttts-pic-wait{animation:sttts-shimmer 1.4s linear infinite}
+#chat .sttts-pic-wait button,#chat .sttts-pic-bar button{font:inherit;font-size:.85em;color:var(--sttts-quote);background:transparent;border:1px solid currentColor;border-radius:999px;padding:4px 12px;cursor:pointer;min-height:30px}
+#chat .sttts-pic-bar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:5px;font-size:.78em;color:color-mix(in srgb,var(--sttts-body) 65%,transparent)}
+#chat .sttts-pic-bar button{border:0;padding:2px 4px;min-height:24px}
+#chat [data-sttts-pic][data-state="error"] .sttts-pic-wait{color:var(--sttts-quote)}
+#chat [data-sttts-pic][data-state="idle"] .sttts-pic-wait,#chat [data-sttts-pic][data-state="error"] .sttts-pic-wait{aspect-ratio:auto;min-height:110px}
+@keyframes sttts-shimmer{to{background-position:-200% 0}}
+@media(max-width:540px){#chat [data-sttts-action="line"]{min-height:32px;height:32px}}
+@media(prefers-reduced-motion:reduce){#chat [data-sttts-action="line"],#chat [data-sttts-bar],#chat .sttts-pic-wait{transition:none;animation:none!important}}
+
+/* The note under a reply whose voice tags could not all be read. */
+#chat .sttts-lint{margin:8px 0 2px;padding:2px 0 2px 10px;font-size:.82em;line-height:1.5;color:color-mix(in srgb,var(--sttts-body) 78%,transparent);border-left:2px solid color-mix(in srgb,var(--sttts-quote) 60%,transparent)}
+#chat .sttts-lint summary{cursor:pointer;list-style:none;color:var(--sttts-quote)}
+#chat .sttts-lint summary::-webkit-details-marker{display:none}
+#chat .sttts-lint summary::before{content:'⚠ '}
+#chat .sttts-lint[open] summary{margin-bottom:4px}
+#chat .sttts-lint ul{margin:4px 0;padding-left:1.2em}
+#chat .sttts-lint li{margin:3px 0}
+#chat .sttts-lint code{display:block;margin-top:2px;white-space:pre-wrap;word-break:break-all;font-size:.92em;opacity:.8;background:none;padding:0}
+#chat .sttts-lint p{margin:4px 0 0}

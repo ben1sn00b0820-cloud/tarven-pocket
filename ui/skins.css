@@ -1,0 +1,176 @@
+/* ST-iPhonie skins. Loaded after phone.css. The default skin ("sky", 晴空贴纸) is phone.css itself.
+   To add a skin: a token block for day and night plus component rules here, a wallpaper and a picker entry of the
+   same key in wallpapers.js, and the key in PHONE_SKINS / PHONE_WALLPAPERS (core/library.js).
+   Each skin sets the full colour token set for day and night, then restyles a handful of shared components:
+   device frame, app background, cards, buttons, switches, segmented controls, app icons, dock and widgets. */
+
+/* =====================================================================
+   Frutiger Aero · 水感玻璃: glossy glass, aqua and grass green, soap bubbles
+   ===================================================================== */
+:root[data-skin=aero]{
+  color-scheme:light;
+  --page:#d6f3ff;--bg:#effbff;--card:#fbfeff;--card2:#e4f5fb;--ink:#0b3850;--ink2:#46707f;--line:#bfe2ee;
+  --accent:#1aa7e0;--accent-ink:#0a6a98;--accent-soft:#d2f0fc;--accent-btn:#1494d2;--on-accent:#fff;
+  --pink:#5cc93a;--dot:#bfe6f5;--shadow:0 10px 22px -12px rgba(0,110,160,.5);
+  --danger:#c8364f;--danger-soft:#ffe3e8;
+  --aero-gloss:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.72));
+  --aero-edge:rgba(255,255,255,.95);
+  font-family:"Segoe UI","Microsoft YaHei UI","PingFang SC","HarmonyOS Sans SC",system-ui,sans-serif;
+}
+:root[data-skin=aero][data-theme=dark]{
+  color-scheme:dark;
+  --page:#021623;--bg:#04202f;--card:#0a3044;--card2:#0e3a50;--ink:#e3f8ff;--ink2:#9ccbdc;--line:#1a4d63;
+  --accent:#48d2ff;--accent-ink:#8fe2ff;--accent-soft:#0f4660;--accent-btn:#28b6ea;--on-accent:#021623;
+  --pink:#7ee25a;--dot:#12465c;--shadow:0 10px 24px -12px rgba(0,0,0,.8);
+  --danger:#ff90a4;--danger-soft:#44162a;
+  --aero-gloss:linear-gradient(180deg,rgba(120,220,255,.16),rgba(120,220,255,.05));
+  --aero-edge:rgba(140,225,255,.28);
+}
+:root[data-skin=aero] .device{background:linear-gradient(135deg,#ffffff,#bfe9fb 30%,#f4fcff 52%,#8fd3ef 78%,#e9f9ff);box-shadow:0 0 0 1px #7cc3e0,inset 0 2px 0 #fff,0 24px 50px -20px rgba(0,90,140,.5)}
+:root[data-skin=aero][data-theme=dark] .device{background:linear-gradient(135deg,#1c5a75,#062536 35%,#155069 60%,#031a26);box-shadow:0 0 0 1px #2a7593,0 24px 50px -20px #000}
+:root[data-skin=aero] .app-frame{background:radial-gradient(130% 55% at 50% -12%,#bdeeff 0,#bdeeff00 70%),radial-gradient(90% 40% at 100% 110%,#d8f7c4 0,#d8f7c400 70%),var(--bg)}
+:root[data-skin=aero][data-theme=dark] .app-frame{background:radial-gradient(130% 55% at 50% -12%,#0b4a66 0,#0b4a6600 70%),radial-gradient(90% 40% at 100% 110%,#0d4a3a 0,#0d4a3a00 70%),var(--bg)}
+:root[data-skin=aero] .view:before{background-image:radial-gradient(circle 16px at 70% 30%,#ffffff00 0 60%,var(--aero-edge) 80%,#fff0 100%),radial-gradient(circle 9px at 40% 60%,#ffffff00 0 55%,var(--aero-edge) 80%,#fff0 100%),radial-gradient(circle 6px at 88% 72%,#ffffff00 0 50%,var(--aero-edge) 80%,#fff0 100%);background-size:120px 110px;opacity:.9}
+:root[data-skin=aero] .group,:root[data-skin=aero] details,:root[data-skin=aero] .role-card,:root[data-skin=aero] .code-preview{background:var(--aero-gloss),var(--card);border:1px solid var(--aero-edge);box-shadow:inset 0 1px 0 var(--aero-edge),var(--shadow)}
+:root[data-skin=aero] .page-heading h1 span{background:none;padding:0;color:var(--accent-ink);text-shadow:0 1px 0 #fff,0 0 14px rgba(40,180,240,.35)}
+:root[data-skin=aero][data-theme=dark] .page-heading h1 span{text-shadow:0 0 14px rgba(72,210,255,.5)}
+:root[data-skin=aero] .primary,:root[data-skin=aero] .segmented button[aria-pressed=true],:root[data-skin=aero] .engine-tab[aria-pressed=true],:root[data-skin=aero] .play-round{
+  --gel:var(--e-btn,var(--accent-btn));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--gel) 35%,#fff) 0%,color-mix(in srgb,var(--gel) 80%,#fff) 46%,var(--gel) 50%,color-mix(in srgb,var(--gel) 80%,#fff) 100%);
+  border:1px solid color-mix(in srgb,var(--gel) 75%,#000);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 4px 12px -4px color-mix(in srgb,var(--gel) 80%,transparent);
+  text-shadow:0 -1px 0 color-mix(in srgb,var(--gel) 60%,#000)}
+:root[data-skin=aero] .primary:active:not(:disabled){transform:translateY(1px);box-shadow:inset 0 2px 6px rgba(0,0,0,.2)}
+:root[data-skin=aero] .secondary,:root[data-skin=aero] .danger{background:var(--aero-gloss),var(--card);border:1px solid var(--aero-edge);box-shadow:inset 0 1px 0 var(--aero-edge),0 3px 10px -4px rgba(0,100,150,.4)}
+:root[data-skin=aero] .secondary:active:not(:disabled),:root[data-skin=aero] .danger:active:not(:disabled){transform:translateY(1px);box-shadow:inset 0 2px 6px rgba(0,0,0,.15)}
+:root[data-skin=aero] .segmented{background:var(--aero-gloss),var(--card2);box-shadow:inset 0 1px 3px rgba(0,80,120,.2)}
+:root[data-skin=aero] .switch{background:linear-gradient(180deg,#c5dde6,#e7f3f7);box-shadow:inset 0 1px 3px rgba(0,60,90,.35)}
+:root[data-skin=aero] .switch:checked{background:linear-gradient(180deg,#8fe9ff,#16a6e0 55%,#39c1f2)}
+:root[data-skin=aero] .switch:after{background:radial-gradient(circle at 50% 30%,#fff,#dff4fb 70%);border:1px solid #9ccfe0}
+:root[data-skin=aero] .icon-tile{border-radius:16px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.6),0 1px 0 rgba(255,255,255,.7),0 8px 16px -6px color-mix(in srgb,var(--t2) 80%,#000)}
+:root[data-skin=aero] .icon-tile:after{inset:2px 2px 48% 2px;border-radius:14px 14px 50% 50%/14px 14px 26% 26%;background:linear-gradient(rgba(255,255,255,.75),rgba(255,255,255,.08))}
+:root[data-skin=aero] .phone-dock{background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.2) 50%,rgba(255,255,255,.35));box-shadow:inset 0 1px 0 #fff,inset 0 0 0 1px rgba(255,255,255,.7),0 10px 24px -10px rgba(0,80,130,.5)}
+:root[data-skin=aero] .widget,:root[data-skin=aero] .control-tile{background:var(--aero-gloss);border:1px solid var(--aero-edge);box-shadow:inset 0 1px 0 var(--aero-edge),0 10px 24px -12px rgba(0,80,130,.55)}
+:root[data-skin=aero] .chip-button,:root[data-skin=aero] .chip{box-shadow:inset 0 1px 0 rgba(255,255,255,.7),inset 0 0 0 1px color-mix(in srgb,var(--e-btn,var(--accent-btn)) 30%,transparent)}
+:root[data-skin=aero] .field input,:root[data-skin=aero] .field textarea,:root[data-skin=aero] .select select,:root[data-skin=aero] input.search{box-shadow:inset 0 1px 3px rgba(0,70,110,.18)}
+
+/* =====================================================================
+   文艺小清新 · 青草信笺: cream paper, sage green and dusty rose, serif titles, a pressed leaf in the corner
+   ===================================================================== */
+:root[data-skin=fresh]{
+  color-scheme:light;
+  --page:#eceee4;--bg:#f7f5ee;--card:#fffdf8;--card2:#f2f0e7;--ink:#3b4740;--ink2:#7b857d;--line:#e3e0d4;
+  --accent:#8fb09a;--accent-ink:#4c7660;--accent-soft:#e2ece2;--accent-btn:#6d977f;--on-accent:#fff;
+  --pink:#dfa39b;--dot:#dcd8c8;--shadow:0 10px 22px -16px rgba(70,80,60,.5);
+  --danger:#bb5a52;--danger-soft:#f7e4e0;
+  --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  --leaf:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 120'%3E%3Cg stroke='%239db8a2' stroke-width='1.3' fill='%23d9e7d4'%3E%3Cpath d='M138 4C110 22 88 52 64 116' fill='none'/%3E%3Cellipse cx='121' cy='24' rx='12' ry='5' transform='rotate(-20 121 24)'/%3E%3Cellipse cx='113' cy='12' rx='10' ry='4.5' transform='rotate(-70 113 12)'/%3E%3Cellipse cx='102' cy='47' rx='13' ry='5' transform='rotate(-35 102 47)'/%3E%3Cellipse cx='89' cy='38' rx='11' ry='4.5' transform='rotate(-80 89 38)'/%3E%3Cellipse cx='86' cy='74' rx='13' ry='5' transform='rotate(-45 86 74)'/%3E%3Cellipse cx='72' cy='64' rx='11' ry='4.5' transform='rotate(-95 72 64)'/%3E%3C/g%3E%3Cg fill='%23f0d0c8'%3E%3Ccircle cx='40' cy='30' r='4'/%3E%3Ccircle cx='46' cy='34' r='4'/%3E%3Ccircle cx='44' cy='41' r='4'/%3E%3Ccircle cx='36' cy='41' r='4'/%3E%3Ccircle cx='34' cy='34' r='4'/%3E%3C/g%3E%3Ccircle cx='40' cy='36' r='2.6' fill='%23f1d98f'/%3E%3C/svg%3E");
+  /* Engine colours, muted to sit on paper: grey-blue, ochre, dusty rose, brick, greyish lilac. */
+  --fish:#7f9fb3;--fish-ink:#3f5d70;--fish-soft:#e3ebef;--fish-btn:#6b8ca0;--fish-on:#fff;
+  --mini:#c9a26a;--mini-ink:#7a5a2c;--mini-soft:#f3eadb;--mini-btn:#b58c52;--mini-on:#fff;
+  --eleven:#c98f8c;--eleven-ink:#8a4f4d;--eleven-soft:#f4e4e1;--eleven-btn:#b67a77;--eleven-on:#fff;
+  --mimo:#bf7254;--mimo-ink:#7e3d26;--mimo-soft:#f5e3db;--mimo-btn:#ad6347;--mimo-on:#fff;
+  --nai:#9b91b5;--nai-ink:#5b5277;--nai-soft:#ebe7f1;--nai-btn:#867ba3;--nai-on:#fff;
+  --llm:#9aab7e;--llm-ink:#586a3e;--llm-soft:#ecf0e0;--llm-btn:#84985f;--llm-on:#fff;
+  font-family:"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",system-ui,sans-serif;
+}
+:root[data-skin=fresh][data-theme=dark]{
+  color-scheme:dark;
+  --page:#141a17;--bg:#1b211e;--card:#232a26;--card2:#2a322d;--ink:#e9e5d9;--ink2:#a3aa9f;--line:#343d37;
+  --accent:#a6c4a6;--accent-ink:#bfd9bd;--accent-soft:#2d3b31;--accent-btn:#98b99b;--on-accent:#16201a;
+  --pink:#dfb1a6;--dot:#2e3731;--shadow:0 10px 22px -14px rgba(0,0,0,.8);
+  --danger:#eba096;--danger-soft:#3e2724;
+  --leaf:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 120'%3E%3Cg stroke='%236f8c76' stroke-width='1.3' fill='%232f3e33'%3E%3Cpath d='M138 4C110 22 88 52 64 116' fill='none'/%3E%3Cellipse cx='121' cy='24' rx='12' ry='5' transform='rotate(-20 121 24)'/%3E%3Cellipse cx='113' cy='12' rx='10' ry='4.5' transform='rotate(-70 113 12)'/%3E%3Cellipse cx='102' cy='47' rx='13' ry='5' transform='rotate(-35 102 47)'/%3E%3Cellipse cx='89' cy='38' rx='11' ry='4.5' transform='rotate(-80 89 38)'/%3E%3Cellipse cx='86' cy='74' rx='13' ry='5' transform='rotate(-45 86 74)'/%3E%3Cellipse cx='72' cy='64' rx='11' ry='4.5' transform='rotate(-95 72 64)'/%3E%3C/g%3E%3Cg fill='%23806660'%3E%3Ccircle cx='40' cy='30' r='4'/%3E%3Ccircle cx='46' cy='34' r='4'/%3E%3Ccircle cx='44' cy='41' r='4'/%3E%3Ccircle cx='36' cy='41' r='4'/%3E%3Ccircle cx='34' cy='34' r='4'/%3E%3C/g%3E%3Ccircle cx='40' cy='36' r='2.6' fill='%23c9b56e'/%3E%3C/svg%3E");
+  --fish:#9bb7c7;--fish-ink:#c6dbe6;--fish-soft:#2a3639;--fish-btn:#8fb0c2;--fish-on:#16201a;
+  --mini:#d4b483;--mini-ink:#ead3aa;--mini-soft:#3a3327;--mini-btn:#cda873;--mini-on:#1e1a12;
+  --eleven:#d4a3a0;--eleven-ink:#ecc7c4;--eleven-soft:#3b2a2a;--eleven-btn:#cc9793;--eleven-on:#221615;
+  --mimo:#d99577;--mimo-ink:#f0c3ae;--mimo-soft:#3d2a22;--mimo-btn:#d38b6c;--mimo-on:#24140d;
+  --nai:#b3aacb;--nai-ink:#d3cce5;--nai-soft:#302d3b;--nai-btn:#a79dc4;--nai-on:#1a1826;
+  --llm:#a8bb86;--llm-ink:#d7e3c0;--llm-soft:#2d3525;--llm-btn:#a8bb86;--llm-on:#18200f;
+}
+:root[data-skin=fresh] .device{background:linear-gradient(135deg,#fbf9f2,#e3ddcc 34%,#f6f2e7 56%,#d7d0bd 80%,#f1ece0);box-shadow:0 0 0 1px #c9c1ab,0 24px 50px -22px rgba(70,70,50,.45)}
+:root[data-skin=fresh][data-theme=dark] .device{background:linear-gradient(135deg,#3a342d,#1c1915 36%,#2d2822 60%,#141210);box-shadow:0 0 0 1px #3d372f,0 24px 50px -20px #000}
+:root[data-skin=fresh] .app-frame{background:radial-gradient(80% 36% at 100% 0,color-mix(in srgb,var(--accent) 16%,transparent) 0,transparent 70%),radial-gradient(70% 30% at 0 100%,color-mix(in srgb,var(--pink) 14%,transparent) 0,transparent 70%),var(--bg)}
+:root[data-skin=fresh] .view:before{top:4px;right:6px;width:118px;height:102px;background:var(--leaf) no-repeat right top/118px 102px;-webkit-mask-image:none;mask-image:none;opacity:.75}
+:root[data-skin=fresh] .eyebrow{font-family:Georgia,"Times New Roman",var(--serif);font-style:italic;font-weight:400;font-size:13px;letter-spacing:.06em;text-transform:none;color:var(--ink2)}
+:root[data-skin=fresh] .page-heading h1{font-family:var(--serif);font-weight:700;letter-spacing:.12em}
+:root[data-skin=fresh] .page-heading h1 span{background:none;padding:0;text-decoration:underline wavy color-mix(in srgb,var(--accent) 70%,transparent) 1.5px;text-underline-offset:9px}
+:root[data-skin=fresh] .page-heading h1 .spark{color:var(--pink);width:13px;height:13px}
+:root[data-skin=fresh] .group-title{font-family:var(--serif);font-weight:700;letter-spacing:.14em}
+:root[data-skin=fresh] .group,:root[data-skin=fresh] details,:root[data-skin=fresh] .role-card,:root[data-skin=fresh] .code-preview{border-radius:16px;box-shadow:inset 0 0 0 1px var(--line),var(--shadow)}
+:root[data-skin=fresh] .primary,:root[data-skin=fresh] .secondary,:root[data-skin=fresh] .danger{font-weight:700;letter-spacing:.06em}
+:root[data-skin=fresh] .primary{box-shadow:0 8px 16px -10px color-mix(in srgb,var(--e-btn,var(--accent-btn)) 90%,#000)}
+:root[data-skin=fresh] .primary:active:not(:disabled){transform:scale(.97);box-shadow:none}
+:root[data-skin=fresh] .secondary{background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--e-ink,var(--accent-ink)) 45%,transparent)}
+:root[data-skin=fresh] .danger{background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--danger) 45%,transparent)}
+:root[data-skin=fresh] .secondary:active:not(:disabled),:root[data-skin=fresh] .danger:active:not(:disabled){transform:scale(.97);box-shadow:inset 0 0 0 1px var(--line)}
+:root[data-skin=fresh] .round-button{box-shadow:inset 0 0 0 1px var(--line),0 6px 14px -10px rgba(60,70,50,.6)}
+:root[data-skin=fresh] .segmented{background:var(--card2);box-shadow:none}
+:root[data-skin=fresh] .segmented button[aria-pressed=true]{background:var(--card);color:var(--e-ink,var(--accent-ink));box-shadow:inset 0 0 0 1px var(--line),0 3px 8px -5px rgba(60,70,50,.5)}
+:root[data-skin=fresh] .switch{width:46px;height:26px}
+:root[data-skin=fresh] .switch:after{width:20px;height:20px;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+:root[data-skin=fresh] .field input,:root[data-skin=fresh] .field textarea,:root[data-skin=fresh] .select select,:root[data-skin=fresh] input.search{background:var(--card);border-width:1px;border-radius:12px}
+:root[data-skin=fresh] .icon-tile:after{display:none}
+/* Icons as postage stamps on letter paper: cream paper, a watercolour wash of the app's colour, a dashed stamp frame,
+   and the picture in muted ink. Each app keeps its own colour (--t1/--t2/--tac from the icon), only softened.
+   The glass and mono icon styles the user can pick in Settings still apply. */
+:root[data-skin=fresh] .screen:not([data-icon-style=glass]):not([data-icon-style=mono]) .icon-tile{
+  --paper:#fbf7ee;--ink:#4b5a50;--wash:42%;--dab:22%;
+  border-radius:12px;
+  background:radial-gradient(58% 52% at 46% 48%,color-mix(in srgb,var(--t1) var(--wash),transparent) 0 55%,color-mix(in srgb,var(--t1) calc(var(--wash) / 3),transparent) 70%,transparent 78%),
+    radial-gradient(40% 34% at 70% 72%,color-mix(in srgb,var(--tac) var(--dab),transparent) 0 60%,transparent 75%),var(--paper);
+  color:color-mix(in srgb,var(--t2) 55%,var(--ink));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 18%,transparent),0 7px 12px -8px rgba(70,70,50,.55);
+  outline:1.2px dashed color-mix(in srgb,var(--t2) 38%,transparent);outline-offset:-5px}
+:root[data-skin=fresh][data-theme=dark] .screen:not([data-icon-style=glass]):not([data-icon-style=mono]) .icon-tile{
+  /* At night a wash on dark paper reads as a glow, not watercolour: plain dark paper, and the app's own colour
+     goes to the picture and the dashed stamp frame instead. */
+  --paper:#262d29;--ink:#e6e0cf;
+  background:var(--paper);color:color-mix(in srgb,var(--t1) 70%,var(--ink));
+  outline:1.5px dashed color-mix(in srgb,var(--t1) 60%,transparent);
+  box-shadow:0 0 0 1px rgba(255,255,255,.07),0 7px 12px -8px rgba(0,0,0,.8)}
+/* Inside the picture: details in paper colour, accents in a dusty version of the app's accent. */
+:root[data-skin=fresh] .screen:not([data-icon-style=glass]):not([data-icon-style=mono]) .icon-tile .glyph{
+  width:38px;height:38px;--t2:var(--paper);--tac:color-mix(in srgb,var(--tac) 55%,#c9a79c)}
+/* Stamps are never stuck on quite straight. */
+:root[data-skin=fresh] .apps-grid .app-icon:nth-child(3n+1) .icon-tile{rotate:-2deg}
+:root[data-skin=fresh] .apps-grid .app-icon:nth-child(3n+2) .icon-tile{rotate:1.5deg}
+:root[data-skin=fresh] .phone-dock .app-icon:nth-child(2n) .icon-tile{rotate:-1.5deg}
+/* Engine cards as tinted letter paper with a postmark ring, instead of glossy bank cards. */
+:root[data-skin=fresh] .bank-card{color:var(--e-ink);border-radius:18px;
+  background:radial-gradient(circle at 84% 74%,transparent 0 27px,color-mix(in srgb,var(--e-ink) 22%,transparent) 27px 28.5px,transparent 29px 33px,color-mix(in srgb,var(--e-ink) 14%,transparent) 33px 34px,transparent 34.5px),
+    repeating-linear-gradient(0deg,transparent 0 23px,color-mix(in srgb,var(--e-ink) 7%,transparent) 23px 24px),
+    linear-gradient(150deg,color-mix(in srgb,var(--e) 34%,#fbf7ee),color-mix(in srgb,var(--e) 58%,#efe7d6));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--e-ink) 16%,transparent),0 -6px 16px -10px rgba(60,60,40,.35),0 12px 22px -14px rgba(60,60,40,.55)}
+:root[data-skin=fresh][data-theme=dark] .bank-card{
+  background:radial-gradient(circle at 84% 74%,transparent 0 27px,color-mix(in srgb,var(--e-ink) 20%,transparent) 27px 28.5px,transparent 29px 33px,color-mix(in srgb,var(--e-ink) 12%,transparent) 33px 34px,transparent 34.5px),
+    repeating-linear-gradient(0deg,transparent 0 23px,color-mix(in srgb,var(--e-ink) 6%,transparent) 23px 24px),
+    linear-gradient(150deg,color-mix(in srgb,var(--e) 30%,#262d29),color-mix(in srgb,var(--e) 16%,#1d2320));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--e-ink) 18%,transparent),0 -6px 16px -10px rgba(0,0,0,.6),0 12px 22px -14px rgba(0,0,0,.8)}
+:root[data-skin=fresh] .bank-card .spark{display:none}
+:root[data-skin=fresh] .card-name{font-family:var(--serif);font-weight:700;letter-spacing:.04em}
+:root[data-skin=fresh] .card-chip{filter:saturate(.6)}
+:root[data-skin=fresh] .app-label{font-family:var(--serif);font-weight:700;letter-spacing:.06em}
+:root[data-skin=fresh] .phone-dock{background:rgba(255,253,246,.5);box-shadow:inset 0 0 0 1px rgba(255,255,255,.75),0 10px 24px -14px rgba(60,70,50,.5)}
+:root[data-skin=fresh][data-theme=dark] .phone-dock{background:rgba(30,36,32,.5);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+:root[data-skin=fresh] .widget,:root[data-skin=fresh] .control-tile{border-radius:20px;background:color-mix(in srgb,var(--card) 80%,transparent);box-shadow:inset 0 0 0 1px rgba(255,255,255,.6),0 10px 24px -14px rgba(60,70,50,.55)}
+:root[data-skin=fresh] .home-clock{font-family:var(--serif);font-weight:500;letter-spacing:.02em}
+:root[data-skin=fresh] .home-date{font-family:var(--serif);letter-spacing:.2em}
+:root[data-skin=fresh] .msgs{background-image:none}
+:root[data-skin=fresh] .chat-bubble{border-radius:18px 18px 18px 6px;box-shadow:inset 0 0 0 1px var(--line),0 4px 10px -8px rgba(60,70,50,.5)}
+:root[data-skin=fresh] .msg.me .chat-bubble{border-radius:18px 18px 6px 18px;box-shadow:0 6px 12px -9px color-mix(in srgb,var(--accent-btn) 90%,#000)}
+:root[data-skin=fresh] .composer .send{box-shadow:none}
+:root[data-skin=fresh] .th-title strong{font-family:var(--serif);letter-spacing:.06em}
+:root[data-skin=fresh] .tool-ico{border-radius:16px}
+:root[data-skin=fresh] .tool-ico:not([data-tool=redpacket]):not([data-tool=transfer]){background:var(--card);box-shadow:inset 0 0 0 1px var(--line)}
+
+/* ---------- Skin picker (settings) ---------- */
+.skin-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px 0 6px}
+.skin-choice{display:flex;flex-direction:column;align-items:stretch;gap:6px;font-size:12px;font-weight:800;color:var(--ink);text-align:center;min-height:44px}
+.skin-choice>span{position:relative;display:block;aspect-ratio:3/4;border-radius:14px;overflow:hidden;box-shadow:inset 0 0 0 2px var(--line)}
+.skin-choice[aria-pressed=true]>span{box-shadow:0 0 0 3px var(--accent-btn)}
+.skin-choice i{position:absolute;left:12%;right:12%;height:18%;border-radius:6px}
+.skin-choice i:nth-of-type(1){top:44%}
+.skin-choice i:nth-of-type(2){top:68%;right:40%}
+.skin-choice b{position:absolute;left:12%;top:12%;width:24%;aspect-ratio:1;border-radius:6px}
+@media (prefers-reduced-motion:reduce){:root[data-skin] .primary,:root[data-skin] .secondary{transition:none}}

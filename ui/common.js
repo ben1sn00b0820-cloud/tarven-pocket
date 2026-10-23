@@ -1,0 +1,141 @@
+import {icon, spark} from './icons.js';
+
+export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+export const engines = {fish: 'Fish Audio', mini: 'MiniMax', eleven: 'ElevenLabs', mimo: '小米 MiMo'};
+import {LANGUAGES, customLanguages} from '../core/languages.js';
+export const languages = LANGUAGES;
+/** Languages typed in by the user anywhere in the settings (default language and every role), for the chip list. */
+export const typedLanguages = state => customLanguages([state.general?.defaultLanguage, ...(state.routes || []).map(r => r.language)]);
+export const languageName = code => languages.find(([value]) => value === code)?.[1] || code;
+export const size = bytes => bytes < 1024 * 1024 ? Math.round(bytes / 1024) + ' KB' : (bytes / 1024 / 1024).toFixed(1) + ' MB';
+
+// style: primary | secondary | danger | text-button | chip-button
+export const btn = (action, text, style = 'secondary', attrs = '') => `<button type="button" class="${style}" data-action="${action}" ${attrs}>${text}</button>`;
+export const help = text => `<button type="button" class="info" data-help="${esc(text)}" aria-label="檢視說明">i</button>`;
+export const field = (label, control, info = '') => `<div class="field"><span>${esc(label)}${info ? help(info) : ''}</span>${control.replace(/aria-label="[^"]*"/, 'aria-label="' + esc(label) + '"')}</div>`;
+export const input = (key, value = '', type = 'text', attrs = '') => `<input data-field="${esc(key)}" aria-label="${esc(key)}" type="${type}" value="${esc(value)}" ${attrs}>`;
+export const select = (key, value, choices, attrs = '') => `<span class="select"><select data-field="${esc(key)}" aria-label="${esc(key)}" ${attrs}>${choices.map(([v, t, disabled]) => `<option value="${esc(v)}" ${String(value) === String(v) ? 'selected' : ''} ${disabled ? 'disabled' : ''}>${esc(t)}</option>`).join('')}</select></span>`;
+export const textArea = (key, value, attrs = '') => `<textarea data-field="${esc(key)}" aria-label="${esc(key)}" rows="5" ${attrs}>${esc(value)}</textarea>`;
+export const toggle = (key, label, value, info = '') => `<div class="setting-row"><span>${esc(label)}${info ? help(info) : ''}</span><input class="switch" aria-label="${esc(label)}" type="checkbox" data-field="${esc(key)}" ${value ? 'checked' : ''}></div>`;
+export const empty = (title, detail = '', art = 'music') => `<div class="empty">${icon(art)}<h2>${esc(title)}</h2>${detail ? `<p>${esc(detail)}</p>` : ''}</div>`;
+
+// Page title: small English eyebrow, a big title with a marker underline, and optional actions.
+export const heading = (title, actions = '', eyebrow = '') => `<header class="page-heading"><div>${eyebrow ? `<span class="eyebrow">${esc(eyebrow)}</span>` : ''}<h1><span>${esc(title)}</span>${spark()}</h1></div>${actions ? `<div class="heading-actions">${actions}</div>` : ''}</header>`;
+/** Copies text: the clipboard API where the page may use it, else the old selection copy (LAN http addresses). */
+export async function copyText(win, text) {
+  try { if (win.navigator.clipboard?.writeText) { await win.navigator.clipboard.writeText(text); return true; } } catch { /* tried the old way below */ }
+  const doc = win.document, box = doc.createElement('textarea');
+  box.value = text; box.setAttribute('readonly', ''); box.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+  doc.body.append(box); box.select();
+  let done = false;
+  try { done = doc.execCommand('copy'); } catch { done = false; }
+  box.remove();
+  return done;
+}
+export const groupTitle = (title, extra = '') => `<div class="group-title"><span>${esc(title)}</span>${extra}</div>`;
+
+// A skewed name plate; engine colour comes from the nearest data-engine ancestor.
+export const plate = (text, attrs = '') => `<span class="plate" ${attrs}><span>${esc(text)}</span></span>`;
+// Pictures for avatars, by name ('me' for the user): filled by the phone from the user's choices and the tavern's own
+// avatars (ui/phone.js refreshAvatars). A name without one shows its first letter.
+const avatarPictures = new Map();
+export function setAvatarPictures(map) { avatarPictures.clear(); for (const [k, v] of Object.entries(map || {})) if (v) avatarPictures.set(k, v); }
+export const avatarPicture = key => avatarPictures.get(key) || '';
+export const avatar = (name, engine = 'none', size = 48, key = name) => {
+  const picture = avatarPictures.get(key), letter = esc(String(name || '?').trim().slice(0, 1) || '?');
+  return `<span class="avatar${engine === 'none' ? ' none' : ''}${picture ? ' pic' : ''}" data-engine="${engine}" style="--s:${size}px">${picture ? `<img src="${esc(picture)}" alt="" loading="lazy" decoding="async" draggable="false">` : letter}</span>`;
+};
+
+export function createView(ctx, name) {
+  const root = ctx.doc.createElement('section');
+  root.className = 'view';
+  root.dataset.app = name;
+  const controller = new ctx.win.AbortController();
+  let disposed = false;
+  const view = {
+    root,
+    back: null,
+    refresh() {},
+    dispose() { disposed = true; controller.abort(); },
+    get disposed() { return disposed; },
+    // Replaces the view content while keeping scroll position, open <details> groups and the scroll of inner lists
+    // marked data-keep-scroll.
+    draw(html) {
+      const y = root.scrollTop;
+      const opened = [...root.querySelectorAll('details[open]')].map(el => el.dataset.group);
+      const inner = new Map([...root.querySelectorAll('[data-keep-scroll]')].map(el => [el.dataset.keepScroll, el.scrollTop]));
+      root.innerHTML = html;
+      for (const el of root.querySelectorAll('details')) if (opened.includes(el.dataset.group)) el.open = true;
+      for (const el of root.querySelectorAll('[data-keep-scroll]')) if (inner.has(el.dataset.keepScroll)) el.scrollTop = inner.get(el.dataset.keepScroll);
+      root.scrollTop = y;
+    },
+    on(type, selector, fn) {
+      root.addEventListener(type, event => {
+        const el = event.target.closest(selector);
+        if (!el || !root.contains(el)) return;
+        if (type === 'click') event.preventDefault();
+        try {
+          const result = fn(el, event);
+          if (result?.catch) result.catch(error => ctx.notify(error.message, {error: true}));
+        } catch (error) { ctx.notify(error.message, {error: true}); }
+      }, {signal: controller.signal});
+    },
+    async busy(el, task) {
+      if (el.disabled) return;
+      el.disabled = true;
+      try { return await task(); } finally { if (el.isConnected) el.disabled = false; }
+    }
+  };
+  view.on('click', '[data-help]', el => ctx.help(el.dataset.help));
+  bindCombos(root, controller.signal);
+  return view;
+}
+
+// A browser <datalist> only lists the entries that match what is already typed (with "ja" in the box it shows only
+// 日语), so the language box has its own list: every language as a chip under the box, opened by tapping the box or ▾.
+// A language not in the list is simply typed in the box (粤语, 上海话, Cantonese…); while typing, the first chip offers to
+// use exactly what was typed, and languages typed before come back as chips marked 自定义.
+export function languageField(key, value, inherit = true, typed = []) {
+  const chip = (v, t, note = v) => `<button type="button" class="combo-chip" data-combo-value="${esc(v)}" aria-pressed="${String(value) === v}">${esc(t)}${note ? `<small>${esc(note)}</small>` : ''}</button>`;
+  const chips = languages.filter(([v]) => v || inherit).map(([v, t]) => chip(v, t)).join('') + typed.map(v => chip(v, v, '自定義')).join('');
+  const control = `<span class="combo">${input(key, value, 'text', `placeholder="${inherit ? '留空跟隨預設，也可以直接打字' : '選一個，或直接打字，比如 粵語'}" autocomplete="off"`)}<button type="button" class="combo-open" data-combo-open aria-expanded="false" aria-label="展開全部語言">${icon('down')}</button></span><span class="combo-menu" role="group" aria-label="全部語言" hidden><button type="button" class="combo-chip combo-typed" data-combo-value="" hidden></button>${chips}</span>`;
+  return field('臺詞語言', control, '列表裡沒有的語言，直接在框裡打字就行，比如 粵語、上海話、Cantonese，模型會照著寫臺詞。角色留空時用預設臺詞語言。ElevenLabs 只認語言程式碼（如 ja、yue），寫成名字時它會自己聽出來。');
+}
+function bindCombos(root, signal) {
+  const menuOf = el => el.closest('.field')?.querySelector('.combo-menu');
+  const show = (field, open, filter = '') => {
+    const menu = field.querySelector('.combo-menu'), box = field.querySelector('.combo input');
+    if (!menu || !box) return;
+    menu.hidden = !open;
+    field.querySelector('[data-combo-open]')?.setAttribute('aria-expanded', String(open));
+    const q = filter.trim().toLowerCase(), own = menu.querySelector('.combo-typed');
+    for (const chip of menu.querySelectorAll('[data-combo-value]:not(.combo-typed)')) {
+      chip.hidden = !!q && !chip.textContent.toLowerCase().includes(q);
+      chip.setAttribute('aria-pressed', String(chip.dataset.comboValue === box.value.trim()));
+    }
+    // What was typed, when it is not one of the chips: 用「粤语」.
+    const exact = [...menu.querySelectorAll('[data-combo-value]:not(.combo-typed)')].some(chip => chip.dataset.comboValue.toLowerCase() === q || chip.firstChild?.textContent.toLowerCase() === q);
+    if (own) {
+      own.hidden = !q || exact;
+      own.dataset.comboValue = filter.trim();
+      own.textContent = `用「${filter.trim()}」`;
+    }
+  };
+  root.addEventListener('focusin', e => { if (e.target.matches('.combo input')) show(e.target.closest('.field'), true); }, {signal});
+  root.addEventListener('click', e => {
+    const opener = e.target.closest('[data-combo-open]'), pick = e.target.closest('[data-combo-value]');
+    if (opener) { const f = opener.closest('.field'); show(f, menuOf(opener).hidden); return; }
+    if (e.target.matches('.combo input')) { show(e.target.closest('.field'), true); return; }
+    if (!pick) return;
+    const f = pick.closest('.field'), box = f.querySelector('.combo input');
+    box.value = pick.dataset.comboValue;
+    for (const type of ['input', 'change']) box.dispatchEvent(new box.ownerDocument.defaultView.Event(type, {bubbles: true}));
+    show(f, false);
+  }, {signal});
+  // Typing narrows the list; a value already chosen (like "ja") still opens the whole list.
+  root.addEventListener('input', e => { if (e.target.matches('.combo input') && e.target.ownerDocument.activeElement === e.target) show(e.target.closest('.field'), true, e.target.value); }, {signal});
+  root.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.closest('.combo')) { const f = e.target.closest('.field'); if (!menuOf(e.target).hidden) { e.stopPropagation(); show(f, false); } } }, {signal});
+  root.ownerDocument.addEventListener('pointerdown', e => {
+    for (const menu of root.querySelectorAll('.combo-menu:not([hidden])')) if (!menu.closest('.field').contains(e.target)) show(menu.closest('.field'), false);
+  }, {signal});
+}

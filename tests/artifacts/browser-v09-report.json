@@ -1,0 +1,32 @@
+{
+  "passed": 14,
+  "checks": [
+    "actual index initializes and a single floating-ball click opens the actual iframe",
+    "all twelve upstream apps, four existing additions and the new Me app remain on the desktop",
+    "docked floating ball reopens phone with one click",
+    "main-input button opens searchable profile/item/ability tabs, distinguishes duplicate names, inserts three references at the saved caret without sending/spending, and fits a 390px viewport",
+    "the first GENERATION_AFTER_COMMANDS event reads unsent composer references before the user message exists and injects only the selected duplicate ability plus current item/profile",
+    "rendered reference chips survive Showdown paragraph formatting; edits resolve by stable ID to current values and deleted items are reported missing without stale ownership or wallet effects",
+    "a compact UUID containing underscores renders as a nested reference chip inside a WeChat card under Showdown while literal HTML/entities/Markdown in the asset label remain harmless text",
+    "switching personas immediately refreshes the picker and rejects references owned by the prior persona without leaking its profile or ability description",
+    "optional @ keyboard completion resolves the selected ability and does not consume Enter during Chinese IME composition",
+    "CHAT_CHANGED closes an open memory picker without inserting a stale selection or modifying the user draft",
+    "turning forum mirroring off archives new records quietly; turning it back on shows subsequent posts without replaying the prior quiet record",
+    "390px Showdown-rendered native batch presents incoming/outgoing WeChat, forum post/reply and one confirmed shop receipt without horizontal overflow, duplicate mirrors or duplicate payment",
+    "shop preset manager creates and imports real JSON files without model calls, selects the saved preset, respects disabled ST prompt-order segments and includes only active custom text in subsequent product generation",
+    "phone settings accept nine books, browse all 658 enabled entries, search past entry 500, read and pin the end of a 12k+ chapter without calling a model, and retrieve that late passage into a subsequent phone-model request"
+  ],
+  "mockedNovelAIRequests": 0,
+  "browser": "151.0.7922.34",
+  "pageErrors": [],
+  "host": "mock SillyTavern 1.19 APIs, original host+iframe, real Chromium IndexedDB, Showdown 2.1.0 paragraph fixture (not full ST formatting pipeline), deterministic model fixture",
+  "scope": "Focused v0.9 replay after full 76-group suite: overlaps primary suite; additionally validates encoded reference within WeChat card and CHAT_CHANGED picker closure. Counts must not be summed.",
+  "finalVisualCheck": {
+    "passed": true,
+    "freshPageLoad": true,
+    "pickerPreviewColor": "rgb(234, 242, 245)",
+    "pickerPreviewOpacity": 0.85,
+    "pageErrors": [],
+    "screenshot": "v09-composer-picker-mobile.png"
+  }
+}

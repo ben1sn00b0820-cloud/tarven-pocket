@@ -1,0 +1,11 @@
+{
+  "name": "st-iphonie-queue",
+  "private": true,
+  "description": "Shared NovelAI queue for ST-iPhonie (Cloudflare Worker + Durable Object).",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

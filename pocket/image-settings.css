@@ -1,0 +1,8 @@
+.pocket-image-settings .pocket-settings-card{margin:16px 0;padding:16px;border:1px solid var(--line,#dce5f2);border-radius:18px;background:var(--card,#fff)}
+.pocket-image-settings h3{font-size:16px;margin:0 0 12px}.pocket-image-settings .hint{line-height:1.65}
+.pocket-preset-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0}
+.pocket-preset-toolbar>*{max-width:100%}.pocket-preset-toolbar .file-button{display:inline-flex;align-items:center;position:relative;overflow:hidden;padding:10px 14px;border-radius:12px;cursor:pointer}
+.pocket-preset-toolbar input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.pocket-preset-list{border:1px solid var(--line,#dce5f2);border-radius:16px;overflow:hidden}.pocket-preset-list .list-row{width:100%;text-align:left}.pocket-preset-list .list-row[aria-pressed=true]{background:var(--soft,#eef5ff)}
+.pocket-preset-list small{overflow-wrap:anywhere}.pocket-preset-note{padding:10px 12px;background:#ecf5ff;border-radius:12px;color:#1b4773;line-height:1.5}
+.pocket-preset-params{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}.pocket-image-settings textarea{min-height:78px;resize:vertical}.pocket-image-settings details summary{padding:10px 0;cursor:pointer}

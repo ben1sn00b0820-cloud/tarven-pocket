@@ -1,0 +1,17 @@
+{
+  "version": "0.9.1",
+  "target": "https://github.com/ben1sn00b0820-cloud/tarven-pocket",
+  "status": "validated for GitHub release",
+  "node": {
+    "tests": 373,
+    "pass": 373,
+    "fail": 0
+  },
+  "runtimeChanges": [
+    "manifest update source and release version",
+    "settings and phone state display release version"
+  ],
+  "protocolVersion": "0.9.0",
+  "browser": "Not repeated: runtime behavior is unchanged; prior browser results remain in VALIDATION.json",
+  "sourceReview": "All 273 local runtime references accounted for; no hardcoded real credentials found in reviewed source."
+}

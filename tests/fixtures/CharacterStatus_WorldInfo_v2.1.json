@@ -1,0 +1,39 @@
+{
+  "entries": {
+    "0": {
+      "uid": 0,
+      "key": [],
+      "keysecondary": [],
+      "comment": "CSB v2.1｜八項數值・手填部位・輸出協定",
+      "content": "【角色狀態欄 CSB v2.1｜輸出協定】\n新版 lewdness 取代 hygiene，其餘設定不變。升級時身體部位手填資料可從最近同名角色的 CSB2 快照沿用。\n每次劇情回覆完成後，在正文最後另起一行輸出一個完整的 [CSB21_PANEL]。不要輸出舊版 CSB 或 CSB2 標記。這是當輪結尾的完整快照，正文正常敘事，狀態區塊不要放入程式碼圍欄，不縮排、不輸出 HTML/CSS/JavaScript。\n\n角色：列出本場景有名字且在場或有即時通訊互動的角色，每人一個 CSB21_ROLE。順序保持穩定，同人不重複；離場且無即時互動者不列出，不為湊欄位創造新角色。預設不列 {{user}}，不替使用者決定行動或內心。沒有適用角色時，面板內保留 time 並寫「目前沒有在場角色。」。\n\n依據與延續：使用者最新明確設定優先，其次是既有人物設定、當輪敘事及最近同名角色快照。維持姓名、年齡、身分、關係及已知數值，不任意重設。位置、行動以當輪結尾為準。time 使用劇情時間，未知寫「未交代」，不可自動套現實日期。文字欄缺乏依據就寫「未交代」；年齡未知寫「未知」；限知敘事無法得知他人想法時，thought 寫「未表露」。\n\n八項數值均為 0–100 整數或「未知」，不加百分號：\naffection 好感度，trust 信任度，皆為角色對 {{user}} 的態度；energy 體力越高越有活力；fatigue 疲倦越高越疲憊；stress 壓力越高越緊繃；satiety 飽食度越高越飽足；hydration 飲水度代表水分充足程度，越高越充足，不是口渴度，也不是喝水毫升數；lewdness 淫蕩值，表示成人虛構角色設定中的性開放程度，越高表示設定越開放；只依使用者明確設定或角色自述填入，未設定寫「未知」，不依外貌、衣著或一般友善態度推定。\n數值是劇情估計，不是客觀測量。未知不可用 0 代替。變動需有依據；輕微情緒變化一般不超過 5，大事件可以更多並在 note 記原因。飲食、喝水、休息、運動等事件只在有明確依據時改變相關數值；不要每回合固定扣分。體力與疲倦不是機械互補，不強制總和 100。好感／信任／淫蕩值均不能代替角色明確表態。舊版 hygiene 清潔度與 lewdness 淫蕩值含義不同，不得把舊值轉移成新值。\n\ncondition 記一般健康或傷勢；outfit 記衣著；action 記可觀察行動；thought 記已表露想法；items 記物品；note 記變化。每值一行，多項用「；」，建議各 40 字內。\n\nbody 是使用者保留的手填部位區。初次輸出時照範本列出 12 部位＋4 自訂部位，所有值保持真正空字串，不填「正常」「未知」「無」或破折號。沒有使用者明確填入內容時，不能自行以劇情推測填滿這區。使用者透過訊息或編輯舊快照填入某角色的部位名稱／內容後，後續同一角色完整保留，除非使用者明確要求修改或清空。不同角色資料不得互相複製。使用者增刪、改名的部位列也應延續，不重置成預設 16 列；仍然空白的列繼續留白。一般健康劇情變化寫 condition，不覆寫手填部位區。\n\n格式：英文鍵名和順序照模板，20 個固定欄位及 body 都要存在。每個部位用一行 [CSB21_PART|欄位名稱|內容]；空內容就是最後兩個符號「|]」，兩個分隔豎線不可省略。body 可有任意數量部位列，名稱不可空。所有欄值用純文字，不含 HTML、反引號、換行、大括號；部位名稱與內容另不得含 ASCII 中括號或豎線，改用全形［］｜。不用 Markdown 強調。完整生成並關閉每個角色與面板。\n\n以下模板每個角色重複一份 CSB21_ROLE 區塊，將文字說明替換成實際資料。身體部位空值必須保留空白：\n[CSB21_PANEL]\ntime: 未交代\n[CSB21_ROLE]\nname: 角色姓名\nage: 未知\nmood: 未交代\nidentity: 未交代\nrelation: 未交代\nlocation: 未交代\naffection: 未知\ntrust: 未知\nenergy: 未知\nfatigue: 未知\nstress: 未知\nsatiety: 未知\nhydration: 未知\nlewdness: 未知\ncondition: 未交代\noutfit: 未交代\naction: 未交代\nthought: 未表露\nitems: 未交代\nnote: 無明顯變化\nbody:\n[CSB21_PART|頭部|]\n[CSB21_PART|面部|]\n[CSB21_PART|頸肩|]\n[CSB21_PART|胸部|]\n[CSB21_PART|背部|]\n[CSB21_PART|腹部|]\n[CSB21_PART|腰部|]\n[CSB21_PART|手臂|]\n[CSB21_PART|手部|]\n[CSB21_PART|腿部|]\n[CSB21_PART|足部|]\n[CSB21_PART|皮膚|]\n[CSB21_PART|自訂部位 01|]\n[CSB21_PART|自訂部位 02|]\n[CSB21_PART|自訂部位 03|]\n[CSB21_PART|自訂部位 04|]\n[/CSB21_ROLE]\n[/CSB21_PANEL]\n\n輸出前檢查所有鍵名、順序、數值範圍、閉合標記，並確認沒有擅自填寫手填區。",
+      "constant": true,
+      "vectorized": false,
+      "selective": true,
+      "selectiveLogic": 0,
+      "addMemo": true,
+      "order": 100,
+      "position": 4,
+      "disable": false,
+      "ignoreBudget": false,
+      "excludeRecursion": true,
+      "preventRecursion": true,
+      "delayUntilRecursion": 0,
+      "probability": 100,
+      "useProbability": true,
+      "depth": 1,
+      "role": 0,
+      "group": "",
+      "groupOverride": false,
+      "groupWeight": 100,
+      "scanDepth": null,
+      "caseSensitive": null,
+      "matchWholeWords": null,
+      "useGroupScoring": null,
+      "automationId": "",
+      "sticky": 0,
+      "cooldown": 0,
+      "delay": 0,
+      "displayIndex": 0
+    }
+  }
+}

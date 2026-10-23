@@ -1,0 +1,18 @@
+{
+  "id": "9b30c203-7f7c-4d94-98f7-bd3b4e87d71f",
+  "scriptName": "Tavern Pocket v0.8.0 — 正文手機卡片・自然指令美化",
+  "findRegex": "/((?:微信(?:傳給|传给)|(?:Instagram|IG)(?:傳給|传给|私訊給|私信给|發文|发文|發帖|发帖|發限動|发限动|限時動態|限时动态))[^<>&\\r\\n：「」]{0,128})[：:][ \\t]*「([^<>&「」\\r\\n]{1,4000})」/gmi",
+  "replaceString": "<span class=\"tp-story-fallback\" style=\"display:block;box-sizing:border-box;margin:10px 0;padding:12px 14px;max-width:440px;border:1px solid #dce6e1;border-radius:16px;background:#f6faf8;color:#24362d;overflow-wrap:anywhere\"><span style=\"display:block;color:#27865a;font-size:12px;margin-bottom:7px\">手機紀錄 · $1</span><span style=\"display:block;white-space:pre-wrap\">$2</span></span>",
+  "trimStrings": [],
+  "placement": [
+    1,
+    2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": true,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+}

@@ -1,0 +1,18 @@
+{
+  "id": "9b30c203-7f7c-4d94-98f7-bd3b4e87d71f",
+  "scriptName": "Tavern Pocket v0.3.0 — 僅隱藏完整手機同步區塊",
+  "findRegex": "/<phone>[\\s\\S]*?<\\/phone>/g",
+  "replaceString": "",
+  "trimStrings": [],
+  "placement": [
+    1,
+    2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": true,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+}

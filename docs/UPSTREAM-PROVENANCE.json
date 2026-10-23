@@ -1,0 +1,328 @@
+{
+  "upstream": "https://github.com/hey8v0/ST-iPhonie",
+  "commit": "a1670bb525c6b0e4f64c67fa77ecb1a487d318ba",
+  "upstream_manifest_version": "0.6.56",
+  "fork_version": "0.9.1",
+  "upstream_files": [
+    {
+      "path": "README.md",
+      "sha256": "2becd73e0fbb6f6a2b3fb3c03f5dc675d4eec06a369012806eec1577d56a4c01"
+    },
+    {
+      "path": "capability-contract.json",
+      "sha256": "413dc172ebdc7b75d6ea449707fc801085a2804c5e90b2c757a975268b192ff7"
+    },
+    {
+      "path": "cloud-queue/package.json",
+      "sha256": "1d733c12f0f62194071033c40b9be13d01c2e9826b0c520afeff0ca9613aeb62"
+    },
+    {
+      "path": "cloud-queue/worker.js",
+      "sha256": "1b2b88402f8f35eca8c8f6e6915fd98a5441f3c98056a4bcc827b9ce8a017c47"
+    },
+    {
+      "path": "cloud-queue/wrangler.toml",
+      "sha256": "9fc3a22a17b0f3fb9a610cb4f87366bef3aad5cb4282c15d8022d1e0da7a5550"
+    },
+    {
+      "path": "cloud-queue/部署说明.md",
+      "sha256": "a21a6eb098810f1efd1a2ba24c5cae8c958aa62a276fd894c78a4e2c0e05d11c"
+    },
+    {
+      "path": "core/app-store.js",
+      "sha256": "6f801b980c0ef9543f5717330b2698807257924127a1f61c8f8ca360e0f4f738"
+    },
+    {
+      "path": "core/audio-join.js",
+      "sha256": "ec31732a55bfc968ce639aa2b8637ce8759295dcc8ffdbfa03a8b2e14669089f"
+    },
+    {
+      "path": "core/backend.js",
+      "sha256": "1632258bc71fc684d078749768a8f8c8a56bd4cd757b8b656cb5cafeba6e0384"
+    },
+    {
+      "path": "core/backup.js",
+      "sha256": "a8159f3bbfe3c2799ce6f9d80d5aef5ed4203c32fe0d99aa0223de427c680e86"
+    },
+    {
+      "path": "core/cache.js",
+      "sha256": "fe2c880aa05da2f18b3b142f597d048d94a41502d0c02fdd0de53985c44d33fa"
+    },
+    {
+      "path": "core/call.js",
+      "sha256": "de61dd0eb91cbb8ddbabcc96d466416ed8905e2b2dfc3831f461a33bddda3eb5"
+    },
+    {
+      "path": "core/chat.js",
+      "sha256": "eed687f91999841800565d6748f1ed089e0a62e7553e41cdcd95a97e41c3e3af"
+    },
+    {
+      "path": "core/chats.js",
+      "sha256": "75ab4250b72020e722f032cdbd20717ad625b0c1f73df7faf1a0269f9d290424"
+    },
+    {
+      "path": "core/cloud-queue.js",
+      "sha256": "f6102883960cc38cad12d618e22a15f8102f3e259666d5e43f008f78cfb415a6"
+    },
+    {
+      "path": "core/compat.js",
+      "sha256": "71a8dcca33a909fdd07790dfa0f8a0571acdc960212b637c6b5f63a71d6985bd"
+    },
+    {
+      "path": "core/diagnostics.js",
+      "sha256": "5b00afe2af6a0fb95461ae0cb73ca69925ceb9d9c4efd28e91a936d18befc5f7"
+    },
+    {
+      "path": "core/draw-queue.js",
+      "sha256": "c4d7a49f036bdafe577b228088eb3307447ba7a38007fc88ed61115fa7a1eb7a"
+    },
+    {
+      "path": "core/draw.js",
+      "sha256": "f7522113547d32156006b8636321c6db7e5813069b3db821774832c474cb6296"
+    },
+    {
+      "path": "core/floating.js",
+      "sha256": "7d3484f7295d520ceecea06daf1112ddc6344befb99b4ca3a0420f972e61416c"
+    },
+    {
+      "path": "core/forum.js",
+      "sha256": "b7fa5383a1f50f06c5ac662423a75bd7825c1d266f09889eda3ebcb3c192e938"
+    },
+    {
+      "path": "core/hash.js",
+      "sha256": "6426334c8f069cb177e772347cf031a9ba15444be39845d339152f61c88e321c"
+    },
+    {
+      "path": "core/idb.js",
+      "sha256": "7e170f6ebceb3d035bc127340030b10955a4db74d052c91d38f30606e6f61b6f"
+    },
+    {
+      "path": "core/image-engines.js",
+      "sha256": "c66a39d6ebd694417f0995f295fc413a9f90da89716b4c015e7fe662685800ae"
+    },
+    {
+      "path": "core/keys.js",
+      "sha256": "1147b69676b9146fcb8f6ef44305895c91348da9226e3667faa755bb74073997"
+    },
+    {
+      "path": "core/languages.js",
+      "sha256": "837ef909973dc4d0b9f26cf69271d52b5b63a2d35bca50a511ef0111b670af67"
+    },
+    {
+      "path": "core/library.js",
+      "sha256": "9f6beb9874a7631cf605902ba276e5e0daf2a596d309da791de5158973263eb6"
+    },
+    {
+      "path": "core/llm.js",
+      "sha256": "2e3ac3c5161c2daf947f4514c806c53f82bd1de385962d420d5478449d87c147"
+    },
+    {
+      "path": "core/moments-store.js",
+      "sha256": "973e67ce08fbf86f63b49c3e8d22cfad1f71755ad9df20cf113bb4aaae13547d"
+    },
+    {
+      "path": "core/moments.js",
+      "sha256": "0697a4230f169556ddea6863732532c9433350b490fc66e10a2ab9f1b4e6b56c"
+    },
+    {
+      "path": "core/novelai.js",
+      "sha256": "d4b64ab3053223ae5cb1abe6e683ac034cc0f199088dec5bc5701cc933ad6ade"
+    },
+    {
+      "path": "core/outgoing.js",
+      "sha256": "a699ff6d9d774a7b4f3a72c1560a5827e50533c7a16fd8cc20c4a08a5bf5e213"
+    },
+    {
+      "path": "core/parameters.js",
+      "sha256": "4c25a4a315ff3cfd2ac38d5f7b3544a5743f4d35a8b0e196714b2eca49c4eedc"
+    },
+    {
+      "path": "core/peek.js",
+      "sha256": "ce9e57ae05a71c138a34d362b82b1466d0d6461e08d4abbfbcbc0348677b573e"
+    },
+    {
+      "path": "core/player.js",
+      "sha256": "8cb27b2b88d9230531f113de9df104d8a8b0aa063f48809c03a252fd60de5bf1"
+    },
+    {
+      "path": "core/protocol.js",
+      "sha256": "6317bfa692648190b01c2e9d620ff13ddefbc129cdf1d71f0cdb09845c569bde"
+    },
+    {
+      "path": "core/providers.js",
+      "sha256": "9785a7d78acc57dc539194b2d2be4c866d15fc77ec05ebdb605aeb6309204dde"
+    },
+    {
+      "path": "core/routes.js",
+      "sha256": "56e0441af8e29ed8beeb047fa077ea7026be0092d9922f258f48c90031913db7"
+    },
+    {
+      "path": "core/state.js",
+      "sha256": "449352f8f42cb8cd2b35f3f2add966b6940b2c115da4da684e58cda90e330d05"
+    },
+    {
+      "path": "core/sync.js",
+      "sha256": "fdfe1bbfc8abdb4c63fd245b84c33d4d2ccd81d8bb47c7d144d8a2c1f57a0449"
+    },
+    {
+      "path": "core/vibes.js",
+      "sha256": "bd781f00a5ea55fea2d33ceba9b1da44603f65ad6a025cf4934e234f3d8742d9"
+    },
+    {
+      "path": "core/wallet.js",
+      "sha256": "9c27f148a6705b1675ddaa771f3dd023b8ec7bfd927b6fbf2d2460de3161d393"
+    },
+    {
+      "path": "download.js",
+      "sha256": "fd746bc3f122e5b7e5064024f55e87cb6cd2cd2daf41d13505d27a39a9537b35"
+    },
+    {
+      "path": "floating.css",
+      "sha256": "e4e1b6d3d26cd741db361f16664a899384187e633f6da0592ecc4052f5441075"
+    },
+    {
+      "path": "host-apps.js",
+      "sha256": "492af1ebd8f32b8ccc5c8b2a274b53d06a8138e9f6323163fc7404ac9197ff70"
+    },
+    {
+      "path": "host-call.js",
+      "sha256": "396fc5741a3c0761ac12b8023017b4a9754b874a03674b452e0e56438434226a"
+    },
+    {
+      "path": "host-chat.js",
+      "sha256": "2beeed2310817e2194f8249be02d518799aa829a834e6eb7029450896ad379a1"
+    },
+    {
+      "path": "host-lore.js",
+      "sha256": "ded356a6b4708634726bd8e59e2746f380cc32f59327c2b1e04dde0ebd7404f4"
+    },
+    {
+      "path": "host-moments.js",
+      "sha256": "d8aaaf8c3d8376277f7ddf556a6c002e36edcde34cc3dd7d14221b6d2256541d"
+    },
+    {
+      "path": "host-pictures.js",
+      "sha256": "42a28b77d620bf9b38f497ea54621967f9db7a0765335643e6cfc0f605f151b2"
+    },
+    {
+      "path": "image-viewer.js",
+      "sha256": "0f16f2e710b09ed7227e51617de7554ad16c3deded96e2ad63230682cd32b036"
+    },
+    {
+      "path": "index.js",
+      "sha256": "0c27229c731eaede4facabb643430cf5c7c7a9b34535e5f11e8e9951c7743c5b"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "0f0d89dad036f27bb096faa605b86f432c12b233e73a1e6e039f5a7b7275f407"
+    },
+    {
+      "path": "package.json",
+      "sha256": "22c2babc4f76634d62a22e6456c4d8c7462d64e359870dceb809404f6e4e59f6"
+    },
+    {
+      "path": "style.css",
+      "sha256": "de554d5558af395f227e58c7d5f6967cdb5487d14f5d50c6821286b150129776"
+    },
+    {
+      "path": "ui/apps.js",
+      "sha256": "8d6f57659be9dd679b0ef8d1b0d7e6c392401c565d727f954236ddca397641a5"
+    },
+    {
+      "path": "ui/backend-client.d.ts",
+      "sha256": "606926ae5f2678d59a3b91e23144e6e07af37985581130408b04f3751d46b68f"
+    },
+    {
+      "path": "ui/backend-client.js",
+      "sha256": "7c320f45b02e420c4cb9262d7f5843a98f7ca31f0b7a8b2545e7030f50c54bf3"
+    },
+    {
+      "path": "ui/call.js",
+      "sha256": "17679d7e50890102d41cc3a769c383b9e52bf56a7de353640daaad956d8daa42"
+    },
+    {
+      "path": "ui/chat.js",
+      "sha256": "80884ef949f2e79ad73328fd51daf958df5a03eedf15b224a6670cfe8b2c82bb"
+    },
+    {
+      "path": "ui/common.js",
+      "sha256": "c67119df98ab2218b03a1959443c6a53c79fbcfbfa2dafb7e29459bd31362b6f"
+    },
+    {
+      "path": "ui/draw.js",
+      "sha256": "c890e894cadfd4ff2359bbd733c87cabb8a48ed933232606219f2895999dae7c"
+    },
+    {
+      "path": "ui/engines.js",
+      "sha256": "4bf2c80c96ad8d673c4c17c3f4842a35104d6c0d2576296633022447cfce52f0"
+    },
+    {
+      "path": "ui/forum.js",
+      "sha256": "39dfc54e92fa32fa165ab4c800138e5fa83901e31b7c962b67de6d7de2f2453e"
+    },
+    {
+      "path": "ui/icons.js",
+      "sha256": "6548f33d7372807f6262100b83aaef2b7301548683b448cfc752dccdc0c669bd"
+    },
+    {
+      "path": "ui/index.html",
+      "sha256": "86ca8880a6bb44647628c070d1db0e708d8b1af355179368706af9f4a37e0c85"
+    },
+    {
+      "path": "ui/media-apps.js",
+      "sha256": "cd441d94da6248cf37be39381f38482f72fe8c22111e2d31ac134bd8f2d89130"
+    },
+    {
+      "path": "ui/moments.js",
+      "sha256": "70390856450016c8ea86478b44114016e81fa0c8f3c0a1e72cca4c59022d1b52"
+    },
+    {
+      "path": "ui/motion.js",
+      "sha256": "297ebeb32a80722e20fe5997d9eed70de24e52dab550b0832ab8db29f9db39cd"
+    },
+    {
+      "path": "ui/peek.js",
+      "sha256": "711cd9eb4774f0647477542fd623153fac981f249e47b30677e8d66d1575541e"
+    },
+    {
+      "path": "ui/pendants.js",
+      "sha256": "7abe71acc84f97942407e645e761fdea353d2542432600f846b04e7b0f2085f8"
+    },
+    {
+      "path": "ui/phone.css",
+      "sha256": "a0ae36710d83a0d70c7742ad6a851320e82f768465bc87a0be91e6e81457d248"
+    },
+    {
+      "path": "ui/phone.js",
+      "sha256": "7ced83f971b016b44dcd8aa8159085918d88b83fefbdfadb8a2712d88bc50d52"
+    },
+    {
+      "path": "ui/presets.js",
+      "sha256": "91c6f78308de2f7944e4a136f58dc3777aa05171c57f831a45d8d0f5ad46da9c"
+    },
+    {
+      "path": "ui/roles.js",
+      "sha256": "b9858a40d61e2f34464eb97e427d47d5dc180d7523832817bef03267f6a247ae"
+    },
+    {
+      "path": "ui/settings.js",
+      "sha256": "049c2b3a9c43d326a715d7104d8bdbdad305508387cf72d78d9326bc48ee3a37"
+    },
+    {
+      "path": "ui/skins.css",
+      "sha256": "a70b6d6da757856b2f55904f4eba2f034fa533dbc085e68f1ae8c7600d90d315"
+    },
+    {
+      "path": "ui/vibes.js",
+      "sha256": "a6508d239c333257b5d72fd1b07937e16d95706bf13e79510383e3db7540a210"
+    },
+    {
+      "path": "ui/wallpapers.js",
+      "sha256": "3507f345f8fd68b1781c68656b788edc664bcdd71fa362588f9c16f2d6d3a3ec"
+    },
+    {
+      "path": "使用说明.md",
+      "sha256": "f787a4bc5f4175ed64cb562171c28a3ea753c442d5f8adfa271b2dc7dec12f23"
+    }
+  ]
+}

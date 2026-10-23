@@ -1,0 +1,46 @@
+/* ST-iPhonie floating ball. Plain DOM, every rule scoped under #sttts-floating so tavern themes cannot reach in
+   and dock scripts can clone the ball. Idle: sky gradient. Playing: the engine's colour with a pulsing ring.
+   Docked: the ball tucks behind the screen edge; the first tap brings it out, the second opens the phone. */
+#sttts-floating{all:initial;position:fixed;z-index:30010;width:58px;height:58px;display:block;color-scheme:light;font-family:"PingFang SC","Microsoft YaHei",sans-serif;pointer-events:none}
+#sttts-floating *,#sttts-floating *:before,#sttts-floating *:after{box-sizing:border-box}
+#sttts-floating svg{display:block;overflow:visible}
+
+#sttts-floating .float{--t1:#9ad8ff;--t2:#3a9cf0;--ring:#fff;--glow:rgba(58,156,240,.55);--ink:#fff;position:relative;display:block;width:58px;height:58px;margin:0;padding:0;pointer-events:auto}
+#sttts-floating .float[data-phase=playing][data-engine=fish],#sttts-floating .float[data-phase=paused][data-engine=fish],#sttts-floating .float[data-phase=generating][data-engine=fish]{--t1:#8fc2ff;--t2:#2268c4;--glow:rgba(34,104,196,.55)}
+#sttts-floating .float[data-phase=playing][data-engine=mini],#sttts-floating .float[data-phase=paused][data-engine=mini],#sttts-floating .float[data-phase=generating][data-engine=mini]{--t1:#ffd98a;--t2:#f2a93b;--glow:rgba(242,169,59,.6);--ink:#3b2400}
+#sttts-floating .float[data-phase=playing][data-engine=eleven],#sttts-floating .float[data-phase=paused][data-engine=eleven],#sttts-floating .float[data-phase=generating][data-engine=eleven]{--t1:#ffadc9;--t2:#c2447a;--glow:rgba(194,68,122,.55)}
+#sttts-floating .float[data-phase=playing][data-engine=mimo],#sttts-floating .float[data-phase=paused][data-engine=mimo],#sttts-floating .float[data-phase=generating][data-engine=mimo]{--t1:#ffb59a;--t2:#e4552a;--glow:rgba(228,85,42,.55)}
+#sttts-floating .float[data-theme=dark]{--ring:#1c2150;color-scheme:dark}
+
+#sttts-floating .orb{all:unset;box-sizing:border-box;position:relative;width:58px;height:58px;padding:0;margin:0;border:3px solid var(--ring);border-radius:50%;display:grid;place-items:center;color:var(--ink);overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  background:linear-gradient(160deg,var(--t1),var(--t2));
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.55),inset 0 -3px 0 rgba(0,0,0,.08),0 8px 20px -6px var(--glow),0 2px 6px rgba(0,0,0,.18);
+  transition:transform 240ms cubic-bezier(.3,1.4,.5,1),box-shadow 180ms,background 240ms,border-radius 240ms}
+#sttts-floating .orb:focus-visible{outline:2.5px solid #1f74cc;outline-offset:4px}
+#sttts-floating .orb:before{content:"";position:absolute;inset:3px 5px 50% 5px;border-radius:50% 50% 40% 40%;background:linear-gradient(rgba(255,255,255,.45),rgba(255,255,255,0));pointer-events:none}
+#sttts-floating .orb svg.wave{position:relative;width:30px;height:30px;fill:currentColor;color:var(--ink);pointer-events:none}
+#sttts-floating .wave rect{fill:currentColor;transform-box:fill-box;transform-origin:center;will-change:transform}
+#sttts-floating .spark{position:absolute;top:-4px;right:-3px;width:14px;height:14px;color:#fff;fill:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,.25));transition:opacity 160ms;pointer-events:none}
+#sttts-floating .pulse{position:absolute;inset:-3px;display:block;border-radius:50%;border:2px solid var(--t2);opacity:0;pointer-events:none}
+#sttts-floating .float[data-phase=playing] .pulse{animation:sttts-float-pulse 1.6s ease-out infinite}
+#sttts-floating .float[data-phase=generating] .orb svg.wave{animation:sttts-float-think 1s ease-in-out infinite}
+@keyframes sttts-float-pulse{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.45)}}
+@keyframes sttts-float-think{50%{opacity:.5}}
+/* Arrow shown on the part of the ball that peeks out when docked. */
+#sttts-floating .edge-mark{position:absolute;top:50%;left:9px;display:block;width:8px;height:8px;margin-top:-4px;border:solid #fff;border-width:0 0 2.5px 2.5px;border-radius:1px;transform:rotate(45deg);opacity:0;transition:opacity 160ms;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+
+/* Docked: the ball slides behind the screen edge and leaves a round sliver with a small arrow.
+   Only the visible sliver takes clicks, so the page underneath stays usable. */
+#sttts-floating .float[data-mode=docked]{pointer-events:none}
+#sttts-floating .float[data-mode=docked] .orb{pointer-events:auto;transform:translateX(36px);box-shadow:inset 0 2px 0 rgba(255,255,255,.55),-3px 4px 12px -4px var(--glow),0 1px 4px rgba(0,0,0,.18)}
+#sttts-floating .float[data-mode=docked][data-side=left] .orb{transform:translateX(-36px)}
+#sttts-floating .float[data-mode=docked][data-side=left] .edge-mark{left:auto;right:9px;transform:rotate(-135deg)}
+#sttts-floating .float[data-mode=docked] .orb svg.wave,#sttts-floating .float[data-mode=docked] .spark{opacity:0}
+#sttts-floating .float[data-mode=docked] .edge-mark{opacity:.95}
+#sttts-floating .float[data-mode=docked] .pulse{transform:translateX(36px)}
+#sttts-floating .float[data-mode=docked][data-side=left] .pulse{transform:translateX(-36px)}
+#sttts-floating .float[data-mode=docked][data-phase=playing] .pulse{animation:none;opacity:.6}
+@media(hover:hover){#sttts-floating .float[data-mode=docked] .orb:hover{transform:translateX(28px)}#sttts-floating .float[data-mode=docked][data-side=left] .orb:hover{transform:translateX(-28px)}}
+#sttts-floating .float[data-dragging=true] .orb{transition:none;transform:scale(1.06);box-shadow:0 16px 34px -8px var(--glow),0 4px 10px rgba(0,0,0,.2)}
+#sttts-floating .orb:active{transform:scale(.94)}
+@media(prefers-reduced-motion:reduce){#sttts-floating .orb,#sttts-floating .edge-mark,#sttts-floating .spark{transition:none}#sttts-floating .pulse,#sttts-floating .orb svg.wave{animation:none!important}#sttts-floating .wave rect{will-change:auto}}

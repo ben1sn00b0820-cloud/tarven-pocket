@@ -1,0 +1,13 @@
+# ST-iPhonie shared NovelAI queue. Deploy with `npx wrangler deploy` from this folder (see 部署说明.md).
+name = "st-iphonie-queue"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+[[durable_objects.bindings]]
+name = "QUEUE"
+class_name = "NovelAIQueue"
+
+# SQLite-backed Durable Objects are available on the free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["NovelAIQueue"]

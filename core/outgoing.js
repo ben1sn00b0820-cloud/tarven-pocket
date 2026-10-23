@@ -1,0 +1,40 @@
+// What the story model is sent: the tavern's chat keeps every tag (waves and pictures are drawn from them),
+// but the copies handed to the model can leave the tags out, so users need no regex of their own.
+import {parseDialogue} from './protocol.js';
+import {withoutPictures} from './draw.js';
+
+/** A reply with each voiced line turned back into its translation: “你好”<tts>A|calm|Hello</tts> → “你好”. */
+export function withoutVoice(message, formats) {
+  const text = String(message);
+  if (!/<tts\b/i.test(text) && !formats.some(f => !/<tts\b/i.test(f))) return text;
+  for (const format of formats) {
+    let lines;
+    try { lines = parseDialogue(text, format); } catch { continue; }
+    if (!lines.length) continue;
+    let out = '', at = 0;
+    for (const line of lines) { out += text.slice(at, line.start) + '“' + line.translation + '”'; at = line.end; }
+    return out + text.slice(at);
+  }
+  return text;
+}
+
+/**
+ * The chat for one story request, changed in place by replacing messages (never mutating them).
+ * pictures: drop picture blocks. voice: drop voice tags; keepLatest leaves the newest reply that has voice lines
+ * as it is, so the model still sees one example of the format.
+ */
+export function outgoingChat(chat, {pictures = true, voice = true, keepLatest = true, formats = []} = {}) {
+  if (!Array.isArray(chat) || (!pictures && !(voice && formats.length))) return chat;
+  const voiced = m => !m?.is_user && typeof m?.mes === 'string' && withoutVoice(m.mes, formats) !== m.mes;
+  let keep = -1;
+  if (voice && keepLatest) for (let i = chat.length - 1; i >= 0; i--) if (voiced(chat[i])) { keep = i; break; }
+  for (let i = 0; i < chat.length; i++) {
+    const m = chat[i];
+    if (typeof m?.mes !== 'string') continue;
+    let mes = m.mes;
+    if (pictures && /<img\b/i.test(mes)) mes = withoutPictures(mes);
+    if (voice && formats.length && i !== keep) mes = withoutVoice(mes, formats);
+    if (mes !== m.mes) chat[i] = {...m, mes};
+  }
+  return chat;
+}

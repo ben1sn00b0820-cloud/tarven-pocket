@@ -1,0 +1,407 @@
+// In-chat pictures: fills the placeholders left by <img>…</img> tags, generates them with NovelAI,
+// uploads the result to the tavern's image folder and remembers it on the message (message.extra.sttts_pics),
+// so every device that opens the chat sees the same picture.
+//
+// A finished picture shows only the image. One tap folds it to a line of text (and back); a double tap opens the
+// viewer, which holds everything else: the versions
+// (‹ ›), the parameters (参数), redraw, open in the drawing app, fold and delete.
+//
+// Each tag keeps every version it was drawn in: {versions: [{url, seed, width, height, …}], index}.
+// Redrawing adds a version (the old ones stay for comparison); deleting removes the shown version and its file.
+// When the last version is deleted the record becomes {removed: true, versions: []}, so it is not drawn again
+// automatically. Older records ({url, seed, …}) read as a single version.
+import {parsePictures, pictureInputs, planRequest, insertPlanned, withoutPictures, sameExact, suggestRequest, cleanSuggestion} from './core/draw.js';
+import {openImageViewer} from './image-viewer.js';
+import {downloadAction} from './download.js';
+import {TIER_NAMES, NAI_MODEL_NAMES} from './core/novelai.js';
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const versionsOf = record => !record ? [] : Array.isArray(record.versions) ? record.versions : record.url ? [{...record}] : [];
+
+export function createPictureHost({context, redrawMessage = (id, message) => context().updateMessageBlock?.(id, message), settings, backend, marker, scheduleRender, openDraw, notice}) {
+  const jobs = new Map(); // queue key -> {state: 'generating'|'error', message}
+  const folds = new Map(); // `${id}:${hash}` -> true/false, this session's fold choice per picture
+  // The latest single tap on a picture: {key, id, message, tag, was, at, rect, timer, done}. It folds or unfolds the
+  // picture after DOUBLE_TAP unless a second tap comes first. A slower second tap lands where the picture was before
+  // it changed size, so one inside the old spot within SLOW_TAP still counts: the fold is put back and the viewer opens.
+  let first = null;
+  const DOUBLE_TAP = 400, SLOW_TAP = 800;
+
+  const stored = (message, hash) => message?.extra?.sttts_pics?.[hash] || null;
+  /** The version on screen, with its position: {…version, index, count}; null when there is none. */
+  function shown(message, hash) {
+    const record = stored(message, hash), list = versionsOf(record);
+    if (!list.length) return null;
+    const index = Math.min(list.length - 1, Math.max(0, Number.isInteger(record.index) ? record.index : list.length - 1));
+    return {...list[index], index, count: list.length};
+  }
+  function keep(message, hash, list, index) {
+    message.extra ??= {};
+    message.extra.sttts_pics ??= {};
+    message.extra.sttts_pics[hash] = list.length ? {versions: list, index: Math.min(list.length - 1, Math.max(0, index))} : {removed: true, versions: [], at: Date.now()};
+  }
+  const jobKey = (id, tag) => `pic:${context()?.chatId ?? ''}:${id}:${tag.hash}`;
+  const saveSoon = () => (context().saveChatDebounced || context().saveChat)?.();
+
+  // The queue changes often (positions, retry countdowns): redraw the placeholders when it does.
+  backend.subscribe?.(event => { if (event.type === 'draw' && event.queue) scheduleRender(); });
+
+  async function upload(blob, name) {
+    const ctx = context();
+    const base64 = await backend.base64(blob);
+    const response = await fetch('/api/images/upload', {
+      method: 'POST', headers: ctx.getRequestHeaders(),
+      body: JSON.stringify({image: base64, format: 'png', ch_name: ctx.name2 || 'ST-iPhonie', filename: String(name).replace(/\./g, '_')})
+    });
+    if (!response.ok) throw Error('图片已生成，但上传到酒馆失败（' + response.status + '）');
+    return (await response.json()).path;
+  }
+  /** Deletes a picture file from the tavern's image folder. A file that is already gone counts as deleted. */
+  async function removeFile(url) {
+    if (!url) return;
+    const response = await fetch('/api/images/delete', {method: 'POST', headers: context().getRequestHeaders(), body: JSON.stringify({path: url})});
+    if (!response.ok && response.status !== 404) throw Error('没能从酒馆删除图片文件（' + response.status + '）');
+  }
+
+  /** Asks before spending Anlas (or paying for a GPT picture). Returns 'free', 'paid' or false (declined, or no key). */
+  async function allowed(interactive) {
+    if (!backend.drawReady()) { if (interactive) notice(backend.drawMissing() + '，请在小手机的引擎卡包里填写'); return false; }
+    const engine = settings().draw.engine;
+    // Through a relay counted as Opus, a subscription it does not pass on is expected, not worth a notice.
+    if (engine === 'nai') try { await backend.naiSubscription(); } catch (error) { const relay = settings().draw.relay; if (interactive && !(relay.url && relay.assumeOpus)) notice(error.message); }
+    const quote = backend.drawQuote();
+    if (quote.free === true) return 'free';
+    if (!interactive) return false;
+    const why = engine === 'gpt' ? 'GPT 生图每张都要花钱（按 OpenAI 或中转的价格）。' : quote.free === null ? '暂时读不到 NovelAI 订阅信息，无法确认是否免费。' : '按当前参数和订阅，这张图会扣 Anlas。';
+    return globalThis.confirm(why + '\n确定要生成吗？') ? 'paid' : false;
+  }
+
+  /** Queues one picture. Redrawing adds a version; the earlier versions stay. */
+  async function generate(id, tag, {interactive = false, permission = null} = {}) {
+    const ctx = context(), message = ctx.chat[id], key = jobKey(id, tag);
+    if (!message || jobs.get(key)?.state === 'generating') return;
+    permission ??= await allowed(interactive);
+    if (!permission) return;
+    jobs.set(key, {state: 'generating'});
+    scheduleRender();
+    try {
+      const inputs = pictureInputs(settings(), tag, message.mes);
+      const result = await backend.generateImage({...inputs, allowPaid: permission === 'paid', name: 'chat', key, label: '正文图片 · ' + tag.prompt.slice(0, 24)});
+      const url = await upload(result.blob, 'st-iphonie-' + Date.now());
+      // Only store the picture when the same message is still there with this tag.
+      const now = context().chat[id];
+      if (now === message && parsePictures(now.mes).some(t => t.hash === tag.hash)) {
+        const list = versionsOf(stored(now, tag.hash));
+        list.push({url, seed: result.seed, width: result.params.width, height: result.params.height, model: result.params.model, steps: result.params.steps, prompt: tag.prompt, characters: inputs.names, at: Date.now()});
+        keep(now, tag.hash, list, list.length - 1);
+        await context().saveChat();
+      }
+      jobs.delete(key);
+    } catch (error) {
+      if (error.cancelled) jobs.delete(key); else jobs.set(key, {state: 'error', message: error.message});
+    }
+    scheduleRender();
+  }
+
+  const planning = new Set();
+  /** Earlier messages for the planner: names and plain text, oldest first. */
+  function before(id, limit = 2) {
+    const chat = context().chat, out = [];
+    for (let i = id - 1; i >= 0 && out.length < limit; i--) {
+      const m = chat[i];
+      if (!m || m.is_system) continue;
+      const text = withoutPictures(m.mes).replace(/<tts\b[^>]*>[\s\S]*?<\/tts\s*>/gi, '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (text) out.unshift({name: m.name || (m.is_user ? '我' : '角色'), text: text.slice(0, 600)});
+    }
+    return out;
+  }
+  /**
+   * 'separate' mode: after a reply is written, ask the model (its own request) for the picture blocks and put them
+   * into the reply after the paragraphs it chose. force: plan again, replacing the blocks already there.
+   */
+  async function planPictures(id, {force = false} = {}) {
+    const ctx = context(), s = settings(), message = ctx.chat[id];
+    if (!message || message.is_user || message.is_system || planning.has(id)) return false;
+    if (!force && parsePictures(message.mes).length) return false;
+    planning.add(id);
+    notice('正在给这条回复挑画面……');
+    try {
+      const source = force ? withoutPictures(message.mes) : message.mes;
+      const preset = s.draw.presets.find(p => p.id === s.draw.activePreset) || s.draw.presets[0];
+      const reply = await backend.generateText(ctx, {prompt: planRequest(s, {message: source, before: before(id)}), trimNames: false, responseLength: Math.min(4000, 500 + preset.count * 400)});
+      if (context().chat[id] !== message) return false;
+      const {text, count} = insertPlanned(source, reply);
+      if (!count) throw Error('这次没有挑出画面，可以在绘图 App 里点“给最新回复配图”再试一次');
+      message.mes = text;
+      if (Array.isArray(message.swipes)) message.swipes[message.swipe_id ?? 0] = text;
+      await ctx.saveChat();
+      redrawMessage(id, message);
+      scheduleRender();
+      return true;
+    } finally { planning.delete(id); }
+  }
+  /** Saves 新外貌 lines of a reply to the 角色 App: new named characters, or roles that have no appearance yet. */
+  function registerAppearances(message) {
+    const added = [];
+    for (const tag of parsePictures(message?.mes || '')) for (const r of tag.spec?.register || []) {
+      const route = settings().routes.find(x => sameExact(x.name, r.name));
+      if (route?.appearance?.trim() || added.includes(r.name)) continue;
+      try {
+        backend.saveRoute(route ? {...route, appearance: r.appearance} : {name: r.name, engine: 'fish', voice: '', model: '', language: '', appearance: r.appearance});
+        added.push(r.name);
+      } catch { /* an unusable name is skipped */ }
+    }
+    if (added.length) notice(`已记下新角色的外貌：${added.join('、')}。可以在小手机的角色 App 里修改`);
+    return added;
+  }
+
+  /**
+   * Called after a new reply is rendered. 'separate' mode plans its pictures first; then new characters' looks are
+   * saved and, when automatic drawing is on and free, all its pictures are queued.
+   */
+  async function autoPictures(id) {
+    const s = settings();
+    if (!s.draw.enabled) return;
+    let message = context().chat[id];
+    if (!message || message.is_user || message.is_system) return;
+    if (s.draw.mode === 'separate' && !parsePictures(message.mes).length) {
+      try { if (!await planPictures(id)) return; } catch (error) { notice(error.message); return; }
+      message = context().chat[id];
+    }
+    registerAppearances(message);
+    if (!s.draw.auto) return;
+    const tags = parsePictures(message.mes).filter(tag => !stored(message, tag.hash));
+    if (!tags.length) return;
+    const permission = await allowed(false);
+    if (!permission) { scheduleRender(); return; }
+    await Promise.all(tags.map(tag => generate(id, tag, {permission})));
+  }
+
+  /** What the queue says about a job, for the placeholder. */
+  function queueText(key) {
+    const job = backend.drawQueue?.get?.(key);
+    if (!job) return 'NovelAI 正在画……';
+    if (job.state === 'running') return job.attempt ? `NovelAI 正在画……（第 ${job.attempt + 1} 次尝试）` : 'NovelAI 正在画……';
+    if (job.state === 'busy') return `NovelAI 账号正忙，稍后自动重试（第 ${job.attempt} 次）`;
+    if (job.state === 'spacing') return '排队中，马上开始';
+    if (job.state === 'remote') {
+      const c = job.cloud || {};
+      if (c.position > 0) return `云端排队中，前面还有 ${c.position} 位${c.holder ? `（${c.holder} 正在画）` : ''}`;
+      return c.cooldown > 5000 ? `账号刚才忙，大家一起等 ${Math.ceil(c.cooldown / 1000)} 秒` : '云端排队，马上轮到你';
+    }
+    return `排队中，前面还有 ${job.position} 张`;
+  }
+
+  function frame(inner) { return `<span class="sttts-pic-frame">${inner}</span>`; }
+  function fill(el, id, message, tag) {
+    const record = stored(message, tag.hash), pic = shown(message, tag.hash), key = jobKey(id, tag), job = jobs.get(key);
+    const s = settings(), folded = folds.get(id + ':' + tag.hash) ?? s.draw.fold;
+    const state = job?.state || (pic ? 'done' : record?.removed ? 'removed' : 'idle');
+    const waiting = state === 'generating' ? queueText(key) : '';
+    const signature = [state, pic?.url, pic?.count, folded, waiting, job?.message].join('|');
+    if (el.dataset.stttsRendered === signature) return;
+    el.dataset.stttsRendered = signature;
+    el.dataset.state = state;
+    el.toggleAttribute('data-folded', state === 'done' && folded);
+    if (state === 'done' && folded) {
+      el.innerHTML = `<button type="button" class="sttts-pic-fold" data-sttts-pic-action="tap" aria-label="展开图片，双击放大查看"><span class="sttts-pic-fold-mark" aria-hidden="true">▸</span>图片已收起${pic.count > 1 ? ` · ${pic.count} 个版本` : ''} · 点一下展开</button>`;
+    } else if (state === 'done') {
+      el.innerHTML = frame(`<button type="button" class="sttts-pic-zoom" data-sttts-pic-action="tap" aria-label="点一下收起，双击放大查看${pic.count > 1 ? `（${pic.count} 个版本）` : ''}、参数和操作"><img src="${esc(pic.url)}" alt="${esc(tag.prompt)}" loading="lazy"></button>`);
+    } else if (state === 'removed') {
+      el.innerHTML = `<span class="sttts-pic-removed">图片已删除<button type="button" data-sttts-pic-action="draw">重新生成</button></span>`;
+    } else if (state === 'generating') {
+      // Redrawing keeps the current picture on screen with a small note over it.
+      el.innerHTML = pic
+        ? frame(`<button type="button" class="sttts-pic-zoom" data-sttts-pic-action="tap" aria-label="点一下收起，双击放大查看"><img src="${esc(pic.url)}" alt="${esc(tag.prompt)}" loading="lazy"></button><span class="sttts-pic-note">${esc(waiting)}<button type="button" data-sttts-pic-action="cancel">取消</button></span>`)
+        : frame(`<span class="sttts-pic-wait">${esc(waiting)}<br><button type="button" data-sttts-pic-action="cancel">取消</button></span>`);
+    } else if (state === 'error') {
+      el.innerHTML = frame(`<span class="sttts-pic-wait">${esc(job.message)}<br><button type="button" data-sttts-pic-action="draw">重试</button></span>`);
+    } else {
+      const reason = !s.draw.enabled ? '正文出图没有开启' : !backend.drawReady() ? backend.drawMissing() : !s.draw.auto ? '自动出图已关闭' : s.draw.engine === 'gpt' && s.draw.gpt.ask ? 'GPT 生图每张都要花钱，点了才画' : '这张图没有自动生成';
+      el.innerHTML = frame(`<span class="sttts-pic-wait">${reason}<br><button type="button" data-sttts-pic-action="draw">点击生成</button></span>`);
+    }
+  }
+
+  /** Fills every picture placeholder in the rendered chat. The tavern's sanitizer renames classes in messages
+   *  (sttts-pic becomes custom-sttts-pic), so placeholders are found by their data attributes. */
+  function decorate(currentMessage) {
+    for (const element of document.querySelectorAll('#chat .mes[mesid]')) {
+      const placeholders = element.querySelectorAll('[data-sttts-pic]');
+      if (!placeholders.length) continue;
+      const id = Number(element.getAttribute('mesid')), message = context().chat[id];
+      if (!message || !currentMessage(id)) continue;
+      const tags = parsePictures(message.mes);
+      for (const el of placeholders) {
+        if (el.dataset.stttsToken !== marker) continue;
+        const tag = tags.find(t => t.hash === el.dataset.stttsHash);
+        if (tag) fill(el, id, message, tag);
+      }
+    }
+  }
+
+  /** Handles clicks inside picture blocks. Returns true when the click was ours. */
+  function click(event) {
+    if (lateSecondTap(event)) return true;
+    const button = event.target.closest('[data-sttts-pic-action]');
+    const box = button?.closest('[data-sttts-pic]');
+    if (!box || box.dataset.stttsToken !== marker) return false;
+    event.preventDefault();
+    const id = Number(box.closest('.mes[mesid]')?.getAttribute('mesid')), message = context().chat[id];
+    const tag = message && parsePictures(message.mes).find(t => t.hash === box.dataset.stttsHash);
+    if (!tag) return true;
+    if (button.dataset.stttsPicAction === 'tap') tap(id, message, tag, button);
+    else act(button.dataset.stttsPicAction, id, message, tag, button);
+    return true;
+  }
+  /** One tap folds or unfolds; a second tap within DOUBLE_TAP opens the viewer instead. */
+  function tap(id, message, tag, source) {
+    const key = id + ':' + tag.hash;
+    if (first && !first.done && first.key === key) {
+      clearTimeout(first.timer);
+      first = null;
+      act('zoom', id, message, tag, source.closest('[data-sttts-pic]')?.querySelector('img') ? source : null);
+      return;
+    }
+    if (first && !first.done) { clearTimeout(first.timer); toggle(first); }
+    const t = first = {key, id, message, tag, was: folds.get(key) ?? settings().draw.fold, at: Date.now(), rect: source.getBoundingClientRect?.(), done: false};
+    t.timer = setTimeout(() => toggle(t), DOUBLE_TAP);
+  }
+  function toggle(t) { t.done = true; act(t.was ? 'unfold' : 'fold', t.id, t.message, t.tag); }
+  /** A second tap that came after the picture already folded or unfolded, on the spot where it was tapped first. */
+  function lateSecondTap(event) {
+    const t = first, r = t?.rect, x = event.clientX, y = event.clientY;
+    if (!t?.done || Date.now() - t.at > SLOW_TAP || !r?.width || !(x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)) return false;
+    first = null;
+    event.preventDefault();
+    folds.set(t.key, t.was);
+    scheduleRender();
+    act('zoom', t.id, t.message, t.tag);
+    return true;
+  }
+  function act(action, id, message, tag, source = null) {
+    const pic = shown(message, tag.hash);
+    if (action === 'draw' || action === 'redo') generate(id, tag, {interactive: true});
+    if (action === 'cancel') backend.drawQueue?.cancel?.(jobKey(id, tag));
+    if (action === 'open') openDraw({...pictureInputs(settings(), tag, message.mes), tag: tag.prompt, seed: pic?.seed});
+    if (action === 'fold' || action === 'unfold') { folds.set(id + ':' + tag.hash, action === 'fold'); scheduleRender(); }
+    if ((action === 'prev' || action === 'next') && pic) {
+      keep(message, tag.hash, versionsOf(stored(message, tag.hash)), pic.index + (action === 'next' ? 1 : -1));
+      saveSoon();
+      scheduleRender();
+    }
+    if (action === 'zoom' && pic) {
+      const list = versionsOf(stored(message, tag.hash));
+      // Paging in the viewer also changes which version the chat shows.
+      const pick = i => { if (i !== shown(message, tag.hash)?.index) { keep(message, tag.hash, list, i); saveSoon(); scheduleRender(); } };
+      openImageViewer({doc: document, from: source?.querySelector?.('img') || source,
+        gallery: {items: list.map(v => ({src: v.url, alt: tag.prompt, info: pictureInfo(v, tag)})), index: pic.index, onIndex: pick},
+        actions: [
+          downloadAction(document, i => ({source: list[i].url, name: [(list[i].characters || []).join('、') || context()?.name2 || 'ST-iPhonie', list[i].seed].filter(v => v !== undefined && v !== '').join('_')}), notice),
+          {label: '重画', run: () => act('redo', id, message, tag)},
+          {label: '在绘图中打开', run: () => act('open', id, message, tag)},
+          {label: '收起', run: () => act('fold', id, message, tag)},
+          {label: '删除这版', danger: true, run: i => { pick(i); return remove(id, tag).then(done => done ? undefined : false); }}
+        ]});
+    }
+    if (action === 'delete') remove(id, tag).catch(error => notice(error.message));
+  }
+  /** The 参数 panel of the viewer for one version. */
+  function pictureInfo(v, tag) {
+    return [
+      ['模型', NAI_MODEL_NAMES?.[v.model] || v.model],
+      ['尺寸', v.width && v.height ? `${v.width} × ${v.height}` : ''],
+      ['步数', v.steps],
+      ['种子', v.seed],
+      ['角色', v.characters ? (v.characters.length ? v.characters.join('、') : '没有补角色外貌') : ''],
+      ['画于', v.at ? new Date(v.at).toLocaleString('zh-CN', {hour12: false}) : ''],
+      ['出图块', tag.spec ? tag.body || '' : tag.prompt]
+    ];
+  }
+  /** Deletes the version on screen (file and record). Returns false when the user cancels. */
+  async function remove(id, tag) {
+    const message = context().chat[id], pic = shown(message, tag.hash);
+    const others = pic ? pic.count - 1 : 0;
+    if (!pic || !globalThis.confirm(`删除这张图？图片文件也会从酒馆删除。${others ? `这个标签还有 ${others} 个别的版本。` : '之后可以点“重新生成”再画。'}`)) return false;
+    await removeFile(pic.url);
+    const list = versionsOf(stored(message, tag.hash)).filter((_, i) => i !== pic.index);
+    keep(message, tag.hash, list, pic.index - 1);
+    await context().saveChat();
+    scheduleRender();
+    return true;
+  }
+  /** Pictures stored in the open chat, counting every version. */
+  function pictureStats() {
+    let count = 0;
+    for (const m of context()?.chat || []) for (const record of Object.values(m?.extra?.sttts_pics || {})) count += versionsOf(record).length;
+    return {count};
+  }
+  /** Deletes every picture (all versions) of the open chat from the tavern; their tags show "点击生成" again. */
+  async function clearPictures() {
+    const ctx = context();
+    let count = 0, failed = 0;
+    for (const m of ctx.chat || []) {
+      const pics = m?.extra?.sttts_pics;
+      if (!pics) continue;
+      for (const record of Object.values(pics)) for (const version of versionsOf(record)) {
+        try { await removeFile(version.url); count++; } catch { failed++; }
+      }
+      delete m.extra.sttts_pics;
+    }
+    await ctx.saveChat();
+    scheduleRender();
+    return {count, failed};
+  }
+
+  // ---------- Bridge helpers for the phone ----------
+  function recentMessages(limit = 8) {
+    const chat = context().chat, rows = [];
+    for (let id = chat.length - 1; id >= 0 && rows.length < limit; id--) {
+      const m = chat[id];
+      if (!m || m.is_system) continue;
+      rows.push({id, name: m.name || (m.is_user ? '我' : '角色'), user: !!m.is_user, preview: String(m.mes || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').slice(0, 60)});
+    }
+    return rows;
+  }
+  async function insertImage(id, photoId) {
+    const ctx = context(), message = ctx.chat[id];
+    if (!message) throw Error('这条消息已经不存在');
+    const photo = await backend.library.getPhoto(photoId);
+    if (!photo) throw Error('图片已不在相册中');
+    const url = await upload(photo.blob, 'st-iphonie-' + Date.now());
+    message.extra ??= {};
+    if (!Array.isArray(message.extra.media)) message.extra.media = [];
+    message.extra.inline_image = !(message.extra.media.length && !message.extra.inline_image);
+    message.extra.media.push({url, type: 'image', title: photo.name, source: 'generated'});
+    message.extra.media_index = message.extra.media.length - 1;
+    const element = globalThis.$?.(`#chat .mes[mesid="${id}"]`);
+    if (element?.length && ctx.appendMediaToMessage) ctx.appendMediaToMessage(message, element);
+    await ctx.saveChat();
+    return {id, url};
+  }
+  async function suggestPrompt() {
+    // The same text model as everything else in the phone (引擎 → 文字模型): the tavern's model without its story
+    // preset, or the custom API. The tavern's quiet generation would carry the whole story preset, and with it a
+    // chain of thought or XML template the model then writes out.
+    const ctx = context(), chat = ctx.chat || [];
+    const reply = await backend.generateText(ctx, {prompt: suggestRequest(settings(), {before: before(chat.length, 6)}), trimNames: false, responseLength: 400});
+    const line = cleanSuggestion(reply);
+    if (!line) throw Error('模型没有写出提示词，再试一次');
+    return line;
+  }
+  const subscriptionLabel = sub => sub ? `${TIER_NAMES[sub.tier] || '未知档位'} · Anlas ${sub.anlas}` : '';
+
+  /** The newest reply from a character: plan its pictures again ('separate') and queue them. */
+  async function planLatest() {
+    const chat = context().chat;
+    for (let id = chat.length - 1; id >= 0; id--) {
+      const m = chat[id];
+      if (!m || m.is_user || m.is_system) continue;
+      const done = await planPictures(id, {force: true});
+      if (done) { registerAppearances(context().chat[id]); if (settings().draw.auto) await autoPictures(id); }
+      return done;
+    }
+    throw Error('聊天里还没有角色的回复');
+  }
+
+  return {decorate, click, autoPictures, planPictures, planLatest, registerAppearances, recentMessages, insertImage, suggestPrompt, subscriptionLabel, pictureStats, clearPictures};
+}

@@ -1,0 +1,9 @@
+{
+  "name": "tavern-pocket-private",
+  "version": "0.9.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}
