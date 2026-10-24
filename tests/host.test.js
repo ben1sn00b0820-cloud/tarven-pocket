@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createPocketHost} from '../pocket/host.js';
+import {PHONE_VERSION} from '../pocket/events.js';
 import {createMemoryMention, searchMemoryMentions} from '../pocket/mentions.js';
 
 const KEY='tavern_pocket_v3';
@@ -109,9 +110,9 @@ test('shop keeps valid partial output, archives quietly and recalls only on requ
  const f=fixture();
  try{
   await f.host.sync();const before=f.c.chat.length;
-  f.backend.nativeResponder=()=> '以下是商品：```json\n'+JSON.stringify({items:[{name:'時間凍結能力',description:'UNBOUGHT_CATALOGUE_FACT',price:'¥ 19.50',kind:'abilities'},{name:'缺價格',description:'不能猜價'}]})+'\n```';
+  f.backend.nativeResponder=()=> '以下是商品：```json\n'+JSON.stringify({items:[{name:'時間凍結能力',description:'UNBOUGHT_CATALOGUE_FACT',price:'1.95 中品靈石',kind:'abilities'},{name:'缺價格',description:'不能猜價'}]})+'\n```';
   const state=await f.api.pocketAction('shop.generate',{mode:'query',query:'時間凍結能力'});
-  assert.equal(state.catalogue.length,1);assert.equal(state.catalogue[0].price,19.5);
+  assert.equal(state.catalogue.length,1);assert.equal(state.catalogue[0].price,195);
   assert.equal(state.catalogueSource.skipped,1);assert.equal(f.c.chat.length,before);
   assert.equal(f.api.pocketArchiveState().shop,1);
   assert.doesNotMatch(JSON.stringify(f.host.promptPlan()),/UNBOUGHT_CATALOGUE_FACT/);
@@ -128,7 +129,7 @@ test('manual catalogue survives regeneration and deletion only removes the listi
  const f=fixture();
  try{
   await f.host.sync();const before=f.c.chat.length;
-  let state=await f.api.pocketAction('shop.save',{name:'星光雨傘',description:'手動收藏商品',price:'88.50',kind:'items'});
+  let state=await f.api.pocketAction('shop.save',{name:'星光雨傘',description:'手動收藏商品',price:'88 下品靈石',kind:'items'});
   const id=state.catalogue[0].id;assert.equal(f.nativeCalls.length,0);
   f.backend.nativeResponder=()=>JSON.stringify({items:[{name:'瓶裝水',description:'補充水分',price:3}]});
   state=await f.api.pocketAction('shop.generate',{mode:'story'});
@@ -306,9 +307,9 @@ test('invalid model merchandise retains previous catalogue and successful genera
  const f=fixture();
  try{
   await f.api.pocketAction('settings.save',{profileId:'phone',worldbooks:['Cafe']});
-  let response=JSON.stringify({items:[{name:'Cafe mug',description:'The cup Alice chose.',price:12.34,emoji:'☕'}]});
+  let response=JSON.stringify({items:[{name:'Cafe mug',description:'The cup Alice chose.',price:'12 中品靈石',emoji:'☕'}]});
   f.c.ConnectionManagerRequestService.sendRequest=async()=>({content:response});
-  const state=await f.api.pocketAction('shop.generate',{});assert.equal(state.catalogue[0].price,12.34);
+  const state=await f.api.pocketAction('shop.generate',{});assert.equal(state.catalogue[0].price,1200);
   assert.equal(f.c.chatMetadata[KEY].events.length,0);
   response=JSON.stringify({items:[{name:'Bad price',description:'Invalid precision',price:1.234}]});
   await assert.rejects(f.api.pocketAction('shop.generate',{}),/價格格式錯誤/);
@@ -355,10 +356,10 @@ test('preset installer updates old regex in place, preserves other scripts and s
   f.c.saveWorldInfo=async(...args)=>{worldbookSaves.push(args);};
   globalThis.fetch=async url=>({ok:true,json:async()=>JSON.parse(await readFile(url,'utf8'))});
   await f.api.pocketAction('presets.install');
-  assert.equal(worldbookSaves.length,1);assert.equal(worldbookSaves[0][0],'Tavern Pocket 手機協定 v0.9.0');assert.equal(worldbookSaves[0][2],true);
+  assert.equal(worldbookSaves.length,1);assert.equal(worldbookSaves[0][0],`傳音玉符協定 v${PHONE_VERSION}`);assert.equal(worldbookSaves[0][2],true);
   assert.match(JSON.stringify(worldbookSaves[0][1]),/group_message/);
   assert.equal(f.settings.regex.length,2);assert.equal(f.settings.regex.find(r=>r.id==='unrelated').findRegex,'/unchanged/');
-  const installed=f.settings.regex.find(r=>r.id===oldId);assert.match(installed.scriptName,/v0\.9\.0/);assert.equal(installed.markdownOnly,true);assert.equal(installed.promptOnly,false);
+  const installed=f.settings.regex.find(r=>r.id===oldId);assert(installed.scriptName.includes(`v${PHONE_VERSION}`));assert.equal(installed.markdownOnly,true);assert.equal(installed.promptOnly,false);
   await f.api.pocketAction('presets.install');assert.equal(f.settings.regex.filter(r=>r.id===oldId).length,1);
  }finally{globalThis.fetch=originalFetch;f.host.dispose();}
 });

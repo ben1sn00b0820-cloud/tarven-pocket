@@ -169,7 +169,9 @@ export interface ChatPreset {
     entries: Array<{ id: string; title: string; enabled: boolean; text: string; use: Array<'dm' | 'group' | 'moments'> }>;
 }
 /** A contact added by hand; story roles come from the 角色 App. */
-export interface Contact { id: string; name: string; persona: string; }
+export interface Contact { id: string; name: string; persona: string; /** Original card partition, when partitioning is enabled. */ space?: string; }
+/** Explicitly removed communication contact; retained until the user restores it. Character information and chat history remain intact. */
+export interface DeletedContact { name: string; deletedAt: number; /** Removed manual contact data, retained for restoration. */ contact?: Contact; }
 /** Voice messages show only the voice bar until 转文字 (or `auto`); then the translation, the original line, or both. */
 export interface VoiceTextOptions { mode: 'translation' | 'original' | 'both'; auto: boolean; }
 /** 朋友圈 preset: rules for posts and reactions, how much story the model reads, and posts per refresh. */
@@ -199,7 +201,7 @@ export interface PeekSnapshot { id: string; kind: 'peek'; name: string; at: numb
 export interface MomentComment { id: string; from: string; to?: string; text: string; at: number; }
 /** author and comment names are 'me' for the user. */
 export interface MomentPost { id: string; author: string; text: string; at: number; source: 'manual' | 'auto' | 'me'; photoId?: string; imageTags?: string; imageState?: 'waiting' | 'done' | 'failed'; imageNote?: string; likes: string[]; comments: MomentComment[]; }
-export interface ChatSettings { presets: ChatPreset[]; activePreset: string; contacts: Contact[]; voiceText: VoiceTextOptions; profile: ChatProfile; /** 特别关心 */ starred: string[];
+export interface ChatSettings { presets: ChatPreset[]; activePreset: string; contacts: Contact[]; deletedContacts: DeletedContact[]; voiceText: VoiceTextOptions; profile: ChatProfile; /** 特别关心 */ starred: string[];
     /** Avatar choices by name ('me' = the user); names not listed use the tavern's avatar, else the first letter. */
     avatars: Record<string, AvatarChoice>;
     /** One wallet for the whole phone. */
@@ -606,7 +608,10 @@ export interface BackendFacade {
     shopCatalog(): { premium: Record<'bubble' | 'frame' | 'background', Record<string, [string, number]>>; kinds: Record<string, string>; gifts: ShopGift[]; ledgerKinds: Record<string, string> };
     saveChatOptions(patch: { voiceText?: Partial<VoiceTextOptions>; profile?: Partial<ChatProfile>; starred?: string[]; /** null: back to the tavern's avatar */ avatars?: Record<string, AvatarChoice | null> }): ChatSettings;
     saveContact(contact: Partial<Contact> & { name: string }): Contact;
-    deleteContact(id: string): ChatSettings;
+    /** Removes a manual contact by ID or a discovered character contact by name; does not delete character information or messages. */
+    deleteContact(idOrName: string): ChatSettings;
+    /** Explicitly restores a deleted contact, including archived manual persona and partition. */
+    restoreContact(name: string): ChatSettings;
     /** Story roles (角色 App) first, then manual contacts. */
     chatContacts(): ChatContact[];
     listThreads(): Promise<ChatThreadSummary[]>;
@@ -629,8 +634,44 @@ export interface BackendFacade {
 }
 
 export interface LatestMessage { id: number; lines: ParsedDialogueLine[]; }
+/** Persisted CSB field values; custom field IDs are shared by all characters. */
+export type CharacterInfoValue = string | number | boolean | string[] | null;
+export interface CharacterInfoField {
+    id: string; label: string; group: string;
+    type: 'text' | 'longtext' | 'number' | 'bar' | 'select' | 'multiselect' | 'boolean';
+    unit: string; default: CharacterInfoValue; policy: 'dynamic' | 'static' | 'manual';
+    hidden: boolean; hideEmpty: boolean; color: string; icon: string;
+    min: number; max: number; maxDelta: number | null;
+    display: 'value' | 'percent' | 'none'; direction: 'neutral' | 'positive' | 'negative';
+    options: string[]; thresholds: Array<{at: number; label: string}>; description: string;
+}
+export interface CharacterInfoSchema {
+    version: 1;
+    groups: Array<{id: string; label: string; icon: string; layout: 'grid' | 'list'; collapsed: boolean}>;
+    fields: CharacterInfoField[];
+}
+export interface CharacterInfoRecord {
+    id: string; name: string; aliases: string[]; present: boolean;
+    values: Record<string, CharacterInfoValue>;
+}
+/** A detached snapshot of the current chat, not a replacement database. */
+export interface CharacterInfoSnapshot {
+    scope: string; revision: number; enabled: boolean; inlineCards: boolean;
+    schema: CharacterInfoSchema;
+    state: {scene: {time: string; location: string}; characters: Record<string, CharacterInfoRecord>};
+    locks: Record<string, Record<string, CharacterInfoValue>>;
+    pinned: string[];
+}
+export interface CharacterInfoOptions { /** Rejects the operation if the user has switched chats. */ scope?: string; }
+export interface CharacterInfoView { refresh(): void; dispose(): void; }
 /** Installed-panel API: facade plus actions that access the current SillyTavern chat. */
 export interface BackendAPI extends BackendFacade {
+    /** Reads the current persistent character database; null if no active snapshot is available. */
+    characterInfoSnapshot(): Promise<CharacterInfoSnapshot | null>;
+    /** Mounts the shared information app into a container owned by this connected panel's document. */
+    mountCharacterInfo(container: HTMLElement, options?: CharacterInfoOptions): Promise<CharacterInfoView>;
+    /** Controls narrative snapshot visibility without disabling storage or updates. */
+    setCharacterInfoInline(enabled: boolean, options?: CharacterInfoOptions): Promise<boolean>;
     /** Closes the settings panel; it does not dispose the backend or stop audio. */
     close(): void;
     /** id is -1 when there is no readable assistant dialogue. */

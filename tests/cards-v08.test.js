@@ -53,7 +53,7 @@ test('native forum and completed purchases create distinct cards while untrusted
 test('financial displays distinguish incoming, user drafts and settled payments without fabricating gift transfers',()=>{
   const transfer={...wx,action:'transfer',amount:88.5};
   const draft=renderPhoneCard({...transfer,from:'小雨',to:'阿澤'},{...actor,isUser:true,source:'user-command'});
-  assert.match(draft,/88\.50/);assert.match(draft,/待手機確認 · 尚未扣款/);
+  assert.match(draft,/88\.5 枚下品靈石/);assert.match(draft,/待手機確認 · 尚未扣款/);
   const received=renderPhoneCard({...transfer,action:'payment_status',paymentKind:'transfer',state:'accepted'},actor);
   assert.match(received,/已收款/);assert.doesNotMatch(received,/待收取|尚未扣款/);
   const gift=renderPhoneCard({...wx,action:'payment_status',paymentKind:'gift',title:'向日葵',state:'accepted'},actor);

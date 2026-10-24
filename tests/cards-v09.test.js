@@ -9,7 +9,7 @@ const receipt={id:'shop:order-123',app:'shop',action:'purchase',from:'me',state:
 test('completed native receipt shows owned ability, virtual total and known timestamp without a phone command',()=>{
   const html=renderActivityCards(receipt,actor);
   assert.match(html,/tp-story-receipt/);assert.match(html,/購買完成/);assert.match(html,/時間停止能力/);
-  assert.match(html,/虛擬付款金額/);assert.match(html,/88\.50/);assert.match(html,/已加入「我的能力」/);assert.match(html,/tp-story-card-time/);
+  assert.match(html,/支付靈石/);assert.match(html,/88\.5 枚下品靈石/);assert.match(html,/已加入「我的能力」/);assert.match(html,/tp-story-card-time/);
   assert.doesNotMatch(html,/<phone>|<\/?(?:div|p|section|article|ul|li|h[1-6])\b/);
   assert.equal(renderPhoneCard(receipt,{...actor,source:'story'}),'');
 });
@@ -20,9 +20,9 @@ test('catalogues and forged shop protocols never produce a settled receipt',()=>
   assert.equal(parsePhoneEvents(raw,actor).events.length,0);
   assert.equal(renderPhoneCards(raw,actor),raw);
   const html=renderActivityCards({...receipt,state:'pending'},actor);
-  assert.doesNotMatch(html,/購買完成|已加入|虛擬付款金額/);assert.match(html,/待處理/);
+  assert.doesNotMatch(html,/購買完成|已加入|支付靈石/);assert.match(html,/待處理/);
   const unknown=renderActivityCards({...receipt,state:undefined,amount:undefined},actor);
-  assert.doesNotMatch(unknown,/購買完成|已加入|虛擬付款金額/);assert.match(unknown,/未記載金額/);
+  assert.doesNotMatch(unknown,/購買完成|已加入|支付靈石/);assert.match(unknown,/未記載金額/);
 });
 
 test('receipt names, descriptions and buyer text cannot inject HTML or Markdown',()=>{

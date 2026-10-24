@@ -65,7 +65,7 @@ export function createMemoryComposer({getState,document:doc=globalThis.document,
   function preview() {
     const row=rows[selected];
     for(const [index,node]of [...results.querySelectorAll('[data-tp-memory-pick]')].entries())node.setAttribute('aria-selected',String(index===selected));
-    if(!row){detail.textContent='可在小手機「我」中新增或修改資料。';field?.removeAttribute('aria-activedescendant');return;}
+    if(!row){detail.textContent='可在傳音玉符「我」中新增或修改資料。';field?.removeAttribute('aria-activedescendant');return;}
     detail.innerHTML='<strong>'+esc(row.title)+'</strong><span>'+esc(row.detail||row.preview).slice(0,2600)+'</span>';
     const id='tp-memory-option-'+selected;search.setAttribute('aria-activedescendant',id);
     if(mode==='inline')field?.setAttribute('aria-activedescendant',id);
@@ -76,7 +76,7 @@ export function createMemoryComposer({getState,document:doc=globalThis.document,
     owner.textContent=(state?.persona||'目前使用者')+' · 已儲存資料';
     panel.dataset.mode=mode;
     for(const tab of panel.querySelectorAll('[data-tp-memory-tab]'))tab.setAttribute('aria-selected',String(tab.dataset.tpMemoryTab===category&&mode==='button'));
-    results.innerHTML=rows.length?rows.map((row,index)=>'<button type="button" role="option" id="tp-memory-option-'+index+'" class="tp-memory-option tp-memory-option-'+row.category+'" data-tp-memory-pick="'+esc(row.key)+'" data-tp-memory-index="'+index+'"><span class="tp-memory-option-icon" aria-hidden="true">'+(row.kind==='abilities'?'✦':row.kind==='items'?'◇':'我')+'</span><span class="tp-memory-option-copy"><strong>'+esc(row.title)+'</strong><small>'+esc(row.preview.slice(0,120))+'</small></span><span class="tp-memory-option-meta">'+esc(row.quantity!==undefined?'× '+row.quantity:row.typeLabel)+'</span></button>').join(''):'<div class="tp-memory-empty">找不到符合的資料<br><small>試試其他名稱，或先在小手機「我」中新增。</small></div>';
+    results.innerHTML=rows.length?rows.map((row,index)=>'<button type="button" role="option" id="tp-memory-option-'+index+'" class="tp-memory-option tp-memory-option-'+row.category+'" data-tp-memory-pick="'+esc(row.key)+'" data-tp-memory-index="'+index+'"><span class="tp-memory-option-icon" aria-hidden="true">'+(row.kind==='abilities'?'✦':row.kind==='items'?'◇':'我')+'</span><span class="tp-memory-option-copy"><strong>'+esc(row.title)+'</strong><small>'+esc(row.preview.slice(0,120))+'</small></span><span class="tp-memory-option-meta">'+esc(row.quantity!==undefined?'× '+row.quantity:row.typeLabel)+'</span></button>').join(''):'<div class="tp-memory-empty">找不到符合的資料<br><small>試試其他名稱，或先在傳音玉符「我」中新增。</small></div>';
     preview();queuePosition();
   }
   async function refresh() {

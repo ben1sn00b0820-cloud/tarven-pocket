@@ -14,6 +14,8 @@ let playwright;try{playwright=require('playwright');}catch{playwright=require(pa
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'), prefix='/scripts/extensions/third-party/tavern-pocket';
 const version=JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'utf8')).version;
 const out=path.join(root,'tests/artifacts');await fs.mkdir(out,{recursive:true});
+// Optional local QA captures; regression runs produce only their JSON report.
+const capture=async(target,name)=>{if(process.env.TP_BROWSER_SCREENSHOTS==='1')await target.screenshot({path:path.join(out,name),animations:'disabled'});};
 const mime={'.html':'text/html;charset=utf-8','.js':'application/javascript','.mjs':'application/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml'};
 const server=createServer(async(req,res)=>{try{
  let p=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
@@ -27,6 +29,7 @@ const server=createServer(async(req,res)=>{try{
 }catch{res.writeHead(404);res.end('not found');}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;const checks=[],errors=[],naiCalls=[];let page;
+const progress=setInterval(()=>console.log('BROWSER_PROGRESS',checks.length,checks.at(-1)||'initializing'),30000);
 try{
  browser=await playwright.chromium.launch({headless:true,executablePath:process.env.TP_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--no-zygote','--single-process']});
  page=await browser.newPage({viewport:{width:1440,height:980},deviceScaleFactor:1,hasTouch:true});page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));
@@ -48,10 +51,10 @@ try{
  const waitAsync=async fn=>{const deadline=Date.now()+12000;do{const result=await api(fn);if(result)return result;await new Promise(resolve=>setTimeout(resolve,50));}while(Date.now()<deadline);throw Error('Asynchronous browser state did not settle within 12 seconds');};
  await api(()=>{window.qaApi=parent.__stIphoniePanelBridge.connect(window);});
  checks.push('actual index initializes and a single floating-ball click opens the actual iframe');
- assert.equal(await frame.locator('.app-icon').count(),17);
- checks.push('all twelve upstream apps, four existing additions and the new Me app remain on the desktop');
- await page.screenshot({path:path.join(out,'desktop-home.png'),animations:'disabled'});
- await fs.copyFile(path.join(out,'desktop-home.png'),path.resolve(root,`../TavernPocket_v${version}_Preview.png`));
+ assert.equal(await frame.locator('.app-icon').count(),18);
+ checks.push('all twelve upstream apps, four existing additions, Me and character information remain on the desktop');
+ await capture(page,'desktop-home.png');
+
  // Closing the panel leaves the ball docked; its next single tap must reopen it.
  await api(()=>window.qaApi.close());await page.locator('#sttts-floating .orb').click();await page.locator('#sttts-panel[open]').waitFor();
  checks.push('docked floating ball reopens phone with one click');
@@ -75,7 +78,7 @@ try{
  await frame.locator('.composer [data-field="draft"]').fill('這是介面送出的訊息');
  await frame.locator('[data-action="send"]').click();
  assert(await api(async()=>(await window.qaApi.getThread(window.qaDm)).messages.some(m=>m.text==='這是介面送出的訊息')));
- await page.screenshot({path:path.join(out,'wechat.png'),animations:'disabled'});
+ await capture(page,'wechat.png');
  checks.push('WeChat composer sends a real persisted message via the UI');
  const walletResult=await api(async()=>{
   const a=window.qaApi;
@@ -104,6 +107,8 @@ try{
   await a.pocketAction('ig.reply',{to:'林知夏'});
   parent.qa.nextResponse='<phone>'+JSON.stringify({id:'mock-diary',app:'diary',action:'entry',from:'林知夏',title:'午後的約定',text:'他坐在窗邊的時候，我覺得今天可以過得慢一些。'})+'</phone>';
   await a.pocketAction('diary.generate',{from:'林知夏'});
+  // Newly generated catalogue prices are integer lower-grade spirit stones.
+  parent.qa.nextResponse=JSON.stringify({items:[{title:'窗邊拿鐵',text:'老地方咖啡館的熱拿鐵。',amount:35},{title:'手作杯墊',text:'小店手工製作的棉麻杯墊。',amount:28},{title:'午後書籤',text:'壓花書籤。',amount:18}]});
   await a.pocketAction('shop.generate',{});
   s=await a.pocketState();const before=a.wallet().balance,item=s.catalogue[0];
   await Promise.all([a.pocketPurchase(item,'browser-order-one'),a.pocketPurchase(item,'browser-order-one')]);
@@ -140,7 +145,7 @@ try{
  assert.equal(retained.m.state,'opened');assert(retained.m.source.stale);assert.equal(retained.balance,payment.after);assert(JSON.stringify(retained.backup).includes(retained.m.paymentId));assert(JSON.stringify(retained.backup).includes('source-red'));
  checks.push('settled narrative redpacket survives source deletion as stale without re-credit; backup retains payment/source identity');
  await api(()=>window.qaApi.pocketAction('presets.install',{}));
- const presets=await page.evaluate(version=>({regex:window.qa.context.extensionSettings.regex,book:window.qa.books['Tavern Pocket 手機協定 v'+version]}),PHONE_VERSION);
+ const presets=await page.evaluate(version=>({regex:window.qa.context.extensionSettings.regex,book:window.qa.books['傳音玉符協定 v'+version]}),PHONE_VERSION);
  assert(presets.regex?.length);assert(presets.book?.entries);checks.push('bundled protocol v'+PHONE_VERSION+' regex and worldbook install through host APIs');
  for(const id of ['instagram','diary','storyshop','pocketsettings']){await go(id);assert(await frame.locator(`.view[data-app="${id}"]`).isVisible());}
  checks.push('all four added apps open via desktop navigation');
@@ -158,14 +163,14 @@ try{
  await waitAsync(async()=>(await window.qaApi.pocketState()).instagram.posts.some(p=>p.photoId&&!p.text));
  await frame.locator('img[data-pocket-photo]').first().waitFor({state:'visible'});await f().waitForFunction(()=>[...document.querySelectorAll('img[data-pocket-photo]')].some(i=>i.complete&&i.naturalWidth>0));
  checks.push('Instagram image-only upload reaches photo storage and renders a decoded image');
- await page.screenshot({path:path.join(out,'instagram.png'),animations:'disabled'});checks.push('Instagram UI compose, like and comment persist');
+ await capture(page,'instagram.png');checks.push('Instagram UI compose, like and comment persist');
  await go('diary');await frame.locator('[data-action="diary-new"]').click();await frame.locator('[data-field="diary-title"]').fill('介面日記');await frame.locator('[data-field="diary-text"]').fill('只屬於我的一頁。');await frame.locator('[data-action="diary-save"]').click();
  await waitAsync(async()=>(await window.qaApi.pocketState()).diaries.some(d=>d.title==='介面日記'&&d.private));checks.push('private diary UI editor saves title and content');
  await go('storyshop');const beforeUiBuy=await api(()=>window.qaApi.wallet().balance);await frame.locator('[data-action="shop-buy"]').nth(1).click();await frame.locator('[data-action="confirm"]').click();
- await waitAsync(async()=>window.qaApi.wallet().inventory.length===2);assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((beforeUiBuy-28.5)*100)/100);checks.push('shop UI confirmation purchases and deducts wallet');
- await go('chat');await frame.locator('.app-nav [data-system="back"]').click();await frame.locator('[data-action="me"]').click();await frame.locator('[data-action="me-wallet"]').click();await frame.locator('[data-action="wallet-edit"]').click();await frame.locator('[data-field="balance"]').fill('2222.22');await frame.locator('[data-action="wallet-save"]').click();await f().waitForFunction(()=>window.qaApi.wallet().balance===2222.22);
+ await waitAsync(async()=>window.qaApi.wallet().inventory.length===2);assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((beforeUiBuy-28)*100)/100);checks.push('shop UI confirmation purchases and deducts wallet');
+ await go('chat');await frame.locator('.app-nav [data-system="back"]').click();await frame.locator('[data-action="me"]').click();await frame.locator('[data-action="me-wallet"]').click();await frame.locator('[data-action="wallet-edit"]').click();await frame.locator('[data-field="balance"]').fill('22 中品 22 下品');await frame.locator('[data-action="wallet-save"]').click();await f().waitForFunction(()=>window.qaApi.wallet().balance===2222);
  checks.push('WeChat wallet edit form sets balance with ledger');
- await frame.locator('.wallet-card').waitFor({state:'visible'});await page.screenshot({path:path.join(out,'wallet.png'),animations:'disabled'});await frame.locator('[data-sheet-close]').click();
+ await frame.locator('.wallet-card').waitFor({state:'visible'});await capture(page,'wallet.png');await frame.locator('[data-sheet-close]').click();
 
  // v0.4: structured messages discover NPCs, CSB21 follows visible narrative, and real photos decode.
  const statusRole=(name,{hydration='61',body='細長的手指',blank='',satiety='74'}={})=>`[CSB21_ROLE]\nname: ${name}\nage: 24\nmood: 放鬆\nidentity: 咖啡館店員\nrelation: 朋友\nlocation: 老地方咖啡館\naffection: 63\ntrust: 67\nenergy: 81\nfatigue: 19\nstress: 12\nsatiety: ${satiety}\nhydration: ${hydration}\nlewdness: 未知\ncondition: 良好\noutfit: 白襯衫與淺色長褲\naction: 在窗邊傳微信\nthought: 今天的光線很好\nitems: 手機\nnote: 喝過水\nbody:\n[CSB21_PART|手部|${body}]\n[CSB21_PART|自訂部位 01|${blank}]\n[/CSB21_ROLE]`;
@@ -235,18 +240,21 @@ try{
  assert((await frame.locator('.tp-contact-data').textContent()).includes('168 cm'));assert((await frame.locator('.tp-contact-data').textContent()).includes('修長'));
  await frame.locator('.tp-contact-body summary').click();await frame.locator('.toast').waitFor({state:'hidden'});
  await frame.locator('.view[data-app="chat"]').evaluate(el=>{el.scrollTop=0;});
- await page.locator('#sttts-panel').screenshot({path:path.join(out,'v04-contact-profile.png'),animations:'disabled'});
- await fs.copyFile(path.join(out,'v04-contact-profile.png'),path.resolve(root,'../TavernPocket_v0.4.0_Contacts.png'));
- await frame.locator('.tp-contact-body').scrollIntoViewIfNeeded();await page.locator('#sttts-panel').screenshot({path:path.join(out,'v04-contact-details.png'),animations:'disabled'});
- await fs.copyFile(path.join(out,'v04-contact-details.png'),path.resolve(root,'../TavernPocket_v0.4.0_ContactDetails.png'));
+ await capture(page.locator('#sttts-panel'),'v04-contact-profile.png');
+
+ await frame.locator('.tp-contact-body').scrollIntoViewIfNeeded();await capture(page.locator('#sttts-panel'),'v04-contact-details.png');
+
  checks.push('native contact profile UI renders physique, current meters, custom body labels and empty reserved fields');
  // v0.5: query-generated essentials have explicit fictional catalogue provenance and real wallet semantics.
  await go('storyshop');
  const requestsBeforeEmptyQuery=await page.evaluate(()=>window.qa.requests.length);
  await frame.locator('[data-field="shop-query"]').fill('');await frame.locator('[data-action="shop-search"]').click();
+ // Completion includes the action's final render; the next edit must not be
+ // replaced by a still-pending render from the rejected empty query.
+ await f().waitForFunction(()=>{const view=document.querySelector('.view[data-app="storyshop"]');return view&&!view.hasAttribute('aria-busy');});
  assert.equal(await page.evaluate(()=>window.qa.requests.length),requestsBeforeEmptyQuery);
  await frame.locator('[data-field="shop-query"]').fill('牙刷、衛生紙、礦泉水');
- await page.evaluate(()=>{window.qa.nextResponse=JSON.stringify({items:[{name:'旅行牙刷',description:'柔軟刷毛，適合每日清潔。',price:12.34,emoji:'🪥'},{name:'隨身衛生紙',description:'日常外出使用的小包裝衛生紙。',price:8.5,emoji:'🧻'},{name:'礦泉水',description:'可攜帶的飲用水，供補充水分。',price:5,emoji:'💧'}]});});
+ await page.evaluate(()=>{window.qa.nextResponse=JSON.stringify({items:[{name:'旅行牙刷',description:'柔軟刷毛，適合每日清潔。',price:12,emoji:'🪥'},{name:'隨身衛生紙',description:'日常外出使用的小包裝衛生紙。',price:8,emoji:'🧻'},{name:'礦泉水',description:'可攜帶的飲用水，供補充水分。',price:5,emoji:'💧'}]});});
  await frame.locator('[data-action="shop-search"]').click();
  await waitAsync(async()=>{const s=await window.qaApi.pocketState();return s.catalogueSource?.mode==='query'&&s.catalogueSource?.query==='牙刷、衛生紙、礦泉水'&&s.catalogue.some(x=>x.name==='旅行牙刷');});
  assert((await frame.locator('.pocket-shop-source').textContent()).includes('牙刷、衛生紙、礦泉水'));
@@ -255,16 +263,16 @@ try{
  const queryBuyBefore=await api(()=>({balance:window.qaApi.wallet().balance,count:window.qaApi.wallet().inventory.length}));
  await frame.locator('[data-action="shop-buy"]').first().click();await frame.locator('[data-action="confirm"]').click();
  await waitAsync(async()=>window.qaApi.wallet().inventory.some(x=>x.name==='旅行牙刷'));
- assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((queryBuyBefore.balance-12.34)*100)/100);
+ assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((queryBuyBefore.balance-12)*100)/100);
  assert.equal(await api(()=>window.qaApi.wallet().inventory.length),queryBuyBefore.count+1);
  checks.push('query UI generates everyday essentials absent from the narrative with Traditional Chinese instructions, labelled fictional source and virtual wallet purchase; empty query makes no model request');
  await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.view[data-app="storyshop"]').evaluate(el=>{el.scrollTop=0;});
- await page.locator('#sttts-panel').screenshot({path:path.join(out,'v05-query-shop.png'),animations:'disabled'});
- await fs.copyFile(path.join(out,'v05-query-shop.png'),path.resolve(root,`../TavernPocket_v${version}_QueryShop.png`));
+ await capture(page.locator('#sttts-panel'),'v05-query-shop.png');
+
  // v0.5: complete preset creation and JSON export/import use the shipped settings UI.
  await go('pocketsettings');await frame.locator('[data-action="open-image-settings"]').click();await frame.locator('.pocket-image-settings').waitFor();
  assert.equal(await api(()=>document.documentElement.lang),'zh-TW');
- assert((await frame.locator('.pocket-image-settings').textContent()).includes('畫師串'));assert((await frame.locator('.pocket-image-settings').textContent()).includes('微信使用的預設'));
+ assert((await frame.locator('.pocket-image-settings').textContent()).includes('畫師串'));assert((await frame.locator('.pocket-image-settings').textContent()).includes('千里傳音使用的預設'));
  await frame.locator('[data-action="image-preset-new"]').click();
  await frame.locator('[data-field="preset-name"]').fill('水彩午後');
  await frame.locator('[data-field="preset-model"]').selectOption('nai-diffusion-3');
@@ -287,8 +295,8 @@ try{
  await frame.locator('[data-field="wechat-preset"]').selectOption(importedPreset.id);await frame.locator('[data-field="wechat-model"]').selectOption('nai-diffusion-4-full');await frame.locator('[data-action="wechat-image-save"]').click();
  await waitAsync(async()=>{const s=await window.qaApi.pocketImageState();return s.wechat.presetId===window.qaSelectedPresetId&&s.wechat.model==='nai-diffusion-4-full';});
  await frame.locator(`[data-action="image-preset-pick"][data-id="${importedPreset.id}"]`).click();
- await frame.locator('.sheet-body').evaluate(el=>{el.scrollTop=0;});await page.locator('#sttts-panel').screenshot({path:path.join(out,'v05-image-presets.png'),animations:'disabled'});
- await fs.copyFile(path.join(out,'v05-image-presets.png'),path.resolve(root,`../TavernPocket_v${version}_ImagePresets.png`));
+ await frame.locator('.sheet-body').evaluate(el=>{el.scrollTop=0;});await capture(page.locator('#sttts-panel'),'v05-image-presets.png');
+
  await frame.locator('[data-sheet-close]').click();
  checks.push('WeChat preset and model choices save through the actual settings UI independently of the global drawing engine');
  // The selected WeChat preset and per-WeChat model must reach NovelAI, independently of the global drawing engine.
@@ -325,8 +333,8 @@ try{
  await frame.locator('[data-field="photo-positive"]').fill('soft natural lighting, detailed hands');
  await frame.locator('[data-field="photo-model"]').selectOption('nai-diffusion-4-5-curated');
  await frame.locator('.sheet-body').evaluate(el=>{el.scrollTop=0;});
- await page.locator('#sttts-panel').screenshot({path:path.join(out,'v05-image-editor.png'),animations:'disabled'});
- await fs.copyFile(path.join(out,'v05-image-editor.png'),path.resolve(root,`../TavernPocket_v${version}_ImageEditor.png`));
+ await capture(page.locator('#sttts-panel'),'v05-image-editor.png');
+
  await frame.locator('[data-action="photo-edit-generate"]').click();await frame.locator('[data-photo-editor]').waitFor({state:'hidden'});
  const regeneratedPhoto=await api(async info=>{const a=window.qaApi,m=(await a.getThread(info.threadId)).messages.find(m=>m.id===info.id),old=await a.getPhoto(info.photoId),current=await a.getPhoto(m.photoId);return {id:m.photoId,oldSize:old?.blob?.size,currentSize:current?.blob?.size};},presetPhoto);
  assert.notEqual(regeneratedPhoto.id,presetPhoto.photoId);assert(regeneratedPhoto.oldSize>0&&regeneratedPhoto.currentSize>0);assert.equal(naiCalls.length,4);assert.equal(naiCalls[3].model,'nai-diffusion-4-5-curated');assert(naiCalls[3].input.includes('sunset terrace, ceramic cup, gentle breeze'));assert(naiCalls[3].input.includes('detailed hands'));assert.equal(naiCalls[3].parameters.negative_prompt,'blurry, watermark, duplicated fingers');
@@ -402,7 +410,7 @@ try{
  await frame.locator('[data-status-field="hydration"]').fill('93');await frame.locator('[data-status-field="mood"]').fill('期待晚餐');await frame.locator('[data-status-field="outfit"]').fill('海軍藍針織外套');
  await frame.locator('[data-status-part]').first().locator('[data-part-value]').fill('左手腕戴銀色手環，指尖沾著水珠');
  await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.sheet-body').evaluate(el=>{el.scrollTop=0;});
- await page.locator('#sttts-panel').screenshot({path:path.join(out,'v06-status-editor.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v06-status-editor.png'),path.resolve(root,`../TavernPocket_v${version}_StatusEditor.png`));
+ await capture(page.locator('#sttts-panel'),'v06-status-editor.png');
  await frame.locator('[data-action="status-save"]').click();await frame.locator('[data-status-editor]').waitFor({state:'hidden'});
  const editedContact=await api(()=>window.qaApi.pocketContactProfile('林知夏'));assert.equal(editedContact.fields.hydration,'93');assert.equal(editedContact.fields.outfit,'海軍藍針織外套');assert.equal(editedContact.body[0].value,'左手腕戴銀色手環，指尖沾著水珠');
  assert(await page.evaluate(()=>window.qa.context.chat.some(m=>m.mes.includes('[CSB21_PANEL]')&&m.mes.includes('hydration: 93')&&m.mes.includes('海軍藍針織外套'))));
@@ -421,19 +429,19 @@ try{
  await frame.locator('[data-action="tab"][data-tab="stories"]').click();await frame.locator(`[data-action="ig-story-open"][data-id="${story.id}"]`).click();await frame.locator('[data-field="story-reply"]').fill('V06 限動回覆：我馬上到。');await frame.locator('[data-action="ig-story-reply"]').click();
  await waitAsync(async()=>(await window.qaApi.pocketState()).instagram.dms.some(m=>m.storyId&&m.to==='沈禾'&&m.text==='V06 限動回覆：我馬上到。'));
  await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.view[data-app="instagram"]').evaluate(el=>{el.scrollTop=0;});
- await page.locator('#sttts-panel').screenshot({path:path.join(out,'v06-instagram-story.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v06-instagram-story.png'),path.resolve(root,`../TavernPocket_v${version}_InstagramStory.png`));
+ await capture(page.locator('#sttts-panel'),'v06-instagram-story.png');
  assert(await page.evaluate(()=>window.qa.context.chat.some(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('V06 限時動態'))));
  checks.push('Instagram discovers CSB/contact roles, selects an NPC publisher, generates a post and 24-hour story, syncs story replies into DM and mirrors the story into the main chat');
  // Owner-only fictional catalogue accepts categories beyond everyday supplies.
- await go('storyshop');assert((await frame.locator('.view[data-app="storyshop"]').textContent()).includes('萬寶商城'));
+ await go('storyshop');assert((await frame.locator('.view[data-app="storyshop"]').textContent()).includes('萬寶閣'));
  await frame.locator('[data-field="shop-query"]').fill('星際通行資格、冒險夥伴、虛構能量槍');
  await page.evaluate(()=>{window.qa.nextResponse=JSON.stringify({items:[{name:'星際通行資格',description:'此劇情世界中的虛構通行資格。',price:45,emoji:'🎫'},{name:'冒險夥伴',description:'自願同行的虛構角色契約。',price:55,emoji:'🧑'},{name:'虛構能量槍',description:'僅作為劇情道具的能量槍。',price:65,emoji:'🔮'}]});});
  await frame.locator('[data-action="shop-search"]').click();await waitAsync(async()=>(await window.qaApi.pocketState()).catalogue.some(x=>x.name==='星際通行資格'));
  const ownerShopRequest=await page.evaluate(()=>window.qa.requests.at(-1));assert(ownerShopRequest.prompt.includes('專屬'));assert(ownerShopRequest.prompt.includes('星際通行資格'));assert(ownerShopRequest.prompt.includes('虛構'));
  await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.view[data-app="storyshop"]').evaluate(el=>{el.scrollTop=0;});
- await page.locator('#sttts-panel').screenshot({path:path.join(out,'v06-wanbao-shop.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v06-wanbao-shop.png'),path.resolve(root,`../TavernPocket_v${version}_WanbaoShop.png`));
+ await capture(page.locator('#sttts-panel'),'v06-wanbao-shop.png');
  checks.push('Wanbao owner-only fictional catalogue generates queried qualifications, companions and fantasy props while using the existing virtual purchase system');
- await api(()=>window.qaApi.close());await page.locator(`.mes[mesid="${roleNaturalId}"]`).scrollIntoViewIfNeeded();await page.locator(`.mes[mesid="${roleNaturalId}"]`).screenshot({path:path.join(out,'v06-main-chat-card.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v06-main-chat-card.png'),path.resolve(root,`../TavernPocket_v${version}_MainChatCard.png`));await page.locator('#sttts-floating .orb').click();await page.locator('#sttts-panel[open]').waitFor();
+ await api(()=>window.qaApi.close());await page.locator(`.mes[mesid="${roleNaturalId}"]`).scrollIntoViewIfNeeded();await capture(page.locator(`.mes[mesid="${roleNaturalId}"]`),'v06-main-chat-card.png');await page.locator('#sttts-floating .orb').click();await page.locator('#sttts-panel[open]').waitFor();
  // v0.7: several inline actions preserve the prose and stay inside one original story message.
  const inlineText='她放下外套，微信傳給你：「吃飯沒？」你看見螢幕亮起。林知夏微信傳給我：「我在樓下。」她又笑了笑，林知夏微信轉帳給你：88.50「晚餐費」，接著林知夏微信紅包給我：20「好運」。夜色漸深。';
  const beforeInline=await page.evaluate(()=>window.qa.context.chat.length);
@@ -443,7 +451,7 @@ try{
  assert(inlineDom.indexOf('她放下外套，')<inlineDom.indexOf('吃飯沒？'));assert(inlineDom.indexOf('吃飯沒？')<inlineDom.indexOf('你看見螢幕亮起。'));assert(inlineDom.indexOf('我在樓下。')<inlineDom.indexOf('她又笑了笑，'));
  assert.equal(await page.evaluate(id=>window.qa.context.chat[id].mes,inlineId),inlineText);assert.equal(await page.evaluate(()=>window.qa.context.chat.length),beforeInline+1);
  await api(()=>window.qaApi.pocketAction('sync',{}));assert.equal(await page.evaluate(()=>window.qa.context.chat.length),beforeInline+1);
- await api(()=>window.qaApi.close());await inlineEl.scrollIntoViewIfNeeded();await inlineEl.screenshot({path:path.join(out,'v07-inline-chat.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v07-inline-chat.png'),path.resolve(root,`../TavernPocket_v${version}_InlineChat.png`));await page.locator('#sttts-floating .orb').click();await page.locator('#sttts-panel[open]').waitFor();
+ await api(()=>window.qaApi.close());await inlineEl.scrollIntoViewIfNeeded();await capture(inlineEl,'v07-inline-chat.png');await page.locator('#sttts-floating .orb').click();await page.locator('#sttts-panel[open]').waitFor();
  checks.push('multiple inline WeChat messages, a transfer and a redpacket render inside the original story message in place, preserve all surrounding prose/raw text and do not append duplicate activity messages');
 
  // v0.8: the formatter must survive a real Markdown paragraph pass at phone width.
@@ -452,7 +460,7 @@ try{
  await api(()=>window.qaApi.close());await page.setViewportSize({width:390,height:844});
  const inlineOverflow=await inlineEl.evaluate(el=>[...el.querySelectorAll('.tp-story-card')].map(card=>({scroll:card.scrollWidth,client:card.clientWidth,width:card.getBoundingClientRect().width,parent:el.querySelector('.mes_text').clientWidth})));
  assert(inlineOverflow.every(x=>x.scroll<=x.client+1&&x.width<=x.parent+1));
- await inlineEl.screenshot({path:path.join(out,'v08-inline-chat-mobile.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v08-inline-chat-mobile.png'),path.resolve(root,`../TavernPocket_v${version}_InlineChat.png`));
+ await capture(inlineEl,'v08-inline-chat-mobile.png');
  await page.setViewportSize({width:1440,height:980});await page.locator('#sttts-floating .orb').click();await page.locator('#sttts-panel[open]').waitFor();
  checks.push('inline cards use span-only HTML inside a real Markdown paragraph and preserve readable prose without card overflow at a 390px mobile viewport');
  // Several actors in one native phone operation produce one main-story batch with stable event IDs.
@@ -468,7 +476,7 @@ try{
  for(const [field,value] of Object.entries({name:'夜航旅人',age:'24',height:'180 cm',weight:'75 kg',build:'精實',appearance:'黑髮、深色眼睛',body:'肩背挺直',anatomy:'右手掌有一道舊疤',penis:'由使用者自行維護'}))await frame.locator(`[data-field="me-${field}"]`).fill(value);
  await frame.locator('[data-action="me-custom-add"]').click();await frame.locator('[data-field="me-custom-name"]').fill('慣用手');await frame.locator('[data-field="me-custom-value"]').fill('右手');await frame.locator('[data-action="me-profile-save"]').click();
  const savedMe=await waitAsync(async()=>{const s=await window.qaApi.pocketMemoryState();return s.profile.name==='夜航旅人'&&s;});assert.equal(savedMe.profile.age,'24');assert.equal(savedMe.profile.body,'肩背挺直');assert.equal(savedMe.profile.penis,'由使用者自行維護');assert.deepEqual(savedMe.profile.customFields,[{name:'慣用手',value:'右手'}]);
- await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.view[data-app="me"]').evaluate(el=>{el.scrollTop=0;});await page.locator('#sttts-panel').screenshot({path:path.join(out,'v07-me-profile.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v07-me-profile.png'),path.resolve(root,`../TavernPocket_v${version}_MeProfile.png`));
+ await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.view[data-app="me"]').evaluate(el=>{el.scrollTop=0;});await capture(page.locator('#sttts-panel'),'v07-me-profile.png');
  checks.push('Me profile UI saves explicit age, build, appearance, body/anatomy/penis and custom fields without filling unknown values or changing the active persona identity');
  const meBranch=async name=>{await frame.locator('[data-action="me-home"]').click();await frame.locator(`[data-action="me-branch"][data-branch="${name}"]`).click();};
  await meBranch('items');await frame.locator('[data-action="me-entry-new"]').click();await frame.locator('[data-field="me-entry-name"]').fill('銀色指南針');await frame.locator('[data-field="me-entry-description"]').fill('V07 手動收藏：指向故事中的北方。');await frame.locator('[data-field="me-entry-quantity"]').fill('2');await frame.locator('[data-action="me-entry-save"]').click();
@@ -502,31 +510,31 @@ try{
  const assetsBeforeRejected=await api(async()=>{const s=await window.qaApi.pocketMemoryState();return s.items.length+s.abilities.length;});
  await page.evaluate(()=>window.qa.incomingRaw('我打開萬寶商城，購買了「不該自動取得能力」。'));await page.evaluate(()=>window.qa.send('如果我在萬寶商城購買了「假設測試能力」，之後會怎樣？'));await api(()=>window.qaApi.pocketAction('sync',{}));assert.equal(await api(async()=>{const s=await window.qaApi.pocketMemoryState();return s.items.length+s.abilities.length;}),assetsBeforeRejected);assert.equal(await api(()=>window.qaApi.wallet().balance),beforeAccident);
  checks.push('assistant-authored acquisition text and hypothetical user prose cannot add assets or debit the wallet');
- await api(async()=>{parent.qa.nextResponse=JSON.stringify({items:[{name:'急救包',description:'劇情用品，供旅途備用。',price:19.5,emoji:'🧰'}]});await window.qaApi.pocketAction('shop.generate',{query:'急救包'});});
+ await api(async()=>{parent.qa.nextResponse=JSON.stringify({items:[{name:'急救包',description:'劇情用品，供旅途備用。',price:19,emoji:'🧰'}]});await window.qaApi.pocketAction('shop.generate',{query:'急救包'});});
  const beforeKnownPurchase=await api(()=>window.qaApi.wallet().balance);
  const knownPurchaseId=await page.evaluate(()=>window.qa.send('我打開萬寶商城，購買了「急救包」。'));
- await api(()=>window.qaApi.pocketAction('sync',{}));const knownItem=await api(async()=>(await window.qaApi.pocketMemoryState()).items.find(x=>x.name==='急救包'));assert(knownItem);assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((beforeKnownPurchase-19.5)*100)/100);
- await page.evaluate(id=>window.qa.emit('MESSAGE_SENT',id),knownPurchaseId);await api(()=>window.qaApi.pocketAction('sync',{}));assert.equal(await api(async()=>(await window.qaApi.pocketMemoryState()).items.filter(x=>x.name==='急救包').length),1);assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((beforeKnownPurchase-19.5)*100)/100);
+ await api(()=>window.qaApi.pocketAction('sync',{}));const knownItem=await api(async()=>(await window.qaApi.pocketMemoryState()).items.find(x=>x.name==='急救包'));assert(knownItem);assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((beforeKnownPurchase-19)*100)/100);
+ await page.evaluate(id=>window.qa.emit('MESSAGE_SENT',id),knownPurchaseId);await api(()=>window.qaApi.pocketAction('sync',{}));assert.equal(await api(async()=>(await window.qaApi.pocketMemoryState()).items.filter(x=>x.name==='急救包').length),1);assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((beforeKnownPurchase-19)*100)/100);
  checks.push('a narrative purchase of an exact catalogued item uses its known price once and stores one lasting item across repeated message/sync events');
- await frame.locator('[data-action="me-home"]').click();await frame.locator('[data-action="me-branch"][data-branch="abilities"]').click();await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.view[data-app="me"]').evaluate(el=>{el.scrollTop=0;});await page.locator('#sttts-panel').screenshot({path:path.join(out,'v07-me-abilities.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v07-me-abilities.png'),path.resolve(root,`../TavernPocket_v${version}_MeAbilities.png`));
+ await frame.locator('[data-action="me-home"]').click();await frame.locator('[data-action="me-branch"][data-branch="abilities"]').click();await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.view[data-app="me"]').evaluate(el=>{el.scrollTop=0;});await capture(page.locator('#sttts-panel'),'v07-me-abilities.png');
 
  // v0.8: malformed catalogue entries are isolated, one schema repair is bounded,
  // and a manual product remains usable when the model cannot return products.
  await go('storyshop');const manualBefore=await api(()=>({balance:window.qaApi.wallet().balance,requests:parent.qa.requests.length,chat:parent.qa.context.chat.length}));
- await frame.locator('[data-action="shop-new"]').click();await frame.locator('[data-field="shop-name"]').fill('星紋護符');await frame.locator('[data-field="shop-description"]').fill('由我設定的虛構護符，能在夜晚辨識方向。');await frame.locator('[data-field="shop-price"]').fill('12.50');await frame.locator('[data-field="shop-kind"]').selectOption('items');await frame.locator('[data-action="shop-save"]').click();
+ await frame.locator('[data-action="shop-new"]').click();await frame.locator('[data-field="shop-name"]').fill('星紋護符');await frame.locator('[data-field="shop-description"]').fill('由我設定的虛構護符，能在夜晚辨識方向。');await frame.locator('[data-field="shop-price"]').fill('12');await frame.locator('[data-field="shop-kind"]').selectOption('items');await frame.locator('[data-action="shop-save"]').click();
  let manualProduct=await waitAsync(async()=>(await window.qaApi.pocketState()).catalogue.find(x=>x.name==='星紋護符'));assert.equal(manualProduct.source,'manual');assert.equal(await page.evaluate(()=>window.qa.requests.length),manualBefore.requests);assert.equal(await api(()=>window.qaApi.wallet().balance),manualBefore.balance);
  await frame.locator(`[data-action="shop-edit"][data-id="${manualProduct.id}"]`).click();await frame.locator('[data-field="shop-description"]').fill('手動商品記憶：護符刻有星紋，在夜晚指出北方。');await frame.locator('[data-action="shop-save"]').click();await waitAsync(async()=>(await window.qaApi.pocketState()).catalogue.find(x=>x.name==='星紋護符')?.description.startsWith('手動商品記憶'));
- await api(async()=>{parent.qa.nextResponse=JSON.stringify({items:[{name:'保留的補給包',description:'完整有效的商品。',price:8.75},{name:'缺失價格商品',description:'不可猜價'}]});await window.qaApi.pocketAction('shop.generate',{query:'補給包'});});
+ await api(async()=>{parent.qa.nextResponse=JSON.stringify({items:[{name:'保留的補給包',description:'完整有效的商品。',price:8},{name:'缺失價格商品',description:'不可猜價'}]});await window.qaApi.pocketAction('shop.generate',{query:'補給包'});});
  const partialCatalogue=await api(()=>window.qaApi.pocketState());assert(partialCatalogue.catalogue.some(x=>x.name==='星紋護符'));assert(partialCatalogue.catalogue.some(x=>x.name==='保留的補給包'));assert(!partialCatalogue.catalogue.some(x=>x.name==='缺失價格商品'));assert.equal(partialCatalogue.catalogueSource.skipped,1);
  checks.push('manual shop UI creates/edits a product without a model call or charge; malformed generated entries are skipped individually and a valid item plus manual stock remain');
  const repairBefore=await page.evaluate(()=>window.qa.requests.length);
- await api(async()=>{parent.qa.responseQueue=['{"items":[{"name":"格式修復書籤" "description":"只修復 JSON 分隔符。","price":3.5}]}',JSON.stringify({items:[{name:'格式修復書籤',description:'只修復 JSON 分隔符。',price:3.5}]})];await window.qaApi.pocketAction('shop.generate',{query:'格式修復書籤'});});
+ await api(async()=>{parent.qa.responseQueue=['{"items":[{"name":"格式修復書籤" "description":"只修復 JSON 分隔符。","price":3}]}',JSON.stringify({items:[{name:'格式修復書籤',description:'只修復 JSON 分隔符。',price:3}]})];await window.qaApi.pocketAction('shop.generate',{query:'格式修復書籤'});});
  const repairedCatalogue=await api(()=>window.qaApi.pocketState());assert(repairedCatalogue.catalogueSource.repaired);assert.equal(await page.evaluate(()=>window.qa.requests.length),repairBefore+2);assert(repairedCatalogue.catalogue.some(x=>x.name==='星紋護符'));
  const retainedNames=repairedCatalogue.catalogue.map(x=>x.name),refusalBefore=await page.evaluate(()=>window.qa.requests.length);
  const refusal=await api(async()=>{parent.qa.nextResponse='很抱歉，我無法提供這些商品。';try{await window.qaApi.pocketAction('shop.generate',{query:'測試失敗保留'});return '';}catch(e){return e.message;}});assert(refusal);assert.equal(await page.evaluate(()=>window.qa.requests.length),refusalBefore+1);assert.deepEqual((await api(()=>window.qaApi.pocketState())).catalogue.map(x=>x.name),retainedNames);
  checks.push('a single format-only repair can recover explicit product fields; refusal is not retried and failure preserves the existing catalogue');
- await frame.locator(`[data-action="shop-buy"][data-id="${manualProduct.id}"]`).click();await frame.locator('[data-action="confirm"]').click();await waitAsync(async()=>(await window.qaApi.pocketMemoryState()).items.some(x=>x.name==='星紋護符'));assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((manualBefore.balance-12.5)*100)/100);await api(()=>window.qaApi.pocketAction('sync',{}));assert(await page.evaluate(()=>window.qa.context.chat.some(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('星紋護符')&&m.extra.display_text.includes('tp-story-shop'))));
- const purchaseMirrorCount=await page.evaluate(()=>window.qa.context.chat.filter(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('星紋護符')).length);await api(()=>window.qaApi.pocketAction('sync',{}));assert.equal(await page.evaluate(()=>window.qa.context.chat.filter(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('星紋護符')).length),purchaseMirrorCount);assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((manualBefore.balance-12.5)*100)/100);
+ await frame.locator(`[data-action="shop-buy"][data-id="${manualProduct.id}"]`).click();await frame.locator('[data-action="confirm"]').click();await waitAsync(async()=>(await window.qaApi.pocketMemoryState()).items.some(x=>x.name==='星紋護符'));assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((manualBefore.balance-12)*100)/100);await api(()=>window.qaApi.pocketAction('sync',{}));assert(await page.evaluate(()=>window.qa.context.chat.some(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('星紋護符')&&m.extra.display_text.includes('tp-story-shop'))));
+ const purchaseMirrorCount=await page.evaluate(()=>window.qa.context.chat.filter(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('星紋護符')).length);await api(()=>window.qaApi.pocketAction('sync',{}));assert.equal(await page.evaluate(()=>window.qa.context.chat.filter(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('星紋護符')).length),purchaseMirrorCount);assert.equal(await api(()=>window.qaApi.wallet().balance),Math.round((manualBefore.balance-12)*100)/100);
  checks.push('manual product purchase charges once, stores it in My Items and renders one grouped shop receipt without replay duplication');
  // New forum/shop actions also remain searchable in archives; recall prompt stays request-driven.
  await api(async()=>{const a=window.qaApi,p=await a.postForum({title:'北極星觀測記錄',text:'今晚在山頂能看見獵戶座。'});await a.replyForum(p.id,{text:'記得帶上望遠鏡，夜裡山風會比較冷。'});await a.pocketAction('sync',{});});
@@ -543,9 +551,9 @@ try{
  archive=await api(()=>window.qaApi.pocketArchiveState());const archiveName=archive.worldbook.name;const archiveBook=await page.evaluate(name=>window.qa.books[name],archiveName);assert(Object.values(archiveBook.entries).some(x=>x.content.includes('今晚在山頂能看見獵戶座')));assert(Object.values(archiveBook.entries).some(x=>x.content.includes('格式修復書籤')));
  const archiveDownloadPromise=page.waitForEvent('download');await frame.locator('[data-action="me-archive-export"]').click();const archiveDownload=await archiveDownloadPromise;assert(archiveDownload.suggestedFilename().endsWith('.json'));const downloadPath=await archiveDownload.path();const exportedArchive=JSON.parse(await fs.readFile(downloadPath,'utf8'));assert(Object.values(exportedArchive.entries).some(x=>x.content.includes('今晚在山頂能看見獵戶座')));
  checks.push('quiet-memory UI searches and expands records, shows empty results, writes the dedicated worldbook and exports complete JSON through a real browser download');
- await page.setViewportSize({width:390,height:844});await frame.locator('[data-field="me-archive-query"]').fill('獵戶座');await frame.locator('[data-action="me-archive-search"]').click();await frame.locator('details.tp-me-archive-record').first().locator('summary').click();await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.tp-me-archive').evaluate(el=>{const view=el.closest('.view');view.scrollTop+=el.getBoundingClientRect().top-view.getBoundingClientRect().top-12;});assert(await frame.locator('.tp-me-archive').evaluate(el=>el.scrollWidth<=el.clientWidth+1));await page.locator('#sttts-panel').screenshot({path:path.join(out,'v08-archive-mobile.png'),animations:'disabled'});await fs.copyFile(path.join(out,'v08-archive-mobile.png'),path.resolve(root,`../TavernPocket_v${version}_Memory.png`));
+ await page.setViewportSize({width:390,height:844});await frame.locator('[data-field="me-archive-query"]').fill('獵戶座');await frame.locator('[data-action="me-archive-search"]').click();await frame.locator('details.tp-me-archive-record').first().locator('summary').click();await frame.locator('.toast').waitFor({state:'hidden'});await frame.locator('.tp-me-archive').evaluate(el=>{const view=el.closest('.view');view.scrollTop+=el.getBoundingClientRect().top-view.getBoundingClientRect().top-12;});assert(await frame.locator('.tp-me-archive').evaluate(el=>el.scrollWidth<=el.clientWidth+1));await capture(page.locator('#sttts-panel'),'v08-archive-mobile.png');
  await page.setViewportSize({width:390,height:844});
- await go('storyshop');await frame.locator('.pocket-products').waitFor({state:'visible'});await frame.locator('.pocket-shop-intro').evaluate(el=>{const view=el.closest('.view');view.scrollTop+=el.getBoundingClientRect().top-view.getBoundingClientRect().top-12;});await page.locator('#sttts-panel').screenshot({path:path.join(out,'mobile-shop.png'),animations:'disabled'});await fs.copyFile(path.join(out,'mobile-shop.png'),path.resolve(root,`../TavernPocket_v${version}_WanbaoShop.png`));
+ await go('storyshop');await frame.locator('.pocket-products').waitFor({state:'visible'});await frame.locator('.pocket-shop-intro').evaluate(el=>{const view=el.closest('.view');view.scrollTop+=el.getBoundingClientRect().top-view.getBoundingClientRect().top-12;});await capture(page.locator('#sttts-panel'),'mobile-shop.png');
  const bounds=await page.locator('#sttts-panel').boundingBox();assert(bounds.width<=390&&bounds.height<=844);
  checks.push('390px viewport keeps phone inside viewport');
  const scopedState=await api(async()=>{const a=window.qaApi;window.qaScopeSnapshot={id:parent.qa.context.chatId,meta:parent.qa.context.chatMetadata,chat:[...parent.qa.context.chat]};const balance=a.wallet().balance;parent.qa.context.chatId='qa-other-conversation';parent.qa.context.chatMetadata={};parent.qa.context.chat.splice(0);await parent.qa.emit('CHAT_CHANGED');await a.pocketAction('sync',{});const s=await a.pocketState(),p=await a.pocketContactProfile('林知夏');return {balance,after:a.wallet().balance,postCount:s.instagram.posts.length,storyCount:s.instagram.stories.length,hydration:p?.fields?.hydration,chatCount:parent.qa.context.chat.length,memory:await a.pocketMemoryState(),archive:await a.pocketArchiveState()};});
@@ -575,7 +583,7 @@ try{
  await page.locator('[data-tp-memory-tab="profile"]').click();await page.locator('[data-tp-memory-pick="profile:all"]').click();await page.waitForFunction(()=>document.querySelector('#send_textarea').value.includes('@【資訊：'));
  const pickedDraft=await page.locator('#send_textarea').inputValue();assert(pickedDraft.startsWith('我走近門口，'));assert(pickedDraft.endsWith('接著離開。'));assert.equal((pickedDraft.match(/@【/g)||[]).length,3);assert(await page.locator('#tp-memory-picker').isVisible());
  await page.locator('#tp-memory-search').fill('不存在的資料查詢');await page.locator('.tp-memory-empty').waitFor();await page.locator('#tp-memory-search').fill('');await page.locator('[data-tp-memory-pick="profile:all"]').waitFor();
- const pickerBounds=await page.locator('#tp-memory-picker').boundingBox();assert(pickerBounds.x>=0&&pickerBounds.y>=0&&pickerBounds.x+pickerBounds.width<=390&&pickerBounds.y+pickerBounds.height<=844);assert(await page.locator('#tp-memory-picker').evaluate(el=>el.scrollWidth<=el.clientWidth+1));await page.screenshot({path:path.join(out,'v09-composer-picker-mobile.png'),animations:'disabled'});
+ const pickerBounds=await page.locator('#tp-memory-picker').boundingBox();assert(pickerBounds.x>=0&&pickerBounds.y>=0&&pickerBounds.x+pickerBounds.width<=390&&pickerBounds.y+pickerBounds.height<=844);assert(await page.locator('#tp-memory-picker').evaluate(el=>el.scrollWidth<=el.clientWidth+1));await capture(page,'v09-composer-picker-mobile.png');
  assert.equal(await api(()=>window.qaApi.wallet().balance),referenceSetup.wallet);assert.equal(await page.evaluate(()=>window.qa.requests.length),referenceSetup.requests);assert.equal(await api(async id=>(await window.qaApi.pocketMemoryState()).items.find(x=>x.id===id)?.quantity,referenceSetup.item.id),3);
  await page.locator('[data-tp-memory-close]').click();
  const beforeReferenceSend=await page.evaluate(()=>window.qa.context.chat.length);await page.evaluate(()=>window.qa.emit('GENERATION_AFTER_COMMANDS','normal',{},false));assert.equal(await page.evaluate(()=>window.qa.context.chat.length),beforeReferenceSend);
@@ -602,24 +610,37 @@ try{
  checks.push('turning forum mirroring off archives new records quietly; turning it back on shows subsequent posts without replaying the prior quiet record');
  // Fresh native actions share one clean card batch. Catalogue browsing itself is silent.
  await page.evaluate(()=>window.qa.incomingRaw('我在窗邊整理手機裡的消息與剛買好的補給。'));
- const visualActivity=await api(async()=>{const a=window.qaApi;await a.pocketAction('shop.save',{name:'旅人的星空防水筆記本與補給套裝',description:'方便旅途攜帶的日常文具與補給。',price:7.5,kind:'items'});const product=(await a.pocketState()).catalogue.find(x=>x.name==='旅人的星空防水筆記本與補給套裝'),before=a.wallet().balance,thread=(await a.listThreads()).find(x=>x.type==='dm');await a.appendChat(thread.id,[{from:'me',kind:'text',text:'知夏，補給買好了，我們下午出發。'},{from:'林知夏',kind:'text',text:'收到！我在咖啡館門口等你。'}]);const post=await a.postForum({title:'週末山徑觀星與溫室散步的行程',text:'記得帶上外套、筆記本和你的好心情。'});await a.replyForum(post.id,{text:'我會帶熱茶，一起出發吧。'});await a.pocketPurchase(product,'v09-visual-order');await a.pocketAction('sync',{});return {before,after:a.wallet().balance};});
- assert.equal(visualActivity.after,Math.round((visualActivity.before-7.5)*100)/100);const visualMirrorId=await page.evaluate(()=>window.qa.context.chat.findLastIndex(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('旅人的星空防水筆記本與補給套裝')));assert(visualMirrorId>=0);const visualMirror=page.locator(`.mes[mesid="${visualMirrorId}"]`);assert(await visualMirror.locator('.tp-story-receipt').count());assert(await visualMirror.locator('.tp-story-forum').count());assert(await visualMirror.locator('.tp-story-wechat').count());
- assert(await visualMirror.locator('.mes_text').evaluate(el=>el.scrollWidth<=el.clientWidth+1));assert.equal(await visualMirror.locator('.tp-story-card').evaluateAll(els=>els.filter(el=>el.scrollWidth>el.clientWidth+1).length),0);await visualMirror.screenshot({path:path.join(out,'v09-mixed-cards-mobile.png'),animations:'disabled'});
+ const visualActivity=await api(async()=>{const a=window.qaApi;await a.pocketAction('shop.save',{name:'旅人的星空防水筆記本與補給套裝',description:'方便旅途攜帶的日常文具與補給。',price:7,kind:'items'});const product=(await a.pocketState()).catalogue.find(x=>x.name==='旅人的星空防水筆記本與補給套裝'),before=a.wallet().balance,thread=(await a.listThreads()).find(x=>x.type==='dm');await a.appendChat(thread.id,[{from:'me',kind:'text',text:'知夏，補給買好了，我們下午出發。'},{from:'林知夏',kind:'text',text:'收到！我在咖啡館門口等你。'}]);const post=await a.postForum({title:'週末山徑觀星與溫室散步的行程',text:'記得帶上外套、筆記本和你的好心情。'});await a.replyForum(post.id,{text:'我會帶熱茶，一起出發吧。'});await a.pocketPurchase(product,'v09-visual-order');await a.pocketAction('sync',{});return {before,after:a.wallet().balance};});
+ assert.equal(visualActivity.after,Math.round((visualActivity.before-7)*100)/100);const visualMirrorId=await page.evaluate(()=>window.qa.context.chat.findLastIndex(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('旅人的星空防水筆記本與補給套裝')));assert(visualMirrorId>=0);const visualMirror=page.locator(`.mes[mesid="${visualMirrorId}"]`);assert(await visualMirror.locator('.tp-story-receipt').count());assert(await visualMirror.locator('.tp-story-forum').count());assert(await visualMirror.locator('.tp-story-wechat').count());
+ assert(await visualMirror.locator('.mes_text').evaluate(el=>el.scrollWidth<=el.clientWidth+1));assert.equal(await visualMirror.locator('.tp-story-card').evaluateAll(els=>els.filter(el=>el.scrollWidth>el.clientWidth+1).length),0);await capture(visualMirror,'v09-mixed-cards-mobile.png');
  const visualMirrorCount=await page.evaluate(()=>window.qa.context.chat.filter(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('旅人的星空防水筆記本與補給套裝')).length);await api(()=>window.qaApi.pocketAction('sync',{}));assert.equal(await page.evaluate(()=>window.qa.context.chat.filter(m=>m.extra?.tavern_pocket_activity&&m.mes.includes('旅人的星空防水筆記本與補給套裝')).length),visualMirrorCount);assert.equal(await api(()=>window.qaApi.wallet().balance),visualActivity.after);
  checks.push('390px Showdown-rendered native batch presents incoming/outgoing WeChat, forum post/reply and one confirmed shop receipt without horizontal overflow, duplicate mirrors or duplicate payment');
  // User-authored shop presets affect a subsequent request; managing them does not call a model.
  await page.locator('#sttts-floating .orb').click();await page.locator('#sttts-panel[open]').waitFor();await go('storyshop');const presetCalls=await page.evaluate(()=>window.qa.requests.length);await frame.locator('[data-action="shop-presets"]').click();await frame.locator('[data-action="shop-preset-new"]').click();await frame.locator('[data-field="shop-preset-name"]').fill('旅程補給');await frame.locator('[data-field="shop-preset-prompt"]').fill('V09_CUSTOM_PRESET：優先提供旅途中的日用品，詳細描述收納方式。');await frame.locator('[data-action="shop-preset-save"]').click();const newShopPreset=await waitAsync(async()=>{const s=(await window.qaApi.pocketState()).shopPresets;return s?.presets.find(x=>x.name==='旅程補給');});assert.equal(await page.evaluate(()=>window.qa.requests.length),presetCalls);assert.equal((await api(()=>window.qaApi.pocketState())).shopPresets.selectedId,newShopPreset.id);
- await frame.locator('[data-sheet-close]').click();await api(()=>{parent.qa.nextResponse=JSON.stringify({items:[{name:'折疊旅行收納袋',description:'輕便，可放入外套口袋。',price:6.5}]});});await frame.locator('[data-action="shop-generate"]').click();await waitAsync(async()=>(await window.qaApi.pocketState()).catalogue.some(x=>x.name==='折疊旅行收納袋'));assert((await page.evaluate(()=>window.qa.requests.at(-1).prompt)).includes('V09_CUSTOM_PRESET'));
+ await frame.locator('[data-sheet-close]').click();await api(()=>{parent.qa.nextResponse=JSON.stringify({items:[{name:'折疊旅行收納袋',description:'輕便，可放入外套口袋。',price:6}]});});await frame.locator('[data-action="shop-generate"]').click();await waitAsync(async()=>(await window.qaApi.pocketState()).catalogue.some(x=>x.name==='折疊旅行收納袋'));assert((await page.evaluate(()=>window.qa.requests.at(-1).prompt)).includes('V09_CUSTOM_PRESET'));
  await frame.locator('[data-action="shop-presets"]').click();const importCalls=await page.evaluate(()=>window.qa.requests.length);await frame.locator('[data-shop-preset-import]').setInputFiles({name:'V09_Imported_ST_Preset.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({name:'匯入的旅行預設',prompts:[{identifier:'enabled',content:'V09_IMPORTED_PRESET：商品附上旅行用途。'},{identifier:'disabled',content:'V09_DISABLED_PRESET_MUST_NOT_APPEAR'}],prompt_order:[{character_id:100001,order:[{identifier:'disabled',enabled:false},{identifier:'enabled',enabled:true}]}]}))});const importedShopPreset=await waitAsync(async()=>(await window.qaApi.pocketState()).shopPresets.presets.find(x=>x.name==='匯入的旅行預設'));assert.equal(await page.evaluate(()=>window.qa.requests.length),importCalls);assert(importedShopPreset.prompt.includes('V09_IMPORTED_PRESET'));assert(!importedShopPreset.prompt.includes('V09_DISABLED_PRESET'));
- await frame.locator('[data-sheet-close]').click();await frame.locator('[data-field="shop-preset"]').selectOption(importedShopPreset.id);await api(()=>{parent.qa.nextResponse=JSON.stringify({items:[{name:'旅行用輕便水壺',description:'有防漏瓶蓋。',price:9.5}]});});await frame.locator('[data-action="shop-generate"]').click();await waitAsync(async()=>(await window.qaApi.pocketState()).catalogue.some(x=>x.name==='旅行用輕便水壺'));const importedPresetPrompt=await page.evaluate(()=>window.qa.requests.at(-1).prompt);assert(importedPresetPrompt.includes('V09_IMPORTED_PRESET'));assert(!importedPresetPrompt.includes('V09_DISABLED_PRESET'));checks.push('shop preset manager creates and imports real JSON files without model calls, selects the saved preset, respects disabled ST prompt-order segments and includes only active custom text in subsequent product generation');
+ await frame.locator('[data-sheet-close]').click();await frame.locator('[data-field="shop-preset"]').selectOption(importedShopPreset.id);await api(()=>{parent.qa.nextResponse=JSON.stringify({items:[{name:'旅行用輕便水壺',description:'有防漏瓶蓋。',price:9}]});});await frame.locator('[data-action="shop-generate"]').click();await waitAsync(async()=>(await window.qaApi.pocketState()).catalogue.some(x=>x.name==='旅行用輕便水壺'));const importedPresetPrompt=await page.evaluate(()=>window.qa.requests.at(-1).prompt);assert(importedPresetPrompt.includes('V09_IMPORTED_PRESET'));assert(!importedPresetPrompt.includes('V09_DISABLED_PRESET'));checks.push('shop preset manager creates and imports real JSON files without model calls, selects the saved preset, respects disabled ST prompt-order segments and includes only active custom text in subsequent product generation');
  // Search must reach entries beyond the old 500-entry cap and the end of a long chapter.
  const worldbookCalls=await page.evaluate(()=>window.qa.requests.length);await page.evaluate(()=>{const entries={};for(let i=0;i<650;i++)entries[i]={uid:i,comment:'旅行備忘 '+i,key:['旅行備忘'],content:'這是一份旅途備忘，記載各地景色與生活習俗。'.repeat(20),disable:false};entries[649]={uid:649,comment:'長篇航行日誌',key:['V09_DEEP_LORE'],content:'沿途的天氣與海色均已記錄。'.repeat(1000)+'V09_DEEP_LORE：極光之門位於第六百四十九號航標。',disable:false};window.qa.books['V09 大型世界書']={entries};for(let i=0;i<8;i++)window.qa.books['V09 附錄 '+i]={entries:{0:{uid:0,comment:'附錄',content:'第 '+i+' 份已啟用的旅行附錄。',disable:false}}};});
- const largeBooks=['V09 大型世界書',...Array.from({length:8},(_,i)=>'V09 附錄 '+i)];await api(async books=>{const a=window.qaApi;await a.pocketAction('settings.save',{...(await a.pocketState()).settings,worldbooks:books});},largeBooks);await go('pocketsettings');assert.equal(await frame.locator('[data-worldbook]:checked').count(),9);await frame.locator('[data-action="worldbooks-browse"]').click();await frame.locator('[data-lore-query]').fill('V09_DEEP_LORE');await frame.locator('[data-lore-form] button[type="submit"]').click();await frame.locator('.pocket-lore-open strong').filter({hasText:'長篇航行日誌'}).waitFor();assert((await frame.locator('.pocket-lore-counts').textContent()).includes('658'));assert((await frame.locator('.pocket-lore-results').textContent()).includes('長篇航行日誌'));await frame.locator('[data-lore-action="read"]').first().click();await frame.locator('.pocket-lore-content').waitFor();assert(!(await frame.locator('.pocket-lore-content').textContent()).includes('V09_DEEP_LORE'));await frame.locator('[data-lore-action="read-next"]').click();await page.waitForFunction(()=>{const doc=document.querySelector('#sttts-panel iframe')?.contentDocument;return doc?.querySelector('.pocket-lore-content')?.textContent.includes('V09_DEEP_LORE');});await frame.locator('[data-lore-action="pin-reading"]').click();await frame.locator('[data-lore-action="pin-reading"][aria-pressed="true"]').waitFor();assert(await frame.locator('.pocket-lore-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1));await page.locator('#sttts-panel').screenshot({path:path.join(out,'v09-worldbook-reader-mobile.png'),animations:'disabled'});await frame.locator('[data-sheet-close]').click();await frame.locator('[data-action="settings-save"]').click();await waitAsync(async()=>(await window.qaApi.pocketState()).settings.worldbookPins.some(x=>x.book==='V09 大型世界書'&&x.entryId==='649'));assert.equal(await page.evaluate(()=>window.qa.requests.length),worldbookCalls);
+ const largeBooks=['V09 大型世界書',...Array.from({length:8},(_,i)=>'V09 附錄 '+i)];await api(async books=>{const a=window.qaApi;await a.pocketAction('settings.save',{...(await a.pocketState()).settings,worldbooks:books});},largeBooks);await go('pocketsettings');assert.equal(await frame.locator('[data-worldbook]:checked').count(),9);await frame.locator('[data-action="worldbooks-browse"]').click();await frame.locator('[data-lore-query]').fill('V09_DEEP_LORE');await frame.locator('[data-lore-form] button[type="submit"]').click();await frame.locator('.pocket-lore-open strong').filter({hasText:'長篇航行日誌'}).waitFor();assert((await frame.locator('.pocket-lore-counts').textContent()).includes('658'));assert((await frame.locator('.pocket-lore-results').textContent()).includes('長篇航行日誌'));await frame.locator('[data-lore-action="read"]').first().click();await frame.locator('.pocket-lore-content').waitFor();assert(!(await frame.locator('.pocket-lore-content').textContent()).includes('V09_DEEP_LORE'));await frame.locator('[data-lore-action="read-next"]').click();await page.waitForFunction(()=>{const doc=document.querySelector('#sttts-panel iframe')?.contentDocument;return doc?.querySelector('.pocket-lore-content')?.textContent.includes('V09_DEEP_LORE');});await frame.locator('[data-lore-action="pin-reading"]').click();await frame.locator('[data-lore-action="pin-reading"][aria-pressed="true"]').waitFor();assert(await frame.locator('.pocket-lore-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1));await capture(page.locator('#sttts-panel'),'v09-worldbook-reader-mobile.png');await frame.locator('[data-sheet-close]').click();await frame.locator('[data-action="settings-save"]').click();await waitAsync(async()=>(await window.qaApi.pocketState()).settings.worldbookPins.some(x=>x.book==='V09 大型世界書'&&x.entryId==='649'));assert.equal(await page.evaluate(()=>window.qa.requests.length),worldbookCalls);
  await api(async()=>{parent.qa.nextResponse='林知夏：極光之門位於第六百四十九號航標。';const thread=(await window.qaApi.listThreads()).find(x=>x.type==='dm');await window.qaApi.appendChat(thread.id,[{from:'me',kind:'text',text:'V09_DEEP_LORE 裡的極光之門在哪裡？'}]);await window.qaApi.chatReply(thread.id);});const deepLorePrompt=await page.evaluate(()=>window.qa.requests.at(-1).prompt);assert(deepLorePrompt.includes('V09_DEEP_LORE：極光之門位於第六百四十九號航標'));
  checks.push('phone settings accept nine books, browse all 658 enabled entries, search past entry 500, read and pin the end of a 12k+ chapter without calling a model, and retrieve that late passage into a subsequent phone-model request');
+ // Locking suspends the visible-view queue. Unlocking must flush the saved
+ // dirty event itself, without requiring another chat or settings event.
+ const lockThread=await api(async()=>(await window.qaApi.listThreads()).find(x=>x.type==='dm'&&x.members.includes('林知夏')));
+ assert(lockThread);await go('chat');
+ if(await frame.locator('.composer').isVisible())await frame.locator('.app-nav [data-system="back"]').click();
+ await frame.locator(`.conv[data-id="${lockThread.id}"]`).click();await frame.locator('.composer').waitFor();
+ await frame.locator('.pull-tab[data-system="control"]').click();await frame.locator('.sheet [data-system="power"]').click();
+ await frame.locator('.lockscreen').waitFor({state:'visible'});
+ await api(id=>window.qaApi.appendChat(id,[{from:'林知夏',kind:'text',text:'V11_UNLOCK_RESUME：鎖屏期間的新訊息'}]),lockThread.id);
+ assert.equal(await frame.locator('.chat-bubble').filter({hasText:'V11_UNLOCK_RESUME'}).count(),0);
+ await frame.locator('.lockscreen [data-system="unlock"]').first().click();await frame.locator('.lockscreen').waitFor({state:'hidden'});
+ await frame.locator('.chat-bubble').filter({hasText:'V11_UNLOCK_RESUME'}).waitFor({state:'visible'});
+ checks.push('locking defers a real incoming chat update; unlocking alone resumes the pending render and immediately shows the saved message without a later event');
  assert.deepEqual(errors,[]);
  assert.equal(naiCalls.length,4);
  const report={passed:checks.length,checks,mockedNovelAIRequests:naiCalls.length,browser:await browser.version(),pageErrors:errors,host:'mock SillyTavern 1.19 APIs, original host+iframe, real Chromium IndexedDB, Showdown 2.1.0 paragraph fixture (not full ST formatting pipeline), deterministic model fixture'};
  await fs.writeFile(path.join(out,'browser-report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
-}catch(error){console.error('CHECKS_COMPLETED',checks.length,checks.at(-1));if(page){await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});console.error('NOTICES',await page.evaluate(()=>window.qa?.notices).catch(()=>[]));console.error('PAGE_ERRORS',errors);console.error('EDITOR_ERRORS',await page.frames().find(x=>x.url().endsWith('/ui/index.html'))?.locator('[data-photo-editor-error]').allTextContents());console.error('NAI_CALL_COUNT',naiCalls.length);}throw error;
-}finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
+}catch(error){await fs.writeFile(path.join(out,'browser-report.json'),JSON.stringify({passed:false,completed:checks.length,checks,error:String(error.stack||error),mockedNovelAIRequests:naiCalls.length,pageErrors:errors},null,2));console.error('CHECKS_COMPLETED',checks.length,checks.at(-1));if(page){await capture(page,'failure.png').catch(()=>{});console.error('NOTICES',await page.evaluate(()=>window.qa?.notices).catch(()=>[]));console.error('PAGE_ERRORS',errors);console.error('EDITOR_ERRORS',await page.frames().find(x=>x.url().endsWith('/ui/index.html'))?.locator('[data-photo-editor-error]').allTextContents());console.error('NAI_CALL_COUNT',naiCalls.length);console.error('UI_STATE',await page.frames().find(x=>x.url().endsWith('/ui/index.html'))?.evaluate(async()=>{const s=await window.qaApi.pocketState();return {query:document.querySelector('[data-field=shop-query]')?.value,working:document.querySelectorAll('.pocket-working').length,toasts:[...document.querySelectorAll('.toast')].map(x=>x.textContent),source:s.catalogueSource,products:s.catalogue.map(x=>({name:x.name,price:x.price})),nextResponse:parent.qa.nextResponse,requests:parent.qa.requests.slice(-2).map(x=>({profileId:x.profileId,prompt:x.prompt.slice(0,800)}))};}).catch(()=>null));}throw error;
+}finally{clearInterval(progress);await browser?.close();await new Promise(resolve=>server.close(resolve));}

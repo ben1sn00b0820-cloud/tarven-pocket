@@ -1,4 +1,4 @@
-// 论坛: a public board next to 朋友圈. The feed (热搜 on top, then posts), a post with its replies as floors, and the
+// 論道臺: a public board next to 朋友圈. The feed (热搜 on top, then posts), a post with its replies as floors, and the
 // user's own posts and replies. New posts, replies and the 热搜 are generated in the tavern page (host-apps.js).
 import {createView, esc, btn, field, input, textArea, heading, avatar, empty} from './common.js';
 import {icon} from './icons.js';
@@ -34,12 +34,12 @@ export function forumApp(ctx) {
     if (v.disposed || ticket !== epoch) return;
     posts = all;
     const roles = characters();
-    const tools = btn('forum-refresh', icon('refresh'), 'round-button', `aria-label="重新整理：看看論壇上的新帖子" ${busy() ? 'disabled' : ''}`) + btn('forum-new', icon('add'), 'round-button', 'aria-label="發帖"') + btn('forum-options', icon('more'), 'round-button', 'aria-label="論壇設定"');
-    v.draw(heading('論壇', tools, `Forum · ${posts.length}`)
+    const tools = btn('forum-refresh', icon('refresh'), 'round-button', `aria-label="重新整理：看看論道臺上的新帖子" ${busy() ? 'disabled' : ''}`) + btn('forum-new', icon('add'), 'round-button', 'aria-label="發帖"') + btn('forum-options', icon('more'), 'round-button', 'aria-label="論道臺設定"');
+    v.draw(heading('論道臺', tools, `Forum · ${posts.length}`)
       + (hot.length ? `<div class="forum-hot"><strong>${icon('star')}熱搜</strong><ol>${hot.map((t, i) => `<li><span class="rank${i < 3 ? ' top' : ''}">${i + 1}</span>${esc(t)}</li>`).join('')}</ol></div>` : '')
-      + (busy() ? '<p class="moments-busy" role="status">論壇正在重新整理……</p>' : '')
+      + (busy() ? '<p class="moments-busy" role="status">論道臺正在重新整理……</p>' : '')
       + (posts.length ? `<div class="forum-feed">${posts.map(p => card(p, roles)).join('')}</div>`
-        : empty('論壇還沒有帖子', '點右上角的重新整理，角色和路人網友就會發帖、上熱搜；也可以自己先發一個。每次重新整理會呼叫一次模型。', 'bubble')));
+        : empty('論道臺還沒有帖子', '點右上角的重新整理，角色和路人網友就會發帖、上熱搜；也可以自己先發一個。每次重新整理會呼叫一次模型。', 'bubble')));
   }
   async function renderPost(ticket) {
     const p = await api.getForumPost(open);
@@ -96,14 +96,14 @@ export function forumApp(ctx) {
     });
   }
   function options() {
-    const d = ctx.dialog('論壇設定', `<p class="help-copy">帖子和熱搜怎麼寫，在預設 App 的聊天預設裡：勾了「論壇」的規則就用在這裡（預設是「論壇口吻」）。</p>
-      <div class="actions">${btn('edit-prompt', icon('edit') + '編輯聊天預設', 'secondary')}</div><div class="actions">${btn('clear-forum', icon('trash') + '清空論壇', 'danger')}</div>`);
+    const d = ctx.dialog('論道臺設定', `<p class="help-copy">帖子和熱搜怎麼寫，在預設 App 的聊天預設裡：勾了「論道臺」的規則就用在這裡（預設是「論道臺口吻」）。</p>
+      <div class="actions">${btn('edit-prompt', icon('edit') + '編輯聊天預設', 'secondary')}</div><div class="actions">${btn('clear-forum', icon('trash') + '清空論道臺', 'danger')}</div>`);
     d.body.addEventListener('click', async e => {
       const b = e.target.closest('[data-action]');
       if (b?.dataset.action === 'edit-prompt') { d.close(); ctx.open('presets'); ctx.showPresetKind?.('chat'); }
       if (b?.dataset.action === 'clear-forum') {
-        if (!await ctx.confirm('清空論壇？', '所有帖子、回覆和熱搜都會刪除。')) return;
-        d.close(); await api.clearForum(); open = ''; await render(); ctx.notify('論壇已清空');
+        if (!await ctx.confirm('清空論道臺？', '所有帖子、回覆和熱搜都會刪除。')) return;
+        d.close(); await api.clearForum(); open = ''; await render(); ctx.notify('論道臺已清空');
       }
     });
   }

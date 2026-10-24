@@ -36,7 +36,7 @@ export function libraryApp(ctx) {
           : empty('還沒有音訊快取', '點聊天裡的聲波生成過的臺詞會暫存在這裡。'))
         + `<div class="actions">${btn('clear-cache', icon('trash') + '清理全部快取', 'danger')}</div><p class="hint">收藏和快取分開儲存，清理快取不會刪掉收藏。</p>`;
     }
-    v.draw(heading('音訊收藏', '', 'Voice Library') + tabs + filters + body);
+    v.draw(heading('留聲閣', '', 'Voice Library') + tabs + filters + body);
   }
   v.refresh = render;
   v.on('click', '[data-action]', async el => {
@@ -79,7 +79,7 @@ export function galleryApp(ctx) {
     const rows = await api.listPhotos();
     if (v.disposed || ticket !== epoch) return;
     clear();
-    v.draw(heading('相簿', importButton, `Album · ${rows.length}`) + (rows.length
+    v.draw(heading('留影閣', importButton, `Album · ${rows.length}`) + (rows.length
       ? `<div class="photo-grid">${rows.map(r => `<button data-action="photo" data-id="${esc(r.id)}" aria-label="檢視 ${esc(r.name)}"><img loading="lazy" data-photo="${esc(r.id)}" alt="${esc(r.name)}"></button>`).join('')}</div>`
       : empty('留住喜歡的畫面', '從本地匯入照片，也可以設為手機桌布。', 'image')));
     for (const row of rows) {
@@ -136,7 +136,7 @@ export function notesApp(ctx) {
     }
     const rows = await api.listNotes();
     if (v.disposed || ticket !== epoch) return;
-    v.draw(heading('備忘錄', btn('add-note', icon('add'), 'round-button', 'aria-label="新增備忘錄"'), `Memo · ${rows.length}`) + (rows.length
+    v.draw(heading('隨行箋', btn('add-note', icon('add'), 'round-button', 'aria-label="新增備忘錄"'), `Memo · ${rows.length}`) + (rows.length
       ? `<div class="notes-grid">${rows.map((n, i) => `<button class="note-card" style="--nc:${color(n.id)};--r:${(hash(n.id) % 5 - 2) * .6}deg" data-action="edit-note" data-id="${esc(n.id)}"><strong>${esc(n.title || '未命名')}</strong><small>${esc(n.text.slice(0, 80) || '空白備忘錄')}</small><small>${dateLabel(n.updatedAt)}</small></button>`).join('')}</div>`
       : empty('隨手記下這一刻', '備忘錄只由你手動記錄，不讀取聊天，也不會注入提示詞。', 'edit')));
   }
@@ -184,7 +184,7 @@ export function listenApp(ctx) {
   async function render() {
     const ticket = ++epoch;
     latest = api.latest();
-    v.draw(heading('聽取', btn('refresh', icon('refresh') + '重新整理', 'chip-button'), 'Now Playing')
+    v.draw(heading('聽風閣', btn('refresh', icon('refresh') + '重新整理', 'chip-button'), 'Now Playing')
       + `<div class="listen-stage"><div class="portrait"><span class="ring"></span><span class="ring"></span>${halo()}<span data-portrait></span></div><span class="chip emotion" data-emotion hidden></span><div class="visualizer" aria-hidden="true">${'<i></i>'.repeat(32)}</div></div>
         <div class="dialogue-box"><span class="plate" data-speaker-plate><span></span></span><span class="dialogue-engine" data-engine-label></span><p class="play-caption" data-playback-line aria-live="polite"></p><div class="dialogue-foot"><span data-playback-message></span><svg viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><path d="M1 3h12L7 12z"/></svg></div></div>
         <div class="actions" data-waiting hidden>${btn('configure', icon('mic') + '去給這個角色選音色', 'primary')}</div>

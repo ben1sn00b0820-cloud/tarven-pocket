@@ -23,8 +23,8 @@ export function peekApp(ctx) {
     const [contacts, peeks] = await Promise.all([api.chatContacts?.() || [], api.listPeeks()]);
     if (v.disposed || ticket !== epoch) return;
     const seen = new Map(peeks.map(p => [p.name, p]));
-    v.draw(heading('查手機', help('能看到 TA 和別人的聊天、搜尋記錄、備忘錄、相簿。內容由模型按人設、世界書和劇情編出來，看一次呼叫一次模型。'), 'Peek')
-      + `<p class="hint">選一個人，偷看 TA 的手機。</p>`
+    v.draw(heading('觀心鏡', help('能看到 TA 和別人的聊天、搜尋記錄、備忘錄、相簿。內容由模型按人設、世界書和劇情編出來，看一次呼叫一次模型。'), 'Peek')
+      + `<p class="hint">選一個人，偷看 TA 的傳音玉符。</p>`
       + (contacts.length ? `<div class="peek-people">${contacts.map(c => `<button type="button" class="peek-person" data-action="peek-open" data-name="${esc(c.name)}">${face(c.name, 52)}<b>${esc(c.name)}</b><small>${seen.has(c.name) ? '看過 · ' + ago(seen.get(c.name).at) : '還沒看過'}</small></button>`).join('')}</div>`
         : empty('還沒有聯絡人', '先在角色 App 裡新增角色，或者在聊天裡新增聯絡人。', 'person')));
   }
@@ -48,12 +48,12 @@ export function peekApp(ctx) {
     if (v.disposed || ticket !== epoch) return;
     const working = busy();
     if (!s) {
-      v.draw(heading(`${who} 的手機`, '', 'Peek') + `<div class="peek-lock">${face(who, 72)}<p>${esc(who)} 的手機就放在桌上……</p>
+      v.draw(heading(`${who} 的傳音玉符`, '', 'Peek') + `<div class="peek-lock">${face(who, 72)}<p>${esc(who)} 的傳音玉符就放在桌上……</p>
         ${btn('peek-look', working ? '正在偷看……' : icon('eye') + '拿起來看看', 'primary', working ? 'disabled' : '')}</div>`);
       return;
     }
     const counts = {chats: s.chats.length, searches: s.searches.length, notes: s.notes.length, photos: s.photos.length};
-    v.draw(heading(`${who} 的手機`, btn('peek-look', icon('refresh'), 'round-button', `aria-label="再看一次" ${working ? 'disabled' : ''}`), `Peek · ${ago(s.at)}`)
+    v.draw(heading(`${who} 的傳音玉符`, btn('peek-look', icon('refresh'), 'round-button', `aria-label="再看一次" ${working ? 'disabled' : ''}`), `Peek · ${ago(s.at)}`)
       + (working ? '<p class="moments-busy" role="status">正在偷看……</p>' : '')
       + `<div class="segmented peek-tabs">${TABS.map(([k, l]) => `<button type="button" data-action="peek-tab" data-tab="${k}" aria-pressed="${k === tab}">${l}${counts[k] ? ` <small>${counts[k]}</small>` : ''}</button>`).join('')}</div>`
       + `<div class="peek-section">${section(s)}</div>`

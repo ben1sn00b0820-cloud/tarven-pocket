@@ -1,8 +1,9 @@
 import {safePhotoUrl} from '../core/photo-url.js';
+import {legacyWalletAmount, parseSpiritText, SPIRIT_MAX} from '../core/currency.js';
 
 /** Strict, side-effect-free narrative → phone protocol. Never guesses events from prose. */
-export const PHONE_VERSION = '0.9.0';
-export const PHONE_LIMITS = Object.freeze({message: 2_000_000, block: 100_000, events: 256, name: 40, text: 4000, longText: 20_000, members: 20, amount: 200000});
+export const PHONE_VERSION = '0.11.0';
+export const PHONE_LIMITS = Object.freeze({message: 2_000_000, block: 100_000, events: 256, name: 40, text: 4000, longText: 20_000, members: 20, amount: SPIRIT_MAX});
 const WX = new Set(['contact', 'message', 'group_message', 'group_create', 'photo', 'voice', 'location', 'pat', 'dice', 'transfer', 'redpacket', 'gift', 'recall']);
 const IG = new Set(['post', 'story', 'dm', 'comment', 'like']);
 const FORUM = new Set(['post', 'comment']);
@@ -36,8 +37,12 @@ export function normalizeContactProfile(value) {
   return Object.fromEntries(Object.entries(value).map(([key, field]) => [key, str(field, `profile.${key}`, limits[key], true, true)]));
 }
 function amount(value) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > PHONE_LIMITS.amount || !/^\d+(?:\.\d{1,2})?$/.test(String(value))) fail('amount 必須是 0.01 至 200000 的數字，最多兩位小數。');
-  return Math.round(value * 100) / 100;
+  // This parser also replays saved events. Preserve their exact original tails;
+  // newly generated protocol amounts are integer lower-grade stones.
+  if (typeof value === 'number') {
+    try { return legacyWalletAmount(value, {zero: false, max: PHONE_LIMITS.amount}); } catch {}
+  }
+  fail(`amount 必須是大於 0 且不超過 ${PHONE_LIMITS.amount} 的下品靈石數字；新事件使用整數，舊事件最多保留兩位小數。`);
 }
 
 /**
@@ -250,6 +255,39 @@ function readCommandQuote(source, at) {
   return null;
 }
 const inertPrefix = prefix => /例如|譬如|比如|舉例|举例|範例|范例|示例|例子|語法|语法|格式|示範|示范|如果|假如|假設|假设|倘若|萬一|万一|若是|可能會|可能会|打算|計畫|计划|準備要|准备要|考慮|考虑|想要|想著|想着|本來想|本来想|尚未|還沒|还没|沒有|没有|不會|不会|不打算|不要|別|别|勿|未曾|能否|要不要|可以|(?:說|说|說道|说道|問|问)[，,：:]\s*$/.test(prefix.replace(/沒有猶豫|没有犹豫/g,''));
+/** Read a complete explicit denomination expression, then convert exactly once.
+ * Bare numbers / 元 keep their old numeric payload and therefore their receipt
+ * fingerprints. Delimiters before prose remain outside the event's source span.
+ */
+function readCommandAmount(source, start) {
+  const tail = source.slice(start, start + 241);
+  // Deliberately capture malformed numeric punctuation as well: a bad grouped
+  // value such as 1,00下品 must fail as a whole, never become a transfer of 1.
+  const term = /\d[\d.,]*[ \t]*(?:枚[ \t]*)?(?:極品|极品|中品|下品|靈石|灵石)(?:靈石|灵石)?/y;
+  let match = term.exec(tail);
+  if (match) {
+    let end = term.lastIndex;
+    while (end < tail.length) {
+      const gap = /^[ \t、，,+]*/.exec(tail.slice(end))[0], next = end + gap.length;
+      if (/\d/.test(tail[next] || '')) {
+        term.lastIndex = next;
+        match = term.exec(tail);
+        if (!match) return null; // e.g. 1中品，2上品: do not import a partial sum.
+        end = term.lastIndex;
+      } else {
+        if (/[、+]/.test(gap) || /^(?:極品|极品|上品|中品|下品|靈石|灵石)/.test(tail.slice(next))) return null;
+        break;
+      }
+    }
+    try { return {value: parseSpiritText(tail.slice(0, end), {zero: false, max: PHONE_LIMITS.amount}), end: start + end}; }
+    catch { return null; }
+  }
+  const legacy = /^(\d+(?:\.\d{1,2})?)(?:[ \t]*元)?/.exec(tail.slice(0, 40));
+  if (!legacy) return null;
+  // Number only decodes the existing, bounded decimal syntax. The shared exact
+  // validator in normalizeEvent checks precision / limits without rounding.
+  return {value: Number(legacy[1]), end: start + legacy[0].length};
+}
 /** Explicit inline commands with quoted boundaries. `matches` preserves exact
  * source offsets; stable messageKey + occurrence IDs survive surrounding edits.
  */
@@ -257,7 +295,7 @@ function parseNaturalPhoneCommands(source, options = {}, roleOrigin = false) {
   const result={events:[],errors:[],matches:[]};
   if((roleOrigin?options.isUser!==false:options.isUser!==true)||typeof source!=='string'||source.length>PHONE_LIMITS.message)return result;
   const protectedSpans=protectedCommandSpans(source),messageKey=options.messageKey??source;
-  const starts=/(微信)(傳給|传给|轉帳給|轉賬給|转账给|紅包給|红包给)|(Instagram|IG)(傳給|传给|私訊給|私信给|發限動|发限动|限時動態|限时动态|發文|发文|發帖|发帖)|(論壇|论坛)(發文|发文|發帖|发帖|回覆|回复)/gi;
+  const starts=/(千里傳音|千里传音|微信)(傳給|传给|轉帳給|轉賬給|转账给|紅包給|红包给)|(浮光錄|浮光录|Instagram|IG)(傳給|传给|私訊給|私信给|發限動|发限动|限時動態|限时动态|發文|发文|發帖|发帖)|(論道臺|論道台|论道台|论坛|論壇)(發文|发文|發帖|发帖|回覆|回复)/gi;
   let spanIndex=0,consumed=0,ordinal=0;
   for(const head of source.matchAll(starts)) {
     const appStart=head.index;if(appStart<consumed)continue;
@@ -275,15 +313,15 @@ function parseNaturalPhoneCommands(source, options = {}, roleOrigin = false) {
     while(/[ \t]/.test(source[at]||'')&&at<source.length)at++;
     let event,end;
     if(money) {
-      const amountMatch=/^(\d+(?:\.\d{1,2})?)(?:[ \t]*元)?/.exec(source.slice(at,at+40));if(!amountMatch)continue;
-      at+=amountMatch[0].length;
+      const parsedAmount=readCommandAmount(source,at);if(!parsedAmount)continue;
+      at=parsedAmount.end;
       // Never accept a valid prefix of an invalid number or currency expression.
       if(/[\d.A-Za-z]/.test(source[at]||''))continue;
       while(/[ \t]/.test(source[at]||'')&&at<source.length)at++;
       const memo=readCommandQuote(source,at);
       if(/[「『“"]/.test(source[at]||'')&&!memo)continue;
       if(!memo&&at<source.length&&!/[\s，,。；;！!？?）)]/.test(source[at]))continue;
-      end=memo?.end??at;event={app,action:/紅包|红包/.test(verb)?'redpacket':'transfer',to,amount:Number(amountMatch[1])};
+      end=memo?.end??at;event={app,action:/紅包|红包/.test(verb)?'redpacket':'transfer',to,amount:parsedAmount.value};
       if(memo?.text.trim())event.text=memo.text;
     }else{
       const content=readCommandQuote(source,at);if(!content)continue;end=content.end;
@@ -297,7 +335,7 @@ function parseNaturalPhoneCommands(source, options = {}, roleOrigin = false) {
     const connector=/^\s*(?:(?:接著|接着|然後|然后|隨後|随后|最後|最后|於是|于是|接下來|接下来|並且|并且|而|又|再)\s*)+/.exec(originalClause)?.[0]||'';
     const clause=originalClause.slice(connector.length);
     const named=/^\s*([\p{L}\p{N}_·．. -]{1,40}?)(?:\s*(?:在|：|:)\s*)?$/u.exec(clause);
-    const narrative=/拿|笑|說|说|傳來|传来|訊息|消息|手機|手机|接著|接着|然後|然后|隨後|随后|最後|最后|於是|于是|開啟|开启|打開|打开|操作|點擊|点击|輸入|输入|送出|傳送|发送|螢幕|屏幕|看見|看见|看著|看着|放下|外套|片刻|通知|低頭|低头/;
+    const narrative=/拿|笑|說|说|傳來|传来|訊息|消息|手機|手机|玉符|接著|接着|然後|然后|隨後|随后|最後|最后|於是|于是|開啟|开启|打開|打开|操作|點擊|点击|輸入|输入|送出|傳送|发送|螢幕|屏幕|看見|看见|看著|看着|放下|外套|片刻|通知|低頭|低头/;
     if(named&&!narrative.test(named[1])) {
       const possible=named[1].trim();
       if(roleOrigin){sender=possible;start=clauseStart+connector.length+clause.indexOf(possible);}

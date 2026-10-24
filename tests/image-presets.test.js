@@ -123,7 +123,7 @@ test('invalid parameter and override values fail before mutation; unknown data n
   const f = fixture(); f.controller.state();
   const before = structuredClone(f.c.extensionSettings);
   for (const params of [{width: 800}, {steps: 0}, {seed: 1.2}, {sampler: 'unknown'}, {variety: 'yes'}, {apiKey: 'NO'}]) assert.throws(() => add(f, {params}));
-  assert.throws(() => f.controller.action('wechatImage.save', {presetId: 'missing'}), /有效的微信生圖預設/);
+  assert.throws(() => f.controller.action('wechatImage.save', {presetId: 'missing'}), /有效的千里傳音生圖預設/);
   assert.throws(() => validateImageOverrides({model: 'nai-diffusion-3', params: {model: 'nai-diffusion-4-full'}}), /模型不一致/);
   assert.throws(() => validateImageOverrides({artist: 'x'.repeat(10001)}), /10000 字元/);
   assert.deepEqual(validateImageOverrides({positive: '', secret: 'bad', params: {model: 'nai-diffusion-3', width: 1024}}), {positive: '', params: {width: 1024}, model: 'nai-diffusion-3'});

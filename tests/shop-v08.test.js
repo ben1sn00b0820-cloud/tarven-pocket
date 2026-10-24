@@ -18,19 +18,19 @@ function fixture(responses) {
 const ctx = {name1:'使用者', name2:'角色'};
 const json = entries => JSON.stringify({items:entries});
 
-test('v0.8 reads prose-wrapped fenced JSON and direct product arrays with exact decimal strings', () => {
-  const raw = '為你找到了：\n```json\n' + JSON.stringify([item({price:'¥ 1,200.50', description:'效果包含字元 } ]，保持原文。'})]) + '\n```\n請選擇。';
+test('v0.8 reads prose-wrapped fenced JSON and direct product arrays with explicit spirit grades', () => {
+  const raw = '為你找到了：\n```json\n' + JSON.stringify([item({price:'12.50 中品靈石', description:'效果包含字元 } ]，保持原文。'})]) + '\n```\n請選擇。';
   const parsed = parseShopResponse(raw, {id:()=> 'only', now:20});
-  assert.equal(parsed.items[0].price, 1200.5);assert.equal(parsed.items[0].cents,120050);
+  assert.equal(parsed.items[0].price, 1250);assert.equal(parsed.items[0].cents,125000);
   assert.equal(parsed.items[0].description,'效果包含字元 } ]，保持原文。');assert.equal(parsed.items[0].source,'model');
   assert.equal(parsed.items[0].id,'only');assert.equal(parsed.items[0].at,20);
 });
 
 test('v0.8 keeps valid partial products and never makes malformed prices free', () => {
-  const parsed = parseShopResponse(json([item(), item({price:'免費'}), item({name:'礦泉水',price:'20–30'}), item({name:'旅行牙刷',price:'12.34'}), item({price:null})]));
-  assert.deepEqual(parsed.items.map(value=>value.price),[1200,12.34]);assert.equal(parsed.skipped,3);assert.match(parsed.warnings[0],/略過 3 件/);
+  const parsed = parseShopResponse(json([item(), item({price:'免費'}), item({name:'礦泉水',price:'20–30'}), item({name:'旅行牙刷',price:'12.34 中品靈石'}), item({price:null})]));
+  assert.deepEqual(parsed.items.map(value=>value.price),[1200,1234]);assert.equal(parsed.skipped,3);assert.match(parsed.warnings[0],/略過 3 件/);
   for(const bad of ['', '免費','-1','1e3','20–30','1,23','0','1.234',null,true,undefined]) assert.throws(()=>shopPrice(bad),/價格格式錯誤/);
-  for(const [given,expected] of [['  NT$ 1,200.50 元 ',1200.5],['0.01',.01],[99999,99999]]) assert.equal(shopPrice(given),expected);
+  for(const [given,expected] of [['  12.50 中品靈石 ',1250],['0.01 中品',1],[99999,99999]]) assert.equal(shopPrice(given),expected);
 });
 
 test('v0.8 keeps first eight valid products when model returns extra and labels omissions', () => {
@@ -82,7 +82,7 @@ test('v0.8 upstream failures are classified without exposing provider URLs, keys
 test('v0.8 manual catalogue CRUD neither requests models nor purchases, and updates retain manual goods', async () => {
   const f=fixture([json([item({name:'模型水瓶'})])]);
   f.data.wallet={balance:3000};f.data.inventory=['已購物品'];
-  const saved=await f.service.save(ctx,item({name:'手動能力',price:'23.45'}));
+  const saved=await f.service.save(ctx,item({name:'手動能力',price:'23.45 中品'}));
   assert.equal(saved.source,'manual');assert.equal(f.calls.length,0);assert.equal(f.data.catalogue.length,2);
   await f.service.save(ctx,{...saved,description:'可自行定義效果。',price:'24'});
   assert.equal(f.data.catalogue.find(value=>value.id===saved.id).price,24);

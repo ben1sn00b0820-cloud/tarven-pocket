@@ -69,7 +69,7 @@ export function instagramApp(ctx) {
   }
   function roleControls() {
     const roles = roleAccounts();
-    return `<div class="tp-ig-publisher"><div><span class="eyebrow">角色帳號</span><strong>讓故事裡的人分享近況</strong></div>${roles.length ? `<label class="field"><span>選擇發文角色</span><select data-field="ig-publisher" aria-label="選擇發文角色">${roles.map(a => `<option value="${esc(a.name)}" ${a.name === publisher ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label><div class="tp-ig-role-actions">${btn('ig-generate', icon('wand') + '角色發貼文', 'secondary')}${btn('ig-story-generate', icon('add') + '角色發限動', 'secondary')}</div><small>依角色、正文與手機接入的世界書生成</small>` : '<p>在正文或微信出現角色後，這裡會自動建立帳號。</p>'}</div>`;
+    return `<div class="tp-ig-publisher"><div><span class="eyebrow">角色帳號</span><strong>讓故事裡的人分享近況</strong></div>${roles.length ? `<label class="field"><span>選擇發文角色</span><select data-field="ig-publisher" aria-label="選擇發文角色">${roles.map(a => `<option value="${esc(a.name)}" ${a.name === publisher ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label><div class="tp-ig-role-actions">${btn('ig-generate', icon('wand') + '角色發貼文', 'secondary')}${btn('ig-story-generate', icon('add') + '角色發限動', 'secondary')}</div><small>依角色、正文與玉符接入的世界書生成</small>` : '<p>在正文或千里傳音出現角色後，這裡會自動建立帳號。</p>'}</div>`;
   }
   async function fillPhotos(ticket) {
     const ids = new Set([...v.root.querySelectorAll('[data-pocket-photo]')].map(el => el.dataset.pocketPhoto));
@@ -86,7 +86,7 @@ export function instagramApp(ctx) {
       ${textArea('post-text', postDraft, 'rows="3" maxlength="4000" placeholder="今天有什麼想分享的？"')}${attach('post', postPicture)}
       <div class="pocket-compose-actions"><small>${publishKind === 'story' ? '到期後保存在限動封存' : '正文與手機同步顯示'}</small>${btn('ig-post', publishKind === 'story' ? '發布限時動態' : '發布動態', 'primary')}</div></div>` + roleControls() + `
       ${posts.length ? `<div class="pocket-feed">${posts.map(post => `<article class="pocket-post">
-        <div class="pocket-person">${face(post.from, state)}<div><strong>${esc(person(post.from, state))}</strong><small>${esc(stamp(post.at))}</small></div><span class="pocket-network">Instagram</span></div>
+        <div class="pocket-person">${face(post.from, state)}<div><strong>${esc(person(post.from, state))}</strong><small>${esc(stamp(post.at))}</small></div><span class="pocket-network">浮光錄</span></div>
         ${imageOf(post)}<p class="pocket-post-text">${esc(post.text)}</p>
         <div class="pocket-post-tools"><button type="button" data-action="ig-like" data-id="${esc(post.id)}" aria-label="${hasLiked(post) ? '取消讚' : '讚'}" aria-pressed="${hasLiked(post)}">${icon('heart')}<span>${rows(post.likes).length || '喜歡'}</span></button><span>${rows(post.comments).length} 則留言</span></div>
         ${rows(post.comments).length ? `<div class="pocket-comments">${rows(post.comments).map(c => `<p><b>${esc(person(c.from, state))}</b><span>${esc(c.text)}</span></p>`).join('')}</div>` : ''}
@@ -101,7 +101,7 @@ export function instagramApp(ctx) {
     const history = dms.filter(m => (own(m.from, state) && m.to === current) || (m.from === current && own(m.to, state))).sort((a, b) => Number(a.at) - Number(b.at));
     return `<div class="pocket-recipient">${field('私訊對象', input('recipient', recipient, 'text', 'maxlength="80" placeholder="輸入角色名字"'))}
       ${contacts.length ? `<div class="pocket-contactchips">${contacts.map(name => `<button type="button" data-action="ig-person" data-name="${esc(name)}" aria-pressed="${name === current}">${face(name, state, 26)}<span>${esc(name)}</span></button>`).join('')}</div>` : ''}</div>
-      <div class="pocket-dm-history" data-keep-scroll="ig-dms" aria-live="polite">${history.length ? history.map(m => `<div class="pocket-dm ${own(m.from, state) ? 'mine' : ''}"><small>${esc(person(m.from, state))} · ${esc(stamp(m.at))}</small>${m.storyId ? '<span class="tp-ig-reply-tag">回覆限時動態</span>' : ''}<p>${esc(m.text)}${imageOf(m)}</p></div>`).join('') : `<div class="pocket-soft-empty">${icon('chat')}<p>向 ${esc(current || '角色')} 說聲嗨</p><small>Instagram 私訊與微信聊天分開保存</small></div>`}</div>
+      <div class="pocket-dm-history" data-keep-scroll="ig-dms" aria-live="polite">${history.length ? history.map(m => `<div class="pocket-dm ${own(m.from, state) ? 'mine' : ''}"><small>${esc(person(m.from, state))} · ${esc(stamp(m.at))}</small>${m.storyId ? '<span class="tp-ig-reply-tag">回覆限時動態</span>' : ''}<p>${esc(m.text)}${imageOf(m)}</p></div>`).join('') : `<div class="pocket-soft-empty">${icon('chat')}<p>向 ${esc(current || '角色')} 說聲嗨</p><small>浮光錄 私訊與千里傳音聊天分開保存</small></div>`}</div>
       <div class="pocket-compose pocket-dm-compose">${textArea('dm-text', dmDraft, 'rows="3" maxlength="4000" placeholder="傳送私訊…"')}${attach('dm', dmPicture)}
         <div class="pocket-compose-actions">${btn('ig-reply', '請角色回覆', 'secondary')}${btn('ig-dm', '傳送', 'primary')}</div></div>`;
   }
@@ -125,7 +125,7 @@ export function instagramApp(ctx) {
     state = next;
     if (!roleAccounts().some(a => a.name === publisher)) publisher = roleAccounts().find(a => a.name === state.characterName)?.name || roleAccounts()[0]?.name || '';
     if (readingStory && !stories().some(s => s.id === readingStory)) { readingStory = ''; storyReply = ''; }
-    v.draw(heading('Instagram', '', '故事裡的每一刻') + tabs(tab, [['feed', '動態'], ['stories', '限動'], ['dm', '私訊'], ['accounts', '帳號']]) + banner() + (readingStory ? storyView() : tab === 'feed' ? feed() : tab === 'stories' ? storyList() : tab === 'accounts' ? accountList() : direct()));
+    v.draw(heading('浮光錄', '', '故事裡的每一刻') + tabs(tab, [['feed', '動態'], ['stories', '限動'], ['dm', '私訊'], ['accounts', '帳號']]) + banner() + (readingStory ? storyView() : tab === 'feed' ? feed() : tab === 'stories' ? storyList() : tab === 'accounts' ? accountList() : direct()));
     await fillPhotos(ticket);
   }
   v.refresh = render;

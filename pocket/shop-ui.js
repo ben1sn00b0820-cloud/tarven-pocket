@@ -20,16 +20,16 @@ export function searchMarkup({query = '', busy = false, source = null, shopPrese
       ${source.presetName ? `<p class="pocket-shop-preset-source">生成預設：${esc(source.presetName)}</p>` : ''}
       ${(Array.isArray(source.warnings) ? source.warnings : []).map(warning => `<p class="pocket-shop-warning">${esc(warning)}</p>`).join('')}`
     : '';
-  return `<section class="pocket-shop-search" aria-label="萬寶商城查詢">
-    <label for="pocket-shop-query">想在萬寶商城找到什麼？</label>
+  return `<section class="pocket-shop-search" aria-label="萬寶閣查詢">
+    <label for="pocket-shop-query">想在萬寶閣找到什麼？</label>
     <div class="pocket-shop-query-row">
       <input id="pocket-shop-query" data-field="shop-query" type="search" maxlength="200" value="${esc(query)}" placeholder="例如：牙刷、人物、資格、能力、武器" autocomplete="off" enterkeyhint="search"${disabled}>
       <button type="button" class="primary" data-action="shop-search"${disabled}>${busy ? '生成中…' : '查詢生成'}</button>
     </div>
     <div class="pocket-shop-preset-row"><label for="pocket-shop-preset">生成預設</label><select id="pocket-shop-preset" data-field="shop-preset" aria-label="商城生成預設"${disabled}>${presets.map(p => `<option value="${esc(p.id)}"${p.id === shopPresets.selectedId ? ' selected' : ''}>${esc(p.name)}</option>`).join('') || '<option value="">預設商城設定</option>'}</select><button type="button" class="secondary" data-action="shop-presets"${disabled}>管理預設</button></div>
     ${selected?.description ? `<p class="pocket-shop-preset-detail">${esc(selected.description)}</p>` : ''}
-    <div class="pocket-shop-categories" role="group" aria-label="萬寶商城分類">${SHOP_CATEGORIES.map(category => `<button type="button" data-action="shop-category" data-query="${esc(category.query)}"${disabled}>${esc(category.label)}</button>`).join('')}</div>
-    <p class="hint">你的專屬商城，查詢生成虛構商品與價格；確認購買才使用微信虛擬餘額。模型生成最多會追加一次格式修復請求；手動新增不呼叫模型。</p>
+    <div class="pocket-shop-categories" role="group" aria-label="萬寶閣分類">${SHOP_CATEGORIES.map(category => `<button type="button" data-action="shop-category" data-query="${esc(category.query)}"${disabled}>${esc(category.label)}</button>`).join('')}</div>
+    <p class="hint">你的專屬萬寶閣，查詢生成虛構商品與價格；確認購買才扣除靈石袋餘額。1 極品 = 1000 中品，1 中品 = 100 下品；新價格以整數下品記帳。模型生成最多追加一次格式修復；手動新增不呼叫模型。</p>
     ${status}
   </section>`;
 }
@@ -37,7 +37,7 @@ export function searchMarkup({query = '', busy = false, source = null, shopPrese
 export function shopPresetEditorMarkup(state, draft, note = '') {
   const presets = Array.isArray(state?.presets) ? state.presets : [];
   const p = draft, maxPrompt = Number(state?.limits?.prompt) || 24000;
-  return `<p class="hint">為商城查詢設定固定提示詞。使用「手機接入」選擇的模型；切換預設不會查詢、扣款或購買。</p>
+  return `<p class="hint">為商城查詢設定固定提示詞。使用「玉符接入」選擇的模型；切換預設不會查詢、扣款或購買。</p>
     ${note ? `<p class="pocket-shop-preset-note" role="status">${esc(note)}</p>` : ''}
     <div class="pocket-shop-preset-tools">${btn('shop-preset-new', '新增預設', 'primary')}<label class="secondary file-button">匯入 JSON<input type="file" data-shop-preset-import accept=".json,application/json" aria-label="匯入商城生成預設"></label>${btn('shop-preset-export-all', '匯出全部', 'secondary')}</div>
     <div class="pocket-shop-preset-list" aria-label="商城生成預設清單">${presets.map(value => `<button type="button" class="pocket-shop-preset-card" data-action="shop-preset-pick" data-id="${esc(value.id)}" aria-pressed="${p?.id === value.id}"><span><strong>${esc(value.name)}</strong><small>${value.builtin ? '內建' : '自訂'}${state.selectedId === value.id ? ' · 使用中' : ''}</small></span><span>查看</span></button>`).join('')}</div>

@@ -194,7 +194,7 @@ export function createImagePresets({context, backend}) {
       result.importedIds = items.map(item => item.id);
     } else if (name === 'wechatImage.save') {
       if (own(payload, 'presetId')) {
-        if (typeof payload.presetId !== 'string' || payload.presetId && !next.presets.some(item => item.id === payload.presetId)) fail('請選擇有效的微信生圖預設。');
+        if (typeof payload.presetId !== 'string' || payload.presetId && !next.presets.some(item => item.id === payload.presetId)) fail('請選擇有效的千里傳音生圖預設。');
         next.wechat.presetId = payload.presetId;
       }
       if (own(payload, 'model')) next.wechat.model = model(payload.model);

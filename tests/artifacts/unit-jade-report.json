@@ -1,0 +1,272 @@
+{
+  "version": "0.11.0",
+  "passed": true,
+  "fileCount": 44,
+  "testCount": 524,
+  "files": [
+    {
+      "file": "tests/activity-memory.test.js",
+      "passed": true,
+      "tests": 5,
+      "elapsedMs": 184
+    },
+    {
+      "file": "tests/activity.test.js",
+      "passed": true,
+      "tests": 30,
+      "elapsedMs": 331
+    },
+    {
+      "file": "tests/cards-v08.test.js",
+      "passed": true,
+      "tests": 7,
+      "elapsedMs": 181
+    },
+    {
+      "file": "tests/cards-v09.test.js",
+      "passed": true,
+      "tests": 5,
+      "elapsedMs": 159
+    },
+    {
+      "file": "tests/contact-read-cache.test.js",
+      "passed": true,
+      "tests": 4,
+      "elapsedMs": 199
+    },
+    {
+      "file": "tests/contact-removal.test.js",
+      "passed": true,
+      "tests": 9,
+      "elapsedMs": 277
+    },
+    {
+      "file": "tests/contacts.test.js",
+      "passed": true,
+      "tests": 15,
+      "elapsedMs": 197
+    },
+    {
+      "file": "tests/csb-contacts.test.js",
+      "passed": true,
+      "tests": 23,
+      "elapsedMs": 403
+    },
+    {
+      "file": "tests/csb-runtime.test.js",
+      "passed": true,
+      "tests": 7,
+      "elapsedMs": 197
+    },
+    {
+      "file": "tests/csb-ui.test.js",
+      "passed": true,
+      "tests": 8,
+      "elapsedMs": 167
+    },
+    {
+      "file": "tests/currency.test.js",
+      "passed": true,
+      "tests": 10,
+      "elapsedMs": 183
+    },
+    {
+      "file": "tests/events-cards.test.js",
+      "passed": true,
+      "tests": 19,
+      "elapsedMs": 201
+    },
+    {
+      "file": "tests/events.test.js",
+      "passed": true,
+      "tests": 25,
+      "elapsedMs": 229
+    },
+    {
+      "file": "tests/forum-source.test.js",
+      "passed": true,
+      "tests": 7,
+      "elapsedMs": 301
+    },
+    {
+      "file": "tests/host.test.js",
+      "passed": true,
+      "tests": 26,
+      "elapsedMs": 411
+    },
+    {
+      "file": "tests/image-presets.test.js",
+      "passed": true,
+      "tests": 11,
+      "elapsedMs": 150
+    },
+    {
+      "file": "tests/instagram.test.js",
+      "passed": true,
+      "tests": 8,
+      "elapsedMs": 137
+    },
+    {
+      "file": "tests/localization.test.js",
+      "passed": true,
+      "tests": 2,
+      "elapsedMs": 96
+    },
+    {
+      "file": "tests/memory-aliases.test.js",
+      "passed": true,
+      "tests": 4,
+      "elapsedMs": 165
+    },
+    {
+      "file": "tests/mentions.test.js",
+      "passed": true,
+      "tests": 16,
+      "elapsedMs": 249
+    },
+    {
+      "file": "tests/narrative-memory.test.js",
+      "passed": true,
+      "tests": 14,
+      "elapsedMs": 130
+    },
+    {
+      "file": "tests/personal-memory.test.js",
+      "passed": true,
+      "tests": 15,
+      "elapsedMs": 218
+    },
+    {
+      "file": "tests/photos.test.js",
+      "passed": true,
+      "tests": 39,
+      "elapsedMs": 446
+    },
+    {
+      "file": "tests/shop-presets.test.js",
+      "passed": true,
+      "tests": 7,
+      "elapsedMs": 165
+    },
+    {
+      "file": "tests/shop-ui-v09.test.js",
+      "passed": true,
+      "tests": 5,
+      "elapsedMs": 181
+    },
+    {
+      "file": "tests/shop-v05.test.js",
+      "passed": true,
+      "tests": 8,
+      "elapsedMs": 113
+    },
+    {
+      "file": "tests/shop-v06.test.js",
+      "passed": true,
+      "tests": 2,
+      "elapsedMs": 109
+    },
+    {
+      "file": "tests/shop-v07.test.js",
+      "passed": true,
+      "tests": 3,
+      "elapsedMs": 182
+    },
+    {
+      "file": "tests/shop-v08.test.js",
+      "passed": true,
+      "tests": 13,
+      "elapsedMs": 141
+    },
+    {
+      "file": "tests/shop-v09.test.js",
+      "passed": true,
+      "tests": 5,
+      "elapsedMs": 106
+    },
+    {
+      "file": "tests/source-sync.test.js",
+      "passed": true,
+      "tests": 23,
+      "elapsedMs": 175
+    },
+    {
+      "file": "tests/spirit-events.test.js",
+      "passed": true,
+      "tests": 7,
+      "elapsedMs": 201
+    },
+    {
+      "file": "tests/spirit-narrative.test.js",
+      "passed": true,
+      "tests": 6,
+      "elapsedMs": 189
+    },
+    {
+      "file": "tests/spirit-native.test.js",
+      "passed": true,
+      "tests": 3,
+      "elapsedMs": 105
+    },
+    {
+      "file": "tests/status-publish.test.js",
+      "passed": true,
+      "tests": 6,
+      "elapsedMs": 131
+    },
+    {
+      "file": "tests/status.test.js",
+      "passed": true,
+      "tests": 19,
+      "elapsedMs": 195
+    },
+    {
+      "file": "tests/view-refresh.test.js",
+      "passed": true,
+      "tests": 12,
+      "elapsedMs": 99
+    },
+    {
+      "file": "tests/wallet.test.js",
+      "passed": true,
+      "tests": 23,
+      "elapsedMs": 199
+    },
+    {
+      "file": "tests/worldbook-large.test.js",
+      "passed": true,
+      "tests": 11,
+      "elapsedMs": 319
+    },
+    {
+      "file": "tests/worldbook-ui.test.js",
+      "passed": true,
+      "tests": 6,
+      "elapsedMs": 126
+    },
+    {
+      "file": "companions/csb-character-state/tests/behavior.test.js",
+      "passed": true,
+      "tests": 6,
+      "elapsedMs": 166
+    },
+    {
+      "file": "companions/csb-character-state/tests/bridge.test.js",
+      "passed": true,
+      "tests": 7,
+      "elapsedMs": 169
+    },
+    {
+      "file": "companions/csb-character-state/tests/core.test.js",
+      "passed": true,
+      "tests": 34,
+      "elapsedMs": 206
+    },
+    {
+      "file": "companions/csb-character-state/tests/persistence-v11.test.js",
+      "passed": true,
+      "tests": 9,
+      "elapsedMs": 199
+    }
+  ]
+}

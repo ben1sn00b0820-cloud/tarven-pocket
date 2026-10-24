@@ -24,6 +24,8 @@ import { NovelAIClient, relayUrl, FISH_PATHS, NAI_MODELS, NAI_MODEL_NAMES, NAI_S
 import { PIC_TAG_FORMAT, DEFAULT_DRAW_RULE, DRAW_COUNT_MAX, PRESET_REV as DRAW_PRESET_REV, drawPromptPlan, planRequest, validateDrawPreset, normalizeDraw, defaultDraw, normalizeVibeSettings } from './draw.js';
 import { defaultChat, normalizeChatPreset, normalizeContact, validateChatPreset, validateContact, chatContacts, inSpace, activeSpace, buildChatRequest, activeChatPreset, normalizeVoiceText, normalizeProfile , normalizeAvatars } from './chat.js';
 import { ChatStore, money } from './chats.js';
+import {parseSpiritAmount, parseSpiritText, formatSpiritAmount, addWalletAmount, legacyWalletAmount} from './currency.js';
+import { deletedContactNames, isContactDeleted, forgetContact, restoreContact as restoreContactRecord } from './contact-book.js';
 import { DrawQueue } from './draw-queue.js';
 import { CloudQueue, KeyHashQueue, newRoomCode, validRoom, sha256Hex } from './cloud-queue.js';
 import { vibeKey, readVibeFile, imageVibe, mergeVibe, encodingFor, withEncoding, vibeSummary, vibeParameters, singleFile, bundleFile, chatu8File, strength as vibeStrength, MAX_FREE_VIBES, VIBE_ANLAS } from './vibes.js';
@@ -50,7 +52,7 @@ const message = error => error instanceof TypeError ? '设置格式无效，请�
 
 /** Framework-independent operations. Host callbacks own SillyTavern persistence and rendering. */
 // Audio files are named after who said what: 诺亚 - 午安，格林小姐.
-const audioName = (role, said) => [String(role || '').trim(), String(said || '').replace(/\s+/g, ' ').trim().slice(0, 30)].filter(Boolean).join(' - ') || 'ST-iPhonie 语音';
+const audioName = (role, said) => [String(role || '').trim(), String(said || '').replace(/\s+/g, ' ').trim().slice(0, 30)].filter(Boolean).join(' - ') || '傳音玉符 语音';
 
 export class TTSBackend {
     constructor({ settings, persist = () => {}, notify = () => {}, change = () => {}, unknown = () => {},
@@ -139,7 +141,7 @@ export class TTSBackend {
         const vibeGroups = want.includes('vibes') ? clone(this.settings.draw.vibe.groups) : null;
         const blob = await writeBackup({ version, settings, library, chats, moments, keys, vibeGroups });
         const day = new Date(), pad = n => String(n).padStart(2, '0');
-        return { blob, name: `ST-iPhonie 备份 ${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}` };
+        return { blob, name: `傳音玉符 备份 ${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}` };
     }
     /** What a backup file holds, to show before restoring. */
     async inspectBackup(file) {
@@ -379,7 +381,7 @@ export class TTSBackend {
     keyPool(engine) { engineCheck(engine); return this.providers.keyPool(engine); }
     keyStatus(engine) { keyCheck(engine); return engine === 'nai' ? this.novelai.configured : engine === 'gpt' ? !!this.gptKey : engine === 'llm' ? this.textKeys.has(this.settings.text.active) : this.providers.keys.has(engine); }
 
-    // ---------- 钱包 and 商城 ----------
+    // ---------- 靈石袋 and 商城 ----------
     wallet() { return clone(this.settings.chat.wallet); }
     /** One wallet transaction at a time in this loaded phone. Failed work does not block the queue. */
     walletSerial(task) {
@@ -388,14 +390,16 @@ export class TTSBackend {
         return job;
     }
     walletEntry(w, amount, {kind, note = '', who = '', id = crypto.randomUUID()} = {}) {
-        const next = cents(w.balance + amount);
-        if (!Number.isFinite(amount) || !Number.isFinite(next) || next < 0 || next > WALLET_LIMITS.balance) throw Object.assign(Error(amount < 0 ? `零錢不夠了：還剩 ¥${yuan(w.balance)}，要 ¥${yuan(-amount)}` : '錢包餘額超過上限'), {code: amount < 0 ? 'BROKE' : 'WALLET_LIMIT'});
+        let next;
+        try { next = addWalletAmount(w.balance, amount, {signed: true}); }
+        catch { throw Object.assign(Error(amount < 0 ? `靈石不足：現有 ${formatSpiritAmount(w.balance)}，需要 ${formatSpiritAmount(-amount)}` : '靈石餘額超過上限'), {code: amount < 0 ? 'BROKE' : 'WALLET_LIMIT'}); }
+        if (!Number.isFinite(amount) || !Number.isFinite(next) || next < 0 || next > WALLET_LIMITS.balance) throw Object.assign(Error(amount < 0 ? `靈石不足：現有 ${formatSpiritAmount(w.balance)}，需要 ${formatSpiritAmount(-amount)}` : '靈石袋餘額超過上限'), {code: amount < 0 ? 'BROKE' : 'WALLET_LIMIT'});
         w.balance = next;
         w.ledger.unshift({id, at: Date.now(), amount, kind, note: String(note).slice(0, 60), who: String(who).slice(0, 40)});
         w.ledger.length = Math.min(w.ledger.length, WALLET_LIMITS.ledger);
     }
     walletJournalSlot(w) {
-        if (w.journal.length >= WALLET_LIMITS.journal) throw Error('錢包交易記錄已滿，請匯出備份後管理記錄；本次沒有扣款');
+        if (w.journal.length >= WALLET_LIMITS.journal) throw Error('靈石袋交易記錄已滿，請匯出備份後管理記錄；本次沒有扣款');
     }
     walletCommit(next) {
         this.save(next);
@@ -405,7 +409,7 @@ export class TTSBackend {
     walletSetBalance(value, note = '') {
         const amount = walletAmount(value);
         return this.walletSerial(() => {
-            const next = this.getState(), w = next.chat.wallet, delta = cents(amount - w.balance);
+            const next = this.getState(), w = next.chat.wallet, delta = addWalletAmount(amount, -w.balance);
             if (!delta) return this.wallet();
             this.walletEntry(w, delta, {kind: 'adjust', note: String(note).trim() || '自行设定剧情零钱'});
             return this.walletCommit(next);
@@ -454,7 +458,10 @@ export class TTSBackend {
     }
     /** A gift of the user's own in the shop (new, or changed by id). */
     saveGift(value) {
-        const next = this.getState(), list = next.chat.wallet.gifts, gift = validateGift(normalizeGift(clone(value || {})));
+        const next = this.getState(), list = next.chat.wallet.gifts, previous = list.find(g => g.id === value?.id);
+        const samePrice = previous && String(previous.price) === String(value?.price);
+        const price = samePrice ? legacyWalletAmount(previous.price) : parseSpiritText(value?.price ?? 0);
+        const gift = validateGift(normalizeGift({...clone(value || {}), price}));
         if (list.some(g => g.name === gift.name && g.id !== gift.id)) throw Error('已經有叫「' + gift.name + '」的禮物了');
         const index = list.findIndex(g => g.id === gift.id);
         if (index < 0) { if (list.length >= WALLET_LIMITS.gifts) throw Error('自定義禮物最多 ' + WALLET_LIMITS.gifts + ' 件'); list.push(gift); } else list[index] = gift;
@@ -488,7 +495,12 @@ export class TTSBackend {
                 item = {from: 'me', kind: 'gift', gift: {name: gift.name, emoji: gift.emoji, price: gift.price}, text: String(value.text || '').slice(0, 60), state: 'sent', paymentId};
                 cost = gift.price; note = gift.name;
             } else if (['redpacket', 'transfer'].includes(value.kind)) {
-                const amount = money(value.amount);
+                // New UI specifies the unit; unmarked calls retain the legacy
+                // API so an interrupted old transaction keeps its fingerprint.
+                // Canonicalize the same payload on every retry. The journal
+                // already contains lower-grade amounts; never reconvert it.
+                const raw = value.unit ? parseSpiritAmount(value.amount, value.unit, {zero: false}) : value.amount;
+                const amount = money(raw);
                 if (!amount) throw Error('金額無效');
                 if (value.kind === 'transfer' && thread.type !== 'dm') throw Error('轉賬只能在私聊裡傳送');
                 item = {from: 'me', kind: value.kind, amount, text: String(value.text || '').slice(0, 40), state: 'sent', paymentId};
@@ -548,7 +560,7 @@ export class TTSBackend {
             if (!prior) {
                 const next = this.getState(), w = next.chat.wallet;
                 this.walletJournalSlot(w);
-                if (accept && m.kind !== 'gift') this.walletEntry(w, walletAmount(m.amount, {zero: false}), {kind: m.kind, note: m.text, who: m.from, id: key});
+                if (accept && m.kind !== 'gift') this.walletEntry(w, walletAmount(m.amount, {zero: false, legacy: true}), {kind: m.kind, note: m.text, who: m.from, id: key});
                 if (accept && m.kind === 'gift') {
                     w.received.unshift({id: key, at: Date.now(), from: m.from, name: m.gift.name, emoji: m.gift.emoji, note: m.text || ''});
                     w.received.length = Math.min(w.received.length, WALLET_LIMITS.received);
@@ -591,9 +603,9 @@ export class TTSBackend {
             if (!prior) {
                 const next = this.getState(), w = next.chat.wallet;
                 this.walletJournalSlot(w);
-                const back = state === 'returned' ? walletAmount(m.kind === 'gift' ? m.gift.price : m.amount) : 0;
+                const back = state === 'returned' ? walletAmount(m.kind === 'gift' ? m.gift.price : m.amount, {legacy: true}) : 0;
                 // Imported story cards are observations, not proof that this wallet actually paid the amount.
-                if (back && m.source && !w.journal.some(r => r.id === 'send:' + m.paymentId && r.status === 'done')) throw Error('這筆劇情付款沒有錢包扣款記錄，不能再次退款');
+                if (back && m.source && !w.journal.some(r => r.id === 'send:' + m.paymentId && r.status === 'done')) throw Error('這筆劇情付款沒有靈石袋扣款記錄，不能再次退款');
                 if (back) this.walletEntry(w, back, {kind: 'refund', note: m.kind === 'gift' ? m.gift.name : m.text, who: actor, id: key});
                 w.journal.push({id: key, flow: 'claim', status: 'pending', at: Date.now(), amount: back, threadId, messageId, actor, action: state, notice: false});
                 this.walletCommit(next);
@@ -656,7 +668,7 @@ export class TTSBackend {
     /** One sync with the tavern: takes what changed there, writes what changed here. */
     async syncNow({ deviceName = '' } = {}) {
         this.assertOpen();
-        if (!this.syncFiles) throw Error('在酒館裡開啟小手機時才能儲存到酒館');
+        if (!this.syncFiles) throw Error('在酒館裡開啟傳音玉符時才能儲存到酒館');
         if (this.syncState.busy) return this.syncState.running;
         clearTimeout(this.syncTimer);
         const stores = {
@@ -1103,13 +1115,25 @@ export class TTSBackend {
         return this.save(next).chat;
     }
     saveContact(value) {
-        const next = this.getState(), contact = validateContact(normalizeContact(clone(value || {})), next.routes);
+        const next = this.getState(), draft = clone(value || {});
+        // An explicit re-add is allowed to restore a voice role. Automatic
+        // narrative imports are filtered before they reach this method.
+        const name = String(draft.name || '').trim();
+        if (isContactDeleted(next.chat, name) && next.routes.some(route => route.name === name)) {
+            next.chat = restoreContactRecord(next.chat, name, {roleNames: next.routes.map(route => route.name)});
+            this.save(next); this.emit('chat', {contacts: true});
+            return clone(this.contacts().find(contact => contact.name === name) || {name, source: 'role'});
+        }
+        const contact = validateContact(normalizeContact(draft), next.routes);
         if (next.chat.contacts.some(c => c.name === contact.name && c.id !== contact.id)) throw Error('已經有同名的聯絡人');
         const index = next.chat.contacts.findIndex(c => c.id === contact.id);
+        if (index < 0 && next.chat.contacts.length >= 200) throw Error('聯絡人已達 200 人，請先整理聯絡人。');
         if (index < 0 && this.spaceKey()) contact.space = this.spaceKey();
         if (index >= 0 && next.chat.contacts[index].space) contact.space = next.chat.contacts[index].space;
         if (index < 0) next.chat.contacts.push(contact); else next.chat.contacts[index] = contact;
+        next.chat.deletedContacts = (next.chat.deletedContacts || []).filter(row => row.name !== contact.name);
         this.save(next);
+        this.emit('chat', {contacts: true});
         return clone(contact);
     }
     /** Phone chat options: {voiceText: {mode, auto}, profile: {name, status, statusText, signature, bubble, frame, background, backgroundPhoto}, starred: [name]}. */
@@ -1127,10 +1151,24 @@ export class TTSBackend {
         if (patch?.avatars && typeof patch.avatars === 'object') { const merged = { ...next.chat.avatars }; for (const [name, a] of Object.entries(patch.avatars)) { if (a) merged[name] = a; else delete merged[name]; } next.chat.avatars = normalizeAvatars(merged); }
         return this.save(next).chat;
     }
-    deleteContact(id) {
+    deleteContact(idOrName) {
         const next = this.getState();
-        next.chat.contacts = next.chat.contacts.filter(c => c.id !== id);
-        return this.save(next).chat;
+        const manual = next.chat.contacts.find(contact => contact.id === idOrName || contact.name === idOrName);
+        const name = manual?.name || next.routes.find(route => route.name === idOrName)?.name
+            || this.contacts().find(contact => contact.name === idOrName)?.name
+            || (next.chat.deletedContacts || []).find(contact => contact.name === idOrName || contact.contact?.id === idOrName)?.name;
+        if (!name) throw Error('找不到這位聯絡人，請重新開啟聯絡簿。');
+        next.chat = forgetContact(next.chat, name);
+        const result = this.save(next).chat;
+        this.emit('chat', {contacts: true, deletedContact: name});
+        return result;
+    }
+    restoreContact(name) {
+        const next = this.getState();
+        next.chat = restoreContactRecord(next.chat, name, {roleNames: next.routes.map(route => route.name)});
+        const result = this.save(next).chat;
+        this.emit('chat', {contacts: true, restoredContact: name});
+        return result;
     }
     previewChatPrompt(preset) {
         const p = validateChatPreset(normalizeChatPreset(clone(preset || activeChatPreset(this.settings.chat))));
@@ -1190,7 +1228,10 @@ export class TTSBackend {
     /** Contacts of the card open now (all of them when 分区 is off). */
     contacts() { return chatContacts(this.settings, this.here()); }
     /** Phone chats of the card open now. */
-    async threads() { const here = this.here(); return (await this.chats.list()).filter(t => inSpace(t, here)); }
+    async threads() {
+        const here = this.here(), removed = deletedContactNames(this.settings.chat);
+        return (await this.chats.list()).filter(t => inSpace(t, here) && !(t.type === 'dm' && removed.has(t.members?.[0])));
+    }
     /** Removes what was made under the open card (or everything, with 分区 off). */
     async clearHere(list, remove, clearAll) {
         const here = this.here();
@@ -1480,7 +1521,7 @@ export class TTSBackend {
             saveChatOptions: patch => this.saveChatOptions(clone(patch)),
             wallet: () => this.wallet(), walletSetBalance: (value, note) => this.walletSetBalance(value, note), pocketPurchase: (item, orderId) => this.pocketPurchase(item, orderId), buyDecoration: (kind, key) => this.buyDecoration(kind, key), saveGift: gift => this.saveGift(gift), deleteGift: id => this.deleteGift(id),
             sendPaid: (threadId, message) => this.sendPaid(threadId, message), takeSent: (threadId, messageId, accept) => this.takeSent(threadId, messageId, accept !== false),
-            shopCatalog: () => clone({ premium: PREMIUM, kinds: DECOR_KINDS, gifts: shopGifts(this.settings.chat.wallet), ledgerKinds: LEDGER_KINDS }), saveContact: contact => this.saveContact(contact), deleteContact: id => this.deleteContact(id), chatContacts: () => clone(this.contacts()),
+            shopCatalog: () => clone({ premium: PREMIUM, kinds: DECOR_KINDS, gifts: shopGifts(this.settings.chat.wallet), ledgerKinds: LEDGER_KINDS }), saveContact: contact => this.saveContact(contact), deleteContact: id => this.deleteContact(id), restoreContact: name => this.restoreContact(name), chatContacts: () => clone(this.contacts()),
             listThreads: () => this.threads(), getThread: id => this.chats.get(id), chatUnread: async () => (await this.threads()).reduce((n, t) => n + (t.muted ? 0 : t.unread), 0),
             createThread: value => this.chatMutate(null, () => this.chats.create({ ...clone(value), space: this.spaceKey() })),
             updateThread: (id, patch) => this.chatMutate(id, () => this.chats.update(id, clone(patch))),

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
-// Tavern Pocket v0.9.0 — offline Termux / SillyDroid installer, revision 2.
-// Usage: node TavernPocket_Termux_Install.cjs [SillyTavern-directory]
+// 傳音玉符 — offline Termux / SillyDroid installer, revision 2.
+// Version and matching presets come from the bundled manifest.
+// Usage: node 傳音玉符_Install.cjs [SillyTavern-directory]
 // No downloads, account changes, package upgrades, server restarts or model calls.
 const fs=require('node:fs');
 const path=require('node:path');
@@ -103,7 +104,10 @@ function main(){
   if(crypto.createHash('sha256').update(raw).digest('hex')!==EXPECTED_DIGEST)fail('安裝包內容校驗失敗，請重新下載。');
   const bundle=JSON.parse(raw.toString('utf8'));
   const manifest=JSON.parse(Buffer.from(bundle['manifest.json'],'base64').toString('utf8'));
-  if(manifest.version!=='0.9.0'||manifest.minimum_client_version!=='1.19.0')fail('安裝包版本不一致。');
+  const release=manifest.version;
+  if(typeof release!=='string'||!/^\d+\.\d+\.\d+$/.test(release)||manifest.minimum_client_version!=='1.19.0')fail('安裝包版本不一致。');
+  const regexName=`TavernPocket_Regex_v${release}.json`,worldName=`TavernPocket_Worldbook_v${release}.json`;
+  for(const name of [regexName,worldName])if(typeof bundle[`presets/${name}`]!=='string')fail('安裝包缺少同版本配套：'+name);
   const {root,version}=selectRoot();
   const match=/^(\d+)\.(\d+)\.(\d+)(?:([+-]).*)?$/.exec(String(version));
   if(!match)fail('無法判斷酒館版本：'+String(version));
@@ -157,17 +161,17 @@ function main(){
   if(!installed)fail('安裝未完成。');
   const downloads=path.join(os.homedir(),'storage','downloads');
   const exportFolder=exists(downloads)?downloads:path.dirname(__filename);
-  const regex=exportPreset(exportFolder,'TavernPocket_Regex_v0.9.0.json',Buffer.from(bundle['presets/TavernPocket_Regex_v0.9.0.json'],'base64'));
-  const world=exportPreset(exportFolder,'TavernPocket_Worldbook_v0.9.0.json',Buffer.from(bundle['presets/TavernPocket_Worldbook_v0.9.0.json'],'base64'));
-  console.log('\n✓ Tavern Pocket v0.9.0 檔案已安裝');
+  const regex=exportPreset(exportFolder,regexName,Buffer.from(bundle[`presets/${regexName}`],'base64'));
+  const world=exportPreset(exportFolder,worldName,Buffer.from(bundle[`presets/${worldName}`],'base64'));
+  console.log('\n✓ '+(manifest.display_name||'傳音玉符')+' v'+release+' 檔案已安裝');
   console.log('安裝器：r2（Termux / SillyDroid）\n執行環境：'+layout.host+'\n酒館版本：'+version+'\n安裝位置：'+target);
   if(backup)console.log('原版本備份：'+backup);
   console.log('\n下一步：用原本方式重新啟動酒館，重新整理瀏覽器，單擊懸浮球，或在對話輸入 /phone。');
   if(layout.host==='SillyDroid')console.log('SillyDroid：請使用 App 原本的酒館啟動／停止控制重啟，再重新載入酒館頁面。此離線安裝包不使用 Git 更新；後續以新版安裝器更新。');
-  console.log('手機內「手機接入 → 更新世界書與正則」可一鍵更新配套；也可手動匯入下列新檔。');
-  console.log('正則：到「擴充功能 → Regex」匯入 '+(regex||path.join(target,'presets','TavernPocket_Regex_v0.9.0.json'))+'，搭配插件將完整手機事件顯示為正文卡片，原始訊息仍保留。');
-  console.log('世界書為選配：'+(world||path.join(target,'presets','TavernPocket_Worldbook_v0.9.0.json'))+'；插件已預設注入手機協定，不必重複啟用。');
-  console.log('底座：ST-iPhonie 0.6.56；微信在底部綠色圖示，Instagram／日記／萬寶商城／手機接入在首頁。');
-  console.log('舊聊天與 v0.2 原始資料保留。新版使用原版全手機共用錢包，可在微信錢包自行設定餘額。');
+  console.log('傳音玉符內「玉符接入 → 安裝／更新配套規則」可一鍵更新配套；也可手動匯入下列新檔。');
+  console.log('正則：到「擴充功能 → Regex」匯入 '+(regex||path.join(target,'presets',regexName))+'，搭配插件將完整傳音玉符事件顯示為正文卡片，原始訊息仍保留。');
+  console.log('世界書為選配：'+(world||path.join(target,'presets',worldName))+'；插件已預設注入傳音玉符協定，不必重複啟用。');
+  console.log('千里傳音在底部綠色圖示；角色信息／浮光錄／修行札記／萬寶閣／玉符接入在首頁。');
+  console.log('舊聊天與既有設定保留。靈石袋沿用原有帳面數值，可在「千里傳音 → 我 → 靈石袋」查看與設定。');
 }
 try{main();}catch(e){console.error('\n安裝未完成：'+e.message);process.exitCode=1;}

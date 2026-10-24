@@ -1,8 +1,8 @@
 {
-  "passed": 78,
+  "passed": 79,
   "checks": [
     "actual index initializes and a single floating-ball click opens the actual iframe",
-    "all twelve upstream apps, four existing additions and the new Me app remain on the desktop",
+    "all twelve upstream apps, four existing additions, Me and character information remain on the desktop",
     "docked floating ball reopens phone with one click",
     "real IndexedDB stores private/group chat, quote/retraction, location, dice, pat and photo",
     "WeChat renders conversations created through the actual bridge",
@@ -15,7 +15,7 @@
     "narrative phone blocks auto-sync WeChat, Instagram and character diary without duplicate replay",
     "main-story edit reconciles message content; native deletion remains hidden after replay",
     "settled narrative redpacket survives source deletion as stale without re-credit; backup retains payment/source identity",
-    "bundled protocol v0.9.0 regex and worldbook install through host APIs",
+    "bundled protocol v0.11.0 regex and worldbook install through host APIs",
     "all four added apps open via desktop navigation",
     "model and worldbook selectors save through actual settings UI",
     "Instagram image-only upload reaches photo storage and renders a decoded image",
@@ -78,10 +78,11 @@
     "turning forum mirroring off archives new records quietly; turning it back on shows subsequent posts without replaying the prior quiet record",
     "390px Showdown-rendered native batch presents incoming/outgoing WeChat, forum post/reply and one confirmed shop receipt without horizontal overflow, duplicate mirrors or duplicate payment",
     "shop preset manager creates and imports real JSON files without model calls, selects the saved preset, respects disabled ST prompt-order segments and includes only active custom text in subsequent product generation",
-    "phone settings accept nine books, browse all 658 enabled entries, search past entry 500, read and pin the end of a 12k+ chapter without calling a model, and retrieve that late passage into a subsequent phone-model request"
+    "phone settings accept nine books, browse all 658 enabled entries, search past entry 500, read and pin the end of a 12k+ chapter without calling a model, and retrieve that late passage into a subsequent phone-model request",
+    "locking defers a real incoming chat update; unlocking alone resumes the pending render and immediately shows the saved message without a later event"
   ],
   "mockedNovelAIRequests": 4,
-  "browser": "151.0.7922.34",
+  "browser": "156.0.8078.47",
   "pageErrors": [],
   "host": "mock SillyTavern 1.19 APIs, original host+iframe, real Chromium IndexedDB, Showdown 2.1.0 paragraph fixture (not full ST formatting pipeline), deterministic model fixture"
 }

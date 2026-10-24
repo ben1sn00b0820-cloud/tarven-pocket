@@ -1,25 +1,27 @@
-name: Install Tavern Pocket
+name: Validate 傳音玉符
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  install:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Extract plugin and save
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate current source
         run: |
-          unzip -o TavernPocket_GitHub_v0.9.1.zip
           test -f manifest.json
           test -f index.js
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-          git diff --cached --quiet && exit 0
-          git commit -m "Install Tavern Pocket v0.9.1"
-          git push
+          node tools/build-presets.mjs
+          git diff --exit-code -- presets/
+          npm test
+          npm run test:csb

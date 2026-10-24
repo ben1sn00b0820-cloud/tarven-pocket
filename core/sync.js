@@ -63,7 +63,7 @@ export async function runSync({stores, files, memory = {}, device = '', deviceNa
   const raw = await files.read(MANIFEST);
   if (raw) {
     try { manifest = JSON.parse(raw); } catch { throw Error('酒館裡的同步檔案讀不出來（st-iphonie-sync.json），可以在酒館的資料資料夾裡刪掉它再試'); }
-    if (manifest?.app !== 'ST-iPhonie' || manifest.kind !== 'sync') throw Error('酒館裡的 st-iphonie-sync.json 不是小手機的同步檔案');
+    if (manifest?.app !== 'ST-iPhonie' || manifest.kind !== 'sync') throw Error('酒館裡的 st-iphonie-sync.json 不是傳音玉符的同步檔案');
     if (manifest.format > SYNC_FORMAT) throw Error('酒館裡的資料來自更新版本的外掛，請先在這臺裝置上更新外掛');
   }
   const remoteParts = manifest?.parts || {}, next = {};

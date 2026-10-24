@@ -67,13 +67,13 @@ export function settingsApp(ctx) {
     const st = api.syncStatus?.();
     if (!st) return '';
     const time = at => new Date(at).toLocaleString('zh-TW', {hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'});
-    const state = !st.available ? '在酒館裡開啟小手機時才能同步'
+    const state = !st.available ? '在酒館裡開啟傳音玉符時才能同步'
       : st.busy ? '正在同步……'
       : st.error ? '同步失敗：' + st.error
       : st.lastAt ? '上次同步 ' + time(st.lastAt) : st.pending ? '有改動，馬上同步' : '還沒同步過';
     const remote = st.remote?.savedAt ? `酒館裡的是${st.remote.deviceName ? ' ' + st.remote.deviceName + ' ' : ''}在 ${time(st.remote.savedAt)} 存的` : '';
     return groupTitle('儲存到酒館')
-      + `<div class="group">${toggle('syncEnabled', '儲存到酒館', st.enabled, '聊天記錄、朋友圈、備忘錄和相簿存進酒館裡你賬號的資料夾（data/你的使用者名稱/user/files）。換一臺裝置、換個瀏覽器開啟酒館，小手機裡的東西都還在；清了瀏覽器資料也不會丟。有改動幾秒後自動儲存，開啟小手機時自動讀取別的裝置的新內容。兩臺裝置都改了同一段聊天或同一條朋友圈時，會合併成一份（訊息和評論都保留）；只有一邊改過就直接用那一邊的。金鑰不會存進去；語音快取和收藏的語音也不存，需要時重新生成。')}
+      + `<div class="group">${toggle('syncEnabled', '儲存到酒館', st.enabled, '聊天記錄、朋友圈、備忘錄和相簿存進酒館裡你賬號的資料夾（data/你的使用者名稱/user/files）。換一臺裝置、換個瀏覽器開啟酒館，傳音玉符裡的東西都還在；清了瀏覽器資料也不會丟。有改動幾秒後自動儲存，開啟傳音玉符時自動讀取別的裝置的新內容。兩臺裝置都改了同一段聊天或同一條朋友圈時，會合併成一份（訊息和評論都保留）；只有一邊改過就直接用那一邊的。金鑰不會存進去；語音快取和收藏的語音也不存，需要時重新生成。')}
         ${st.enabled ? `<div class="setting-row"><span class="row-text"><strong data-sync-state>${esc(state)}</strong>${remote ? `<small>${esc(remote)}</small>` : ''}</span>${btn('sync-now', icon('refresh') + '立即同步', 'chip-button', st.busy || !st.available ? 'disabled' : '')}</div>` : ''}</div>`
       ;
   }
@@ -111,7 +111,7 @@ export function settingsApp(ctx) {
     if (v.disposed || ticket !== epoch) return;
     const s = api.getState();
     const wallName = phone.wallpaper.kind === 'builtin' ? wallpapers[phone.wallpaper.key]?.name : '自定義照片';
-    v.draw(heading('設定', '', 'Settings')
+    v.draw(heading('玉符設定', '', 'Settings')
       + groupTitle('外觀')
       + `<div class="group pad">
           <div class="field"><span>主題風格</span><div class="skin-options">${Object.entries(skins).map(([key, s]) => `<button class="skin-choice" data-action="skin" data-value="${key}" aria-pressed="${(phone.skin || 'sky') === key}"><span style="background:${s.preview[0]}"><b style="background:${s.preview[3]}"></b><i style="background:${s.preview[1]}"></i><i style="background:${s.preview[2]}"></i></span>${s.name}</button>`).join('')}</div></div>
@@ -125,13 +125,14 @@ export function settingsApp(ctx) {
           ${toggle('voiceEnabled', '正文語音', s.general.voiceEnabled !== false, '關掉後，聊天請求裡不再加入語音規則，模型只寫普通對白；正文裡已有的語音標籤只顯示中文譯文，不顯示聲波；手機聊天裡的聯絡人也只發文字。開啟後恢復。')}
           ${toggle('stripVoice', '發給模型時去掉舊配音標籤', s.general.stripVoice !== false, '酒館裡的正文不變，聲波照常顯示；只是之後每次請求模型時，舊回覆裡的每句臺詞只留中文譯文，標籤和原文不發，省上下文，也不用自己寫正則。最新一條帶臺詞的回覆保留原樣，給模型做格式示範（正文語音關掉時也一起去掉）。出圖塊在「繪圖」裡另有同樣的開關。')}
           ${toggle('floatingEnabled', '懸浮入口', s.general.floatingEnabled, '在酒館裡顯示可以拖動的小球，點開再點一次進入手機。')}
+          ${toggle('fastMode', '流暢模式', s.general.fastMode !== false, '合併畫面更新，關閉背景模糊與裝飾動效。資料保存、聊天、語音、生圖及所有應用功能照常運作。')}
           ${toggle('waveformEnabled', '聲波動效', s.general.waveformEnabled, '臺詞旁和手機裡的聲波隨真實音訊跳動。系統開啟減少動態效果時保持靜止。\n\n正文聲波的顏色跟隨酒館主題：\n· 虛線小點：這個角色還沒配音（斜體色）\n· 淡色：還沒生成（正文色）\n· 引號色：已生成，可以播放\n· 引號色加底色：正在播放\n· 下劃線色：已經播放過')}
           <div class="field"><div class="meter-label"><span>播放音量</span><output>${Math.round(phone.volume * 100)}%</output></div><input class="slider" type="range" data-field="volume" min="0" max="100" value="${Math.round(phone.volume * 100)}" aria-label="播放音量"></div>
         </div>`
       + groupTitle('繪圖')
       + `<div class="group">${toggle('drawEnabled', '正文出圖', s.draw.enabled, '開啟後，繪圖預設會加進聊天請求，讓模型在正文裡寫出圖示籤。')}${toggle('drawAuto', '新回覆自動出圖', s.draw.auto, '只自動畫不花錢的：NovelAI 免費檔內的圖、ComfyUI 的圖；GPT 生圖在「每張先問」關掉後也會自動畫。其餘的正文裡顯示“點選生成”。用哪個引擎畫在繪圖 App 頂上選。')}${toggle('drawFold', '正文圖片預設收起', s.draw.fold, '正文裡只留一個小縮圖，點開再看。每張圖也能單獨收起或展開。')}${toggle('drawGuard', '免費檔守衛', s.draw.guard, '步數不超過 28、尺寸不超過 1024×1024，不會發出扣 Anlas 的請求。')}</div>`
       + groupTitle('分割槽')
-      + (() => { const space = api.phoneSpace?.() || {}; return `<div class="group">${toggle('partition', '按角色卡分開', s.chat.partition === 'card', '開啟後，每張角色卡（群聊是每個群）一部手機：聊天記錄、朋友圈、論壇、查手機各管各的，換卡就換手機；聯絡人只有這張卡的角色、在這張卡劇情裡說過話的角色，和在這張卡里手動加的聯絡人。「我」跟著酒館給這張卡鎖定的人設走。\n\n開啟之前就有的聊天和動態沒有歸屬，每張卡都看得到；不想要的可以刪掉。關掉分割槽後，所有東西又會一起顯示。')}
+      + (() => { const space = api.phoneSpace?.() || {}; return `<div class="group">${toggle('partition', '按角色卡分開', s.chat.partition === 'card', '開啟後，每張角色卡（群聊是每個群）一部手機：聊天記錄、朋友圈、論道臺、查手機各管各的，換卡就換手機；聯絡人只有這張卡的角色、在這張卡劇情裡說過話的角色，和在這張卡里手動加的聯絡人。「我」跟著酒館給這張卡鎖定的人設走。\n\n開啟之前就有的聊天和動態沒有歸屬，每張卡都看得到；不想要的可以刪掉。關掉分割槽後，所有東西又會一起顯示。')}
           <div class="setting-row"><span>現在是</span><small>${space.key ? esc(space.name || '這張角色卡') + (s.chat.partition === 'card' ? ' 的手機' : '') : '沒有開啟角色卡'}</small></div></div>`; })()
       + groupTitle('手機')
       + `<div class="group">${toggle('lockOnOpen', '開啟時顯示鎖屏', phone.lockOnOpen, '鎖屏可隨時跳過，是外掛內的外觀，不是手機安全鎖。')}<button class="list-row" data-action="lock"><span><strong>看一眼鎖屏</strong></span>${icon('lock')}</button></div>`
@@ -144,9 +145,9 @@ export function settingsApp(ctx) {
         <details class="tool-fold" data-group="storage-clear"><summary>${icon('trash')}清理<small>語音快取 · 相簿裡的繪圖 · 正文圖片</small></summary><div>
           <div class="actions" style="margin-top:0">${btn('clear-cache', icon('trash') + '清理語音快取', 'danger')}${btn('clear-drawn', icon('trash') + '清除相簿裡的繪圖', 'danger', drawn?.count ? '' : 'disabled')}${chatPictures ? btn('clear-chat-pictures', icon('trash') + '清除正文圖片', 'danger', chatPictures.count ? '' : 'disabled') : ''}</div></div></details>
         ${syncGroup()}
-        ${groupTitle('備份與恢復')}<div class="group"><button class="list-row" data-action="backup"><span><strong>備份到檔案</strong><small>設定、角色音色、聊天記錄、相簿和收藏存成一個檔案，換裝置或誤刪時能找回</small></span>${icon('next')}</button><label class="list-row file-button"><span><strong>從檔案恢復</strong><small>選一個 ST-iPhonie 備份檔案</small></span>${icon('next')}<input type="file" data-backup-file accept=".json,application/json" aria-label="選擇備份檔案"></label></div>
+        ${groupTitle('備份與恢復')}<div class="group"><button class="list-row" data-action="backup"><span><strong>備份到檔案</strong><small>設定、角色音色、聊天記錄、相簿和收藏存成一個檔案，換裝置或誤刪時能找回</small></span>${icon('next')}</button><label class="list-row file-button"><span><strong>從檔案恢復</strong><small>選一個 傳音玉符 備份檔案</small></span>${icon('next')}<input type="file" data-backup-file accept=".json,application/json" aria-label="選擇備份檔案"></label></div>
         ${groupTitle('幫助')}<div class="group"><button class="list-row" data-action="self-check"><span><strong>自檢</strong><small>出問題時看看是哪裡不對，可以把報告發給幫你的人</small></span>${icon('next')}</button></div>
-        <div class="actions">${btn('about', '關於 ST-iPhonie', 'text-button')}</div>`);
+        <div class="actions">${btn('about', '關於 傳音玉符', 'text-button')}</div>`);
   }
 
   v.back = () => { if (!appearance && !check && !backup && !restore) return false; appearance = check = backup = restore = null; render().catch(e => ctx.notify(e.message)); return true; };
@@ -160,7 +161,7 @@ export function settingsApp(ctx) {
       return;
     }
     if (key === 'syncEnabled') { api.saveSync({enabled: el.checked}); await render(); return; }
-    if (['voiceEnabled', 'floatingEnabled', 'waveformEnabled', 'cacheEnabled', 'wallpaperMotion', 'stripVoice'].includes(key)) api.updateGeneral({[key]: el.checked});
+    if (['voiceEnabled', 'floatingEnabled', 'waveformEnabled', 'cacheEnabled', 'wallpaperMotion', 'stripVoice', 'fastMode'].includes(key)) api.updateGeneral({[key]: el.checked});
     else if (key === 'drawEnabled') api.saveDraw({enabled: el.checked});
     else if (key === 'drawAuto') api.saveDraw({auto: el.checked});
     else if (key === 'drawGuard') api.saveDraw({guard: el.checked});
@@ -265,7 +266,7 @@ export function settingsApp(ctx) {
       }
       case 'save-report': {
         const text = check?.report?.text || '', stamp = new Date().toLocaleString('zh-TW', {hour12: false}).replace(/[/:]/g, '-');
-        await v.busy(el, async () => ctx.notify('已下載 ' + await saveFile(ctx.doc, new Blob([text], {type: 'text/plain;charset=utf-8'}), `ST-iPhonie 自檢 ${stamp}`)));
+        await v.busy(el, async () => ctx.notify('已下載 ' + await saveFile(ctx.doc, new Blob([text], {type: 'text/plain;charset=utf-8'}), `傳音玉符 自檢 ${stamp}`)));
         break;
       }
       case 'clear-drawn':
@@ -277,7 +278,7 @@ export function settingsApp(ctx) {
       case 'clear-cache':
         if (await ctx.confirm('清理語音快取？', '正在播放的音訊會停止，收藏和其他資料會保留。')) { await v.busy(el, () => api.clearCache()); await render(); ctx.notify('語音快取已清理'); }
         break;
-      case 'about': ctx.help('ST-iPhonie\n酒館裡的小手機：聊天、角色配音、聽取、繪圖（NovelAI、GPT 生圖、ComfyUI）、收藏、相簿和備忘錄。\n\n金鑰和本地資料儲存在當前瀏覽器與酒館地址。狀態列的訊號和電量是裝飾。語音只在你點選播放或試聽後生成。'); break;
+      case 'about': ctx.help('傳音玉符\n酒館裡的傳音玉符：聊天、角色配音、聽取、繪圖（NovelAI、GPT 生圖、ComfyUI）、收藏、相簿和備忘錄。\n\n金鑰和本地資料儲存在當前瀏覽器與酒館地址。狀態列的訊號和電量是裝飾。語音只在你點選播放或試聽後生成。'); break;
     }
   });
   render().catch(e => ctx.notify(e.message));

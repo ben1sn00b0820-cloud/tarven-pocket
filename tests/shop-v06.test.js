@@ -7,7 +7,7 @@ import {SHOP_CATEGORIES, searchMarkup} from '../pocket/shop-ui.js';
 // fictional inventory descriptions; none of these queries executes a purchase.
 test('Wanbao query retains requested fictional people, qualifications, weapons and everyday goods', async () => {
  const items = [
-  {name:'旅行牙刷',description:'日常清潔用品。',price:12.5,emoji:'🪥'},
+  {name:'旅行牙刷',description:'日常清潔用品。',price:12,emoji:'🪥'},
   {name:'NPC 林雨',description:'善於情報整理的虛構人物，購入後作為新角色加入故事。',price:1500,emoji:'👤'},
   {name:'王城通行資格',description:'劇情內獲得進出王城的資格。',price:800,emoji:'🎫'},
   {name:'虛構制式手槍',description:'用於故事場景的武器裝備。',price:600,emoji:'⚙️'},
@@ -24,6 +24,6 @@ test('Wanbao query retains requested fictional people, qualifications, weapons a
 
 test('all Wanbao category queries use existing valid query route and inclusive categories',()=>{
  assert.deepEqual(SHOP_CATEGORIES.map(x=>x.label),['生活用品','人物／NPC','資格與能力','槍支與武器','特殊物件']);
- for(const category of SHOP_CATEGORIES){assert.equal(normalizeShopRequest({query:category.query}).mode,'query');assert.match(shopInstruction({query:category.query}),/萬寶商城/);}
- const html=searchMarkup();assert.match(html,/萬寶商城查詢/);assert.match(html,/你的專屬商城/);assert.doesNotMatch(html,/劇情商城/);
+ for(const category of SHOP_CATEGORIES){assert.equal(normalizeShopRequest({query:category.query}).mode,'query');assert.match(shopInstruction({query:category.query}),/萬寶閣/);}
+ const html=searchMarkup();assert.match(html,/萬寶閣查詢/);assert.match(html,/你的專屬萬寶閣/);assert.doesNotMatch(html,/劇情商城/);
 });

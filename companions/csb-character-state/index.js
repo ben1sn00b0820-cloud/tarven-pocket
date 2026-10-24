@@ -1,13 +1,13 @@
 import {StateController,KEY} from './src/controller.js';
 import {replay,makePrompt,stripUpdate} from './src/core.js';
-import {el,openManager,statusPanel} from './src/ui.js';
+import {el,openManager,statusPanel,mountInformation} from './src/ui.js';
 import {createCharacterStateBridge,characterStateScope} from './src/bridge.js';
-import {clone,defaultSettings,newDatabase} from './src/schema.js';
 
 let controller,manager,bridge,messageFormatter=null,scheduled=null,busy=false,dirty=false,lastSaved='',lastSynced='',started=false,epoch=0,slashRegistered=false;
 const listeners=[];
+let formattedNodes=new WeakMap(),cardSnapshots=new WeakMap(),managerRevision='';
 const context=()=>globalThis.SillyTavern.getContext();
-const report=e=>{console.error('[CSB]',e);globalThis.toastr?.error(e.message??String(e),'角色狀態工坊');};
+const report=e=>{console.error('[CSB]',e);globalThis.toastr?.error(e.message??String(e),'角色信息');};
 function closeDialogs(){
   for(const dialog of document.querySelectorAll('dialog.csb-dialog')){try{dialog.close();}catch{}dialog.remove();}
   manager=null;
@@ -19,26 +19,28 @@ function guardedController(){
   return new Proxy(controller,{get(target,key){const value=Reflect.get(target,key);return typeof value==='function'?(...args)=>{guard();return value.apply(target,args);}:value;}});
 }
 function showManager(){
-  if(!started||!controller)throw Error('角色狀態工坊尚未啟動。');
+  if(!started||!controller)throw Error('角色信息尚未啟動。');
   if(manager?.dialog?.isConnected){manager.dialog.focus();return manager;}
   const guarded=guardedController();guarded.getSnapshot();manager=openManager(guarded);return manager;
 }
 function showEditor(id){showManager().editCharacter(id);}
 function launchManager(){try{showManager();}catch(e){report(e);}}
 function readPublicSnapshot(){
-  const c=context(),settings=clone(c.extensionSettings?.[KEY]??defaultSettings());
-  // The bridge projects a cloned journal. Reads cannot create message IDs,
-  // initialize metadata or accept changes on behalf of the CSB controller.
-  const db=clone(c.chatMetadata?.[KEY]??newDatabase(settings.template));
-  return {db,settings,state:replay(db,c.chat,{capture:true,allowNew:settings.allowNew}).state};
+  // Read-only callers share the runtime cache without mutating the journal,
+  // assigning message IDs, or creating a database merely by opening a menu.
+  return controller.getSnapshot({readOnly:true});
 }
 function mount(){
   if(document.getElementById('csb-launcher'))return;
   const target=document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings');if(!target)return;
-  target.append(el('div',{id:'csb-launcher',class:'csb csb-launcher'},el('button',{type:'button',class:'csb-btn csb-primary',onclick:launchManager},'◈ 角色狀態工坊'),el('small',{class:'csb-muted'},'角色記憶 · 共用欄位 · MVU 同步')));
+  target.append(el('div',{id:'csb-launcher',class:'csb csb-launcher'},el('button',{type:'button',class:'csb-btn csb-primary',onclick:launchManager},'◈ 角色信息'),el('small',{class:'csb-muted'},'角色記憶 · 共用欄位 · MVU 同步')));
 }
-function openedPaths(root){return new Set([...root.querySelectorAll('details[open]')].map(d=>d.dataset.char??(d.classList.contains('csb-panel')?'panel':d.querySelector(':scope > summary')?.textContent)));}
-function restoreOpen(root,set){for(const d of root.querySelectorAll('details')){const key=d.dataset.char??(d.classList.contains('csb-panel')?'panel':d.querySelector(':scope > summary')?.textContent);if(set.has(key))d.open=true;}}
+function detailPath(d){if(d.dataset.char)return `character:${d.dataset.char}`;if(d.classList.contains('csb-panel'))return 'panel';return `${d.closest('.csb-character')?.dataset.char??''}:${d.querySelector(':scope > summary')?.textContent}`;}
+function openedPaths(root){return new Set([...root.querySelectorAll('details[open]')].map(detailPath));}
+function restoreOpen(root,set){
+  for(const d of root.querySelectorAll('.csb-panel,.csb-character'))if(set.has(detailPath(d))){d.open=true;d.csbEnsureBody?.();}
+  for(const d of root.querySelectorAll('details'))if(set.has(detailPath(d)))d.open=true;
+}
 export function setMessageFormatter(formatter=null){
   if(formatter!==null&&typeof formatter!=='function')throw TypeError('訊息格式化介面必須是函式');
   messageFormatter=formatter;schedule();
@@ -48,32 +50,35 @@ function formatMessage(text,message,index,c){
   if(typeof html!=='string')throw Error('訊息格式化介面必須回傳 HTML 文字');
   return html;
 }
-function render(){
+function render(snapshot=null){
   if(!started||!controller)return;
   mount();const c=context();if(!c.chatMetadata||!Array.isArray(c.chat))return;
-  const s=controller.getSnapshot();
+  const s=snapshot??controller.getSnapshot(),pinned=s.db.pinned.join('|');
   for(const mes of document.querySelectorAll('#chat .mes[mesid]')){
     const index=Number(mes.getAttribute('mesid')),message=c.chat[index];if(!message||message.is_user||message.is_system)continue;
-    const old=mes.querySelector(':scope .csb-message-card');const textNode=mes.querySelector('.mes_text');if(!textNode)continue;
-    // Never reformat the streaming message or a user's open edit control.
-    if(busy&&index===c.chat.length-1)continue;
-    if(mes.querySelector('textarea.edit_textarea, textarea.mes_edit'))continue;
-    const original=String(message.extra?.display_text??message.mes??'');
-    const cleaned=stripUpdate(original),shouldClean=s.settings.enabled&&cleaned!==original;
+    const textNode=mes.querySelector('.mes_text');if(!textNode)continue;
+    if(busy&&index===c.chat.length-1||mes.querySelector('textarea.edit_textarea, textarea.mes_edit'))continue;
+    let old=mes.querySelector('.csb-message-card');const open=old?openedPaths(old):new Set();
+    const original=String(message.extra?.display_text??message.mes??''),cleaned=stripUpdate(original),shouldClean=s.settings.enabled&&cleaned!==original;
     if((shouldClean||textNode.dataset.csbCleaned==='true')&&(messageFormatter||typeof c.messageFormatting==='function')){
-      const display=shouldClean?cleaned:original;
-      // Use ST's own formatter; plugin fields are rendered separately with textContent.
-      textNode.innerHTML=formatMessage(display,message,index,c);
-      textNode.dataset.csbCleaned=String(shouldClean);
+      const display=shouldClean?cleaned:original,previous=formattedNodes.get(textNode);
+      if(!previous||previous.display!==display||previous.formatter!==messageFormatter||previous.first!==(textNode.firstChild?.classList?.contains('csb-message-card')?null:textNode.firstChild)){
+        textNode.innerHTML=formatMessage(display,message,index,c);
+        textNode.dataset.csbCleaned=String(shouldClean);formattedNodes.set(textNode,{display,formatter:messageFormatter,first:textNode.firstChild});
+        old=mes.querySelector('.csb-message-card');
+      }
     }
-    const open=old?openedPaths(old):new Set();old?.remove();
-    if(!s.settings.enabled||!s.settings.inlineCards||!s.result.frames[index])continue;
-    const frame=s.result.frames[index];if(!Object.keys(frame.characters).length&&!String(message.mes).includes('<CSB_UPDATE>'))continue;
-    const holder=el('div',{class:'csb csb-message-card'}),errors=s.result.errors.filter(e=>e.index===index);
-    errors.forEach(e=>holder.append(el('div',{class:'csb-message-error'},`狀態未更新：${e.message}。可編輯原始回覆修正，資料維持上一輪。`)));
-    holder.append(statusPanel(frame,s.db.schema,{showAbsent:s.settings.showAbsent,onManage:showManager,onEdit:showEditor,pinned:s.db.pinned}));restoreOpen(holder,open);textNode.after(holder);
+    const frame=s.result.frames[index];
+    if(!s.settings.enabled||!s.settings.inlineCards||!frame||(!Object.keys(frame.characters).length&&!String(message.mes).includes('<CSB_UPDATE>'))){old?.remove();continue;}
+    const errors=s.result.errors.filter(e=>e.index===index),errorKey=errors.map(e=>e.message).join('|'),previous=old&&cardSnapshots.get(old);
+    if(previous&&previous.frame===frame&&previous.schema===s.db.schema&&previous.showAbsent===s.settings.showAbsent&&previous.pinned===pinned&&previous.errorKey===errorKey){if(old.parentNode!==textNode)textNode.append(old);continue;}
+    const holder=el('div',{class:'csb csb-message-card'});
+    errors.forEach(e=>holder.append(el('div',{class:'csb-message-error'},`狀態未更新：${e.message}。可編輯原始回覆修正，角色信息保持原值。`)));
+    holder.append(statusPanel(frame,s.db.schema,{title:'劇情狀態',showAbsent:s.settings.showAbsent,onManage:showManager,onEdit:showEditor,pinned:s.db.pinned}));
+    restoreOpen(holder,open);old?.remove();textNode.append(holder);
+    cardSnapshots.set(holder,{frame,schema:s.db.schema,showAbsent:s.settings.showAbsent,pinned,errorKey});
   }
-  if(manager?.dialog.isConnected)manager.refresh();
+  if(manager?.dialog.isConnected&&managerRevision!==s.revision){manager.refresh();managerRevision=s.revision;}
 }
 async function settle(session=epoch){
   if(session!==epoch||!started)return;scheduled=null;if(!controller||busy)return;
@@ -81,9 +86,9 @@ async function settle(session=epoch){
   try{
     const c=context(),scope=characterStateScope(c);if(!scope){bridge?.notify();return;}
     const current=()=>started&&session===epoch&&controller===owner&&characterStateScope(context())===scope&&context().chatMetadata===c.chatMetadata&&context().chat===c.chat;
-    const s=owner.getSnapshot();render();
+    const s=owner.getSnapshot();render(s);
     // Persist accepted journal entries once, without rewriting the original messages.
-    const stamp=JSON.stringify([scope,s.db]);
+    const stamp=`${scope}:${s.revision}`;
     if(stamp!==lastSaved){await owner.flush(c);if(!current())return;lastSaved=stamp;}
     if(s.settings.enabled&&s.settings.mvuSync&&owner.mvu()&&dirty){
       const signature=JSON.stringify([scope,c.chat.length,c.chat.at(-1)?.swipe_id,s.state,s.db.schema]);
@@ -92,7 +97,7 @@ async function settle(session=epoch){
     if(!current())return;dirty=false;bridge?.notify();
   }catch(e){if(started&&session===epoch)report(e);}
 }
-function schedule(changed=false){if(!started)return;dirty||=changed;if(scheduled!==null)clearTimeout(scheduled);const session=epoch;scheduled=setTimeout(()=>settle(session),80);}
+function schedule(changed=false){if(!started)return;dirty||=changed;if(busy)return;if(scheduled!==null)clearTimeout(scheduled);const session=epoch;scheduled=setTimeout(()=>settle(session),80);}
 
 export async function intercept(chat,contextSize,abort,type){
   if(!started||!controller)return;
@@ -117,22 +122,22 @@ export function initialize(){
   const c=context(),events=c.eventTypes??c.event_types??{};
   if(!c.eventSource?.on)return null;
   started=true;epoch++;controller=new StateController({context,getMvu:()=>globalThis.Mvu});
-  bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,onError:report});
+  bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,mountView:mountInformation,setInlineCards:enabled=>guardedController().setInlineCards(enabled),onError:report});
   globalThis.CSBCharacterState=bridge.api;globalThis.csbCharacterStateIntercept=intercept;
-  controller.onChange=()=>{if(!started)return;dirty=true;render();schedule(true);};
+  controller.onChange=()=>{if(!started)return;dirty=true;schedule(true);};
   const listen=(name,fn)=>{if(!events[name])return;c.eventSource.on(events[name],fn);listeners.push({source:c.eventSource,event:events[name],fn});};
   for(const name of ['CHAT_CHANGED','CHAT_CREATED'])listen(name,()=>{
-    closeDialogs();lastSaved='';lastSynced='';dirty=false;busy=false;context().setExtensionPrompt(KEY,'',1,0,false,0);schedule();
+    closeDialogs();controller.invalidate();managerRevision='';lastSaved='';lastSynced='';dirty=false;busy=false;context().setExtensionPrompt(KEY,'',1,0,false,0);schedule();
     // Clear consumers immediately, even when the new selection has no chat.
     try{bridge?.notify();}catch(e){report(e);}
   });
   for(const name of ['MESSAGE_RECEIVED','MESSAGE_UPDATED','MESSAGE_EDITED','MESSAGE_DELETED','MESSAGE_SWIPED','CHARACTER_MESSAGE_RENDERED','USER_MESSAGE_RENDERED'])listen(name,()=>{
-    if(['MESSAGE_UPDATED','MESSAGE_EDITED','MESSAGE_DELETED','MESSAGE_SWIPED'].includes(name))closeDialogs();schedule(true);
+    schedule(true);
   });
   listen('GENERATION_STARTED',()=>{busy=true;});
   for(const name of ['GENERATION_ENDED','GENERATION_STOPPED'])listen(name,()=>{busy=false;schedule(true);});
   listen('APP_READY',()=>schedule());listen('MORE_MESSAGES_LOADED',()=>schedule());
-  if(!slashRegistered&&c.SlashCommandParser&&c.SlashCommand){c.SlashCommandParser.addCommandObject(c.SlashCommand.fromProps({name:'csb',callback:async()=>{if(started)launchManager();return '';},helpString:'開啟角色狀態工坊。'}));slashRegistered=true;}
+  if(!slashRegistered&&c.SlashCommandParser&&c.SlashCommand){c.SlashCommandParser.addCommandObject(c.SlashCommand.fromProps({name:'csb',callback:async()=>{if(started)launchManager();return '';},helpString:'開啟角色信息。'}));slashRegistered=true;}
   mount();schedule();return bridge.api;
 }
 
@@ -154,6 +159,6 @@ export function dispose(){
   }
   if(globalThis.CSBCharacterState===bridge?.api)delete globalThis.CSBCharacterState;
   if(globalThis.csbCharacterStateIntercept===intercept){delete globalThis.csbCharacterStateIntercept;c.setExtensionPrompt?.(KEY,'',1,0,false,0);}
-  bridge?.dispose();bridge=null;if(controller)controller.onChange=()=>{};controller=null;messageFormatter=null;busy=false;dirty=false;lastSaved='';lastSynced='';
+  bridge?.dispose();bridge=null;if(controller)controller.onChange=()=>{};controller=null;messageFormatter=null;busy=false;dirty=false;lastSaved='';lastSynced='';formattedNodes=new WeakMap();cardSnapshots=new WeakMap();managerRevision='';
 }
 initialize();

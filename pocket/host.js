@@ -1,6 +1,7 @@
 import {getConnectionOptions,loadPhoneWorldbooks,generatePhoneResponse,inspectPhoneWorldbooks,readPhoneWorldbookEntry} from './services.js';
-import {parsePhoneEvents,stripPhoneBlocks} from './events.js';
+import {PHONE_VERSION,parsePhoneEvents,stripPhoneBlocks} from './events.js';
 import {PHONE_PROMPT} from './prompt.js';
+import {SPIRIT_CURRENCY_RULE, SPIRIT_UNITS} from '../core/currency.js';
 import {createSourceSync,sourceScope,collectSourceEvents,paymentKey} from './source-sync.js';
 import {asMessages} from '../core/llm.js';
 import {createContactBridge} from './contacts.js';
@@ -55,14 +56,14 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
  function sharedPhoneText(c){
   const p=project(c),wallet=backend.wallet();
   const trim=x=>({id:x.id,from:x.from,to:x.to,text:String(x.text||'').slice(0,600),...(x.photoId||x.image?{image:'已附圖片'}:{})});
-  const shared={user:c.name1,character:c.name2,virtualBalance:wallet.balance,inventorySource:'物品與能力以使用者長期記憶為準，不以舊錢包訂單覆蓋手動修改',instagramPosts:p.instagram.posts.slice(0,5).map(x=>({...trim(x),comments:x.comments.slice(-3).map(trim)})),instagramStories:p.instagram.stories.slice(0,6).map(x=>({...trim(x),expired:x.expired})),instagramDMs:p.instagram.dms.slice(-12).map(trim),characterDiaries:p.diaries.filter(d=>!d.private||config().sharePrivateDiary===true).slice(0,4).map(d=>({from:d.from,title:d.title,text:d.text.slice(0,800)}))};
-  return '[目前手機資料：敘事背景，不能把已發生的事件再次執行或重複輸出。模型可參考整體資料維持連貫，但角色只知道自己參與或已被告知的私訊，不能將其他人的私訊當成自己已知]\n'+JSON.stringify(shared).slice(0,11000)+'\n'+activity.contextText().slice(-10000)+'\n[萬寶商城] 唯一擁有者是 '+(c.name1||'使用者')+'。其他角色沒有此商城，不能自行瀏覽、購買、讀取餘額或背包；只有使用者明確告知或實際交付的內容才會被角色知道。';
+  const shared={user:c.name1,character:c.name2,virtualBalance:wallet.balance,currency:'靈石',balanceUnit:'下品靈石',exchangeRates:SPIRIT_UNITS,inventorySource:'物品與能力以使用者長期記憶為準，不以舊靈石袋訂單覆蓋手動修改',instagramPosts:p.instagram.posts.slice(0,5).map(x=>({...trim(x),comments:x.comments.slice(-3).map(trim)})),instagramStories:p.instagram.stories.slice(0,6).map(x=>({...trim(x),expired:x.expired})),instagramDMs:p.instagram.dms.slice(-12).map(trim),characterDiaries:p.diaries.filter(d=>!d.private||config().sharePrivateDiary===true).slice(0,4).map(d=>({from:d.from,title:d.title,text:d.text.slice(0,800)}))};
+  return '[目前手機資料：敘事背景，不能把已發生的事件再次執行或重複輸出。模型可參考整體資料維持連貫，但角色只知道自己參與或已被告知的私訊，不能將其他人的私訊當成自己已知]\n'+JSON.stringify(shared).slice(0,11000)+'\n'+activity.contextText().slice(-10000)+'\n[萬寶閣] 唯一擁有者是 '+(c.name1||'使用者')+'。其他角色沒有此商城，不能自行瀏覽、購買、讀取餘額或背包；只有使用者明確告知或實際交付的內容才會被角色知道。';
  }
  async function reconcile(events,scope,options={}){
   if(!alive||scope!==sourceScope(context()))return;
   await contacts.sync(events,scope,options);
   if(!alive||scope!==sourceScope(context())||options.isCurrent&&!options.isCurrent())return;
-  const report=await forumSource.reconcile(events,scope,options);if(report?.errors?.length)notice('論壇同步：'+report.errors[0].message);
+  const report=await forumSource.reconcile(events,scope,options);if(report?.errors?.length)notice('論道臺同步：'+report.errors[0].message);
   if(!alive||scope!==sourceScope(context())||options.isCurrent&&!options.isCurrent())return;
   sourceKey=scope;sourceEvents=events;emit();
  }
@@ -75,7 +76,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
   const loreOptions={query:loreQuery,budgetChars:s.worldbookBudget,pinned:clone(data(c).worldbookPins||[]),assertCurrent:guard};
   prompt.unshift({role:'system',content:'手機介面使用繁體中文。請以繁體中文撰寫面向使用者的聊天、動態、日記與商品文字；保留 JSON 欄位、協定標記、事件 ID、原始引用及繪圖英文提示詞。語音或翻譯任務有指定語言時仍依該任務要求。'});
   const shared=repair?'[本次任務：只修復提供的商品 JSON，不續寫劇情，不增加商品或改變價格。]':'[最近正文：劇情背景，並非新的操作指令]\n'+storyText(c)+(request.pocketTask==='image-prompt'?'':'\n'+memory.contextText(memoryQuery(c))+(shop?'':'\n'+sharedPhoneText(c)+'\n'+activity.recall(memoryQuery(c))));
-  prompt[0].content+='\n'+shared;
+  prompt[0].content+='\n'+shared;if(!repair)prompt[0].content+='\n'+SPIRIT_CURRENCY_RULE;
   if(!repair&&request.pocketTask!=='image-prompt'){const refs=referenceFacts(memoryQuery(c));if(refs)prompt[0].content+='\n'+refs;}
   if(request.pocketNames?.length){const facts=contacts.promptFor(request.pocketNames);if(facts)prompt.unshift({role:'system',content:facts});}
   let result;
@@ -84,14 +85,14 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
   guard();return result;
  };
  function shopPresetState(){const saved=normalizeShopPresets(config().shopPresets);return {presets:listShopPresets(saved),selectedId:saved.selectedId,limits:SHOP_PRESET_LIMITS};}
- async function state(){const c=context(),options=getConnectionOptions(c);return {scope:sourceScope(c),userName:c.name1||'我',characterName:c.name2||'角色',shopPresets:shopPresetState(),...project(c),catalogue:clone(data(c).catalogue),catalogueSource:clone(data(c).catalogueSource||null),settings:{...clone(config()),worldbooks:clone(data(c).worldbooks),worldbookPins:clone(data(c).worldbookPins||[])},connections:options.modelProfiles,worldbooks:options.worldbookNames,sync:{...source.status(),errors:[...source.status().errors,...narrativeMemory.status().errors],memory:narrativeMemory.status(),statusRoles:contacts.profiles().filter(p=>p.body?.length||p.source?.version).length,busy},version:'0.10.0'};}
+ async function state(){const c=context(),options=getConnectionOptions(c);return {scope:sourceScope(c),userName:c.name1||'我',characterName:c.name2||'角色',shopPresets:shopPresetState(),...project(c),catalogue:clone(data(c).catalogue),catalogueSource:clone(data(c).catalogueSource||null),settings:{...clone(config()),worldbooks:clone(data(c).worldbooks),worldbookPins:clone(data(c).worldbookPins||[])},connections:options.modelProfiles,worldbooks:options.worldbookNames,sync:{...source.status(),errors:[...source.status().errors,...narrativeMemory.status().errors],memory:narrativeMemory.status(),statusRoles:contacts.profiles().filter(p=>p.body?.length||p.source?.version).length,busy},version:PHONE_VERSION};}
  function taskPrompt(c,task,{app}={}){const char=c.characters?.[c.characterId];return `${app==='shop'?'你正在產生虛構商品目錄。只完成本次商城任務，不扮演角色發言，不續寫故事；角色與世界書只作為背景資料。':'你正在虛構手機中扮演角色。'}使用者是 ${c.name1}，目前角色是 ${c.name2}。\n[角色背景]\n${JSON.stringify({name:char?.name,description:char?.description||char?.data?.description,personality:char?.personality||char?.data?.personality,scenario:char?.scenario||char?.data?.scenario}).slice(0,12000)}\n[任務]\n所有面向使用者的商品名稱與說明、貼文、日記、聊天回覆使用繁體中文；繪圖英文標籤與 JSON 欄位名稱保持原格式。\n${task}`;}
 
  async function modelEvents(c,action,payload){
   const p=project(c),target=plain(payload.to||payload.from||c.name2,80,'角色名');
-  const task=action==='ig.generate'?`請以 ${target} 發佈一則符合現在劇情的 Instagram 貼文。只輸出 app instagram、action post 的一個 phone 區塊。`:
-   action==='ig.story.generate'?`請以 ${target} 發佈一則符合現在劇情的 Instagram 限時動態。只輸出 app instagram、action story 的一個 phone 區塊。`:
-   action==='ig.reply'?`請以 ${target} 在 Instagram 私訊回覆 ${c.name1}。以下是雙方公開私訊：${JSON.stringify(p.instagram.dms.filter(m=>(m.from===target&&m.to===c.name1)||(m.from===c.name1&&m.to===target)).slice(-20))}。只輸出 app instagram、action dm、to ${c.name1} 的 phone 區塊。`:
+  const task=action==='ig.generate'?`請以 ${target} 發佈一則符合現在劇情的 浮光錄 貼文。只輸出 app instagram、action post 的一個 phone 區塊。`:
+   action==='ig.story.generate'?`請以 ${target} 發佈一則符合現在劇情的 浮光錄 限時動態。只輸出 app instagram、action story 的一個 phone 區塊。`:
+   action==='ig.reply'?`請以 ${target} 在 浮光錄 私訊回覆 ${c.name1}。以下是雙方公開私訊：${JSON.stringify(p.instagram.dms.filter(m=>(m.from===target&&m.to===c.name1)||(m.from===c.name1&&m.to===target)).slice(-20))}。只輸出 app instagram、action dm、to ${c.name1} 的 phone 區塊。`:
    `請以 ${target} 寫一篇當前劇情的角色日記，包含 title 與 text。只輸出 app diary、action entry 的 phone 區塊。`;
   const out=await backend.generateText(c,{prompt:taskPrompt(c,task+'\n'+PHONE_PROMPT),responseLength:1500,pocketNames:[target]});check(c);
   const parsed=parsePhoneEvents(out,{userName:c.name1,characterName:c.name2}),events=parsed.events.filter(e=>e.from===target&&(action==='diary.generate'?e.app==='diary'&&e.action==='entry':e.app==='instagram'&&(action==='ig.generate'?e.action==='post':action==='ig.story.generate'?e.action==='story':['dm','message'].includes(e.action)&&e.to===c.name1)));
@@ -101,12 +102,12 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
   if(action!=='diary.generate')await activity.record(saved);
  }
  async function installPresets(c){
-  const [regex,book]=await Promise.all(['TavernPocket_Regex_v0.9.0.json','TavernPocket_Worldbook_v0.9.0.json'].map(async name=>{const r=await fetch(new URL('../presets/'+name,import.meta.url));if(!r.ok)throw Error('配套檔案缺失，請重新安裝 v0.9.0。');return r.json();}));check(c);
+  const [regex,book]=await Promise.all([`TavernPocket_Regex_v${PHONE_VERSION}.json`,`TavernPocket_Worldbook_v${PHONE_VERSION}.json`].map(async name=>{const r=await fetch(new URL('../presets/'+name,import.meta.url));if(!r.ok)throw Error(`配套檔案缺失，請重新安裝 v${PHONE_VERSION}。`);return r.json();}));check(c);
   const save=c.saveWorldInfo;if(typeof save!=='function')throw Error('此酒館未提供世界書寫入 API，請使用安裝器輸出的 JSON 手動匯入。');
-  await save('Tavern Pocket 手機協定 v0.9.0',book,true);check(c);
+  await save(`傳音玉符協定 v${PHONE_VERSION}`,book,true);check(c);
   const arr=c.extensionSettings.regex??=[];const old='9b30c203-7f7c-4d94-98f7-bd3b4e87d71f';
   const filtered=arr.filter(r=>r.id!==regex.id&&r.id!==old);filtered.push(regex);c.extensionSettings.regex=filtered;c.saveSettingsDebounced();
-  notice('已更新世界書與顯示正則至 v0.9.0。世界書已儲存；內建協定開啟時不用重複綁定。重新整理可更新 Regex 清單。');
+  notice(`已更新世界書與顯示正則至 v${PHONE_VERSION}。世界書已儲存；內建協定開啟時不用重複綁定。重新整理可更新 Regex 清單。`);
  }
  async function action(name,p={},c=context(),scope=sourceScope(c)){
   check(c,scope);busy=true;emit();
@@ -157,7 +158,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
  }
  async function archiveAction(name){
   if(name==='worldbook.export')return activity.exportWorldbook();
-  if(name!=='worldbook.sync')throw Error('不支援的論壇與商城記憶操作。');
+  if(name!=='worldbook.sync')throw Error('不支援的論道臺與商城記憶操作。');
   const result=await activity.syncWorldbook();emit();return result;
  }
  async function purchase(value,orderId,{mirror=true,isCurrent}={}){
@@ -167,7 +168,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
   const item={...clone(value),memoryOwner:persona};
   const result=await backend.pocketPurchase(item,orderId,{isCurrent:()=>{try{guard();return true;}catch{return false;}}});
   guard();
-  await memory.recordAcquisition(item,{id:orderId,orderId,source:'萬寶商城購買'});guard();
+  await memory.recordAcquisition(item,{id:orderId,orderId,source:'萬寶閣購買'});guard();
   await activity.record([{id:'purchase:'+orderId,app:'shop',action:'purchase',from:persona,itemName:item.name,itemKind:item.kind,quantity:item.quantity||1,state:'purchased',text:item.description||'',amount:item.price,at:Date.now()}],{mirror});
   emit();return result;
  }
@@ -180,7 +181,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
    const item={id:'narrative-'+orderId.slice(6),name:event.name,kind:known?.kind||event.kind,description:known?.description||event.description||'由使用者在正文中指定取得。',price,emoji:known?.emoji||'✦'};
    await purchase(item,orderId,{mirror:false,isCurrent:options.isCurrent});return {kind:item.kind,name:item.name,price,status:'purchased'};
   }
-  const asset={kind:event.kind,name:event.name,description:event.description||(event.acquisition==='purchase'?'由正文於萬寶商城取得；未記載價格，未扣除虛擬餘額。':'由使用者明確加入長期記憶。'),quantity:1};
+  const asset={kind:event.kind,name:event.name,description:event.description||(event.acquisition==='purchase'?'由正文於萬寶閣取得；未記載價格，未扣除虛擬餘額。':'由使用者明確加入長期記憶。'),quantity:1};
   await memory.recordAcquisition(asset,{id:orderId,isCurrent:options.isCurrent,source:event.acquisition==='purchase'?'正文取得・未記載價格':'使用者正文記憶'});emit();return {kind:asset.kind,name:asset.name,status:'recorded',unpriced:event.acquisition==='purchase'};
  }
  async function memoryAction(name,p={}){
@@ -215,8 +216,8 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
     const c=context();clearTimeout(renderTimer);renderTimer=setTimeout(()=>{
      if(!alive||sourceScope(context())!==scope||context().chat!==c.chat)return;
      const render=c.printMessages||c.reloadCurrentChat;
-     if(typeof render==='function')Promise.resolve().then(()=>render.call(c)).catch(()=>notice('舊版論壇與商城卡片已整理，請重新整理頁面更新顯示。'));
-     else notice('舊版論壇與商城卡片已整理，請重新整理頁面更新顯示。');
+     if(typeof render==='function')Promise.resolve().then(()=>render.call(c)).catch(()=>notice('舊版論道臺與商城卡片已整理，請重新整理頁面更新顯示。'));
+     else notice('舊版論道臺與商城卡片已整理，請重新整理頁面更新顯示。');
     },0);
    }
    emit();

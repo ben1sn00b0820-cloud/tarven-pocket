@@ -1,8 +1,9 @@
 import {TYPES,POLICIES,clone,uid,field,valueOf} from './schema.js';
 import {validateSchema,normalizeValue,parseJSON} from './core.js';
 
-export function el(tag,attrs={},...children){
-  const node=document.createElement(tag);
+export function el(tag,attrs={},...children){return elementIn(document,tag,attrs,...children);}
+export function elementIn(doc,tag,attrs={},...children){
+  const node=doc.createElement(tag);
   for(const [k,v]of Object.entries(attrs)){
     if(v===null||v===undefined||v===false)continue;
     if(k==='class')node.className=v;
@@ -12,14 +13,15 @@ export function el(tag,attrs={},...children){
     else if(k==='value')node.value=v;
     else node.setAttribute(k,v===true?'':String(v));
   }
-  for(const child of children.flat(Infinity)){if(child!==null&&child!==undefined&&child!==false)node.append(child instanceof Node?child:document.createTextNode(String(child)));}
+  for(const child of children.flat(Infinity)){if(child!==null&&child!==undefined&&child!==false)node.append(child&&typeof child==='object'&&typeof child.nodeType==='number'?child:doc.createTextNode(String(child)));}
   return node;
 }
 const btn=(label,fn,cls='')=>el('button',{type:'button',class:`csb-btn ${cls}`,onclick:fn},label);
 const note=t=>el('p',{class:'csb-muted'},t);
 const empty=t=>el('div',{class:'csb-empty'},t);
 const format=(v,f)=>v===null||v===undefined||v===''?'未設定':Array.isArray(v)?v.join('、'):typeof v==='boolean'?(v?'是':'否'):`${v}${f.unit?' '+f.unit:''}`;
-export function barView(f,v){
+export function barView(f,v,doc=document){
+  const el=(tag,attrs,...children)=>elementIn(doc,tag,attrs,...children);
   const known=typeof v==='number'&&Number.isFinite(v),pct=known?Math.max(0,Math.min(100,(v-f.min)/(f.max-f.min)*100)):0;
   let label='未知';if(known)label=f.display==='percent'?`${Math.round(pct)}%`:f.display==='none'?'':`${v}${f.unit?` ${f.unit}`:''} / ${f.max}`;
   const stage=known?[...(f.thresholds||[])].reverse().find(t=>v>=t.at)?.label:null;
@@ -27,14 +29,16 @@ export function barView(f,v){
   const bar=el('div',{class:`csb-bar-track ${known?'':'csb-bar-unknown'}`,role:'progressbar','aria-label':f.label,'aria-valuemin':f.min,'aria-valuemax':f.max,...(known?{'aria-valuenow':v}:{'aria-valuetext':'未知'})},fill);
   return el('div',{class:'csb-gauge'},el('div',{class:'csb-gauge-top'},el('span',{},f.icon?`${f.icon} `:'',f.label),el('strong',{},label)),bar,stage?el('small',{class:'csb-stage'},stage):null);
 }
-export function characterCard(c,schema,{expanded=false,onEdit=null,pinned=false}={}){
+export function characterCard(c,schema,{expanded=false,onEdit=null,pinned=false,document:doc=document}={}){
+  const el=(tag,attrs,...children)=>elementIn(doc,tag,attrs,...children);
+  const btn=(label,fn,cls='')=>el('button',{type:'button',class:`csb-btn ${cls}`,onclick:fn},label);
   const overview=[c.values.age?`${c.values.age} 歲`:null,c.values.identity,c.values.relation].filter(Boolean).join(' · ');
   const card=el('details',{class:'csb-character',open:expanded,'data-char':c.id});
   const summary=el('summary',{class:'csb-character-head'},el('span',{class:'csb-avatar'},Array.from(c.name)[0]||'◇'),
     el('span',{class:'csb-person'},el('strong',{},c.name),el('small',{},overview||'人物資料待補充')),
     el('span',{class:`csb-presence ${c.present?'is-present':''}`},c.present?'在場':'離場'),el('span',{class:'csb-chevron'},'⌄'));
   card.append(summary);
-  const body=el('div',{class:'csb-character-body'});
+  let body;const build=()=>{if(body)return;body=el('div',{class:'csb-character-body'});
   if(onEdit)body.append(el('div',{class:'csb-card-actions'},pinned?el('span',{class:'csb-chip'},'已優先載入'):null,btn('編輯角色',()=>onEdit(c.id),'csb-small')));
   for(const group of schema.groups){
     const fields=schema.fields.filter(f=>f.group===group.id&&!f.hidden&&(!f.hideEmpty||![null,undefined,''].includes(valueOf(c,f))));
@@ -42,21 +46,24 @@ export function characterCard(c,schema,{expanded=false,onEdit=null,pinned=false}
     const content=el('div',{class:`csb-field-grid ${group.layout==='list'?'csb-list':''}`});
     for(const f of fields){
       const v=valueOf(c,f);
-      if(f.type==='bar')content.append(barView(f,v));
+      if(f.type==='bar')content.append(barView(f,v,doc));
       else content.append(el('div',{class:`csb-value-card ${f.type==='longtext'?'csb-wide':''}`},el('span',{class:'csb-value-label'},f.icon?`${f.icon} `:'',f.label),el('span',{class:`csb-value ${v===null||v===''?'is-empty':''}`},format(v,f))));
     }
     body.append(el('details',{class:'csb-group',open:!group.collapsed},el('summary',{},el('span',{class:'csb-group-icon'},group.icon),group.label,el('span',{class:'csb-group-count'},fields.length)),content));
   }
-  card.append(body);return card;
+  card.append(body);};
+  card.csbEnsureBody=build;card.addEventListener('toggle',()=>{if(card.open)build();});if(expanded)build();return card;
 }
-export function statusPanel(state,schema,{showAbsent=false,expanded=false,onManage=null,onEdit=null,pinned=[]}={}){
+export function statusPanel(state,schema,{showAbsent=false,expanded=false,onManage=null,onEdit=null,pinned=[],title='劇情狀態',document:doc=document}={}){
+  const el=(tag,attrs,...children)=>elementIn(doc,tag,attrs,...children);
+  const btn=(label,fn,cls='')=>el('button',{type:'button',class:`csb-btn ${cls}`,onclick:fn},label);
   const all=Object.values(state.characters),shown=all.filter(c=>showAbsent||c.present);
   const panel=el('details',{class:'csb csb-panel',open:expanded});
-  panel.append(el('summary',{class:'csb-panel-head'},el('span',{class:'csb-emblem'},'◈'),el('span',{},el('strong',{},'角色狀態'),el('small',{},state.scene.location||'CHARACTER ARCHIVE')),el('span',{class:'csb-count'},`${shown.length} 人`),el('span',{class:'csb-chevron'},'⌄')));
+  panel.append(el('summary',{class:'csb-panel-head'},el('span',{class:'csb-emblem'},'◈'),el('span',{},el('strong',{},title),el('small',{},state.scene.location||'CHARACTER ARCHIVE')),el('span',{class:'csb-count'},`${shown.length} 人`),el('span',{class:'csb-chevron'},'⌄')));
   const content=el('div',{class:'csb-panel-body'});
   content.append(el('div',{class:'csb-scene-line'},el('span',{},state.scene.time||'劇情時間未設定'),onManage?btn('管理',onManage,'csb-small'):null));
   if(!shown.length)content.append(empty(all.length?'目前沒有在場角色；完整資料保留於角色庫。':'尚未建立角色。可手動新增、匯入 CSB21，或由下一則劇情建立。'));
-  shown.forEach(c=>content.append(characterCard(c,schema,{onEdit,pinned:pinned.includes(c.id)})));
+  shown.forEach(c=>content.append(characterCard(c,schema,{onEdit,pinned:pinned.includes(c.id),document:doc})));
   panel.append(content);return panel;
 }
 function control(label,input,hint='') {input.setAttribute('aria-label',label);return el('label',{class:'csb-control'},el('span',{},label),input,hint?el('small',{class:'csb-muted'},hint):null);}
@@ -66,7 +73,7 @@ function input(type,value,attrs={}){return el('input',{type,value:value??'',...a
 function modal(title,body,onClose=()=>{}){
   const d=el('dialog',{class:'csb csb-dialog','aria-label':title});
   const close=btn('關閉',()=>d.close(),'csb-close');
-  d.append(el('header',{class:'csb-dialog-head'},el('div',{},el('small',{class:'csb-eyebrow'},'CSB / CHARACTER STATE'),el('h2',{},title)),close),body);
+  d.append(el('header',{class:'csb-dialog-head'},el('div',{},el('small',{class:'csb-eyebrow'},'CSB / CHARACTER INFORMATION'),el('h2',{},title)),close),body);
   d.addEventListener('close',()=>{d.remove();onClose();},{once:true});document.body.append(d);d.showModal();return d;
 }
 async function readFile(accept='.json,.txt'){
@@ -79,7 +86,7 @@ export function downloadJson(name,data){const url=URL.createObjectURL(new Blob([
 
 // Host contract: all mutations stay in host; the same UI is used by ST and the offline preview.
 export function openManager(host,initialTab='characters'){
-  let tab=initialTab,search='',filter='all',legacyDraft='';const body=el('div',{class:'csb-manager-body'}),tabs=el('nav',{class:'csb-tabs','aria-label':'角色工坊功能'}),area=el('div',{class:'csb-tab-body'}),feedback=el('div',{class:'csb-feedback',role:'status','aria-live':'polite'});
+  let tab=initialTab,search='',filter='all',legacyDraft='';const body=el('div',{class:'csb-manager-body'}),tabs=el('nav',{class:'csb-tabs','aria-label':'角色信息功能'}),area=el('div',{class:'csb-tab-body'}),feedback=el('div',{class:'csb-feedback',role:'status','aria-live':'polite'});
   let dialog;
   const status=(message,error=false)=>{feedback.textContent=message;feedback.classList.toggle('is-error',error);};
   const run=async(fn,success='已儲存')=>{try{await fn();status(success);render();}catch(e){status(e.message,true);}};
@@ -104,7 +111,7 @@ export function openManager(host,initialTab='characters'){
   function editCharacter(id){
     const s=host.getSnapshot(),c=id?s.state.characters[id]:{id:uid('c'),name:'',aliases:[],present:true,values:{}},form=el('form',{class:'csb-form'}),error=el('p',{class:'csb-error',role:'alert'});
     const name=input('text',c.name,{required:true,maxlength:100}),aliases=input('text',c.aliases.join('、')),present=checkbox(c.present),pin=checkbox(s.db.pinned.includes(c.id));
-    form.append(note('修改隨目前回覆保存；切換回覆時可能不同。勾選「鎖定」可在此聊天中固定欄位。'),el('div',{class:'csb-form-grid'},control('姓名',name),control('別名（以頓號分隔）',aliases),control('目前在場',present),control('優先載入模型',pin,'角色未出場時，也優先提供詳細資料。')));
+    form.append(note('角色信息會持續保存；新訊息、切換回覆、離場與省略欄位不會清空設定。只有後續正文的明確條目更新才會改變；勾選「鎖定」可禁止模型修改該欄位。'),el('div',{class:'csb-form-grid'},control('姓名',name),control('別名（以頓號分隔）',aliases),control('目前在場',present),control('優先載入模型',pin,'角色未出場時，也優先提供詳細資料。')));
     const editors=[];
     for(const g of s.db.schema.groups){
       const fields=s.db.schema.fields.filter(f=>f.group===g.id&&!f.hidden);if(!fields.length)continue;
@@ -182,13 +189,51 @@ export function openManager(host,initialTab='characters'){
   }
   function renderSettings(s){
     const form=el('form',{class:'csb-form'}),settings=clone(s.settings),items=[];
-    for(const [key,label,hint]of [['enabled','啟用角色狀態工坊','關閉後停止注入提示與顯示狀態。'],['allowNew','允許模型建立新角色','關閉後只能更新已建立的角色。'],['inlineCards','在 AI 訊息下顯示狀態欄','每則回覆顯示當時快照。'],['showAbsent','狀態欄同時顯示離場角色','角色庫始終保留所有角色。'],['mvuSync','完成更新後同步到 MVU','需要先安裝並啟動 MVU。']]){const c=checkbox(settings[key]);items.push([key,c]);form.append(control(label,c,hint));}
+    for(const [key,label,hint]of [['enabled','啟用角色信息','關閉後停止注入提示與顯示狀態。'],['allowNew','允許模型建立新角色','關閉後只能更新已建立的角色。'],['inlineCards','在正文顯示劇情狀態','只控制正文快照顯示；關閉後角色信息仍持續保存與更新。'],['showAbsent','狀態欄同時顯示離場角色','角色庫始終保留所有角色。'],['mvuSync','完成更新後同步到 MVU','需要先安裝並啟動 MVU。']]){const c=checkbox(settings[key]);items.push([key,c]);form.append(control(label,c,hint));}
     const budget=input('number',settings.promptBudget,{min:6000,max:500000,step:1000});form.append(control('角色提示字元預算',budget,'不是 token 數。角色很多時優先載入在場、被提及、已釘選角色；完整資料仍保存。'),el('button',{type:'submit',class:'csb-btn csb-primary'},'儲存設定'));
     form.addEventListener('submit',e=>{e.preventDefault();run(()=>{for(const[k,c]of items)settings[k]=c.checked;settings.promptBudget=Number(budget.value);return host.saveSettings(settings);});});
     const prompt=host.promptInfo();
     area.append(form,el('section',{class:'csb-data-section'},el('h4',{},'目前模型資料'),note(`載入 ${prompt.selected}／${prompt.total} 位角色詳細資料 · 約 ${prompt.characters} 字元${prompt.overBudget?' · 欄位設定已超過預算，請精簡說明':''}`),prompt.omitted?note(`${prompt.omitted} 位角色目前只提供姓名與 ID；可在角色編輯中開啟優先載入。`):null,btn('查看本輪提示',()=>{modal('注入內容',el('div',{class:'csb-form'},el('textarea',{readonly:true,rows:18,value:prompt.text})));})),
-      el('section',{class:'csb-data-section'},el('h4',{},'變化與診斷'),note(`版本 1.0.1 · ${s.result.inactiveEdits||0} 筆手動修改屬於其他回覆分支`),...(s.result.errors||[]).slice(-10).map(e=>el('p',{class:'csb-error'},`第 ${e.index+1} 則：${e.message}`)),...(s.result.warnings||[]).slice(-5).map(e=>note(`第 ${e.index+1} 則：${e.message}`)),el('div',{class:'csb-history'},...(s.result.changes||[]).slice(-30).reverse().map(c=>el('div',{},el('strong',{},`${c.name} · ${c.label}`),el('span',{},`${format(c.old,{})} → ${format(c.value,{})}`),el('small',{},c.reason)))),btn('重新讀取目前對話',()=>run(()=>host.rebuild(),'已依目前訊息重建狀態'))));
+      el('section',{class:'csb-data-section'},el('h4',{},'變化與診斷'),note(`版本 1.1.0 · ${s.result.inactiveEdits||0} 筆手動修改屬於其他回覆分支`),...(s.result.errors||[]).slice(-10).map(e=>el('p',{class:'csb-error'},`第 ${e.index+1} 則：${e.message}`)),...(s.result.warnings||[]).slice(-5).map(e=>note(`第 ${e.index+1} 則：${e.message}`)),el('div',{class:'csb-history'},...(s.result.changes||[]).slice(-30).reverse().map(c=>el('div',{},el('strong',{},`${c.name} · ${c.label}`),el('span',{},`${format(c.old,{})} → ${format(c.value,{})}`),el('small',{},c.reason)))),btn('重新讀取目前對話',()=>run(()=>host.rebuild(),'已依目前訊息重建狀態'))));
   }
-  body.append(tabs,feedback,area);dialog=modal('角色狀態工坊',body);render();
-  return {dialog,refresh:render,editCharacter};
+  body.append(tabs,feedback,area);dialog=modal('角色信息',body);render();
+  return {dialog,refresh(){const active=dialog.ownerDocument.activeElement;if(dialog.contains(active)&&active.matches?.('input,textarea,select,[contenteditable="true"]'))return;if(dialog.ownerDocument.querySelector('dialog.csb-dialog .csb-form'))return;render();},editCharacter};
+}
+
+/** A document-local application view backed by the very same persisted database. */
+export function mountInformation(container,api,{scope:expectedScope}={}){
+  if(!container?.ownerDocument||typeof container.append!=='function')throw TypeError('角色信息需要有效的畫面容器');
+  const doc=container.ownerDocument,e=(tag,attrs,...children)=>elementIn(doc,tag,attrs,...children);
+  const root=e('section',{class:'csb csb-information-app','aria-label':'角色信息'}),message=e('p',{class:'csb-muted',role:'status'}),count=e('p',{class:'csb-muted'}),list=e('div',{class:'csb-information-roster'});
+  const search=e('input',{type:'search',placeholder:'搜尋角色姓名、身分、別名','aria-label':'搜尋角色信息'}),filter=e('select',{'aria-label':'角色顯示範圍'},e('option',{value:'all'},'全部角色'),e('option',{value:'present'},'目前在場'),e('option',{value:'absent'},'目前離場'));
+  const inline=e('input',{type:'checkbox','aria-label':'在正文顯示劇情狀態'}),manage=e('button',{type:'button',class:'csb-btn csb-primary'},'管理角色與欄位');
+  root.append(e('header',{},e('h2',{},'角色信息'),e('p',{class:'csb-muted'},'資料持續保存。未更新的條目沿用原值；正文狀態欄只顯示當回合快照。')),e('div',{class:'csb-toolbar'},manage,e('label',{class:'csb-information-toggle'},inline,'在正文顯示劇情狀態')),e('div',{class:'csb-toolbar'},search,filter),count,message,list);container.append(root);
+  let alive=true,current=null,lastRevision='',schemaSignature='',cards=new Map(),refreshing=false;
+  const showError=error=>{message.textContent=error?.message??String(error);message.classList.add('is-error');};
+  function draw(){
+    if(!current)return;const query=search.value.trim().toLocaleLowerCase(),characters=Object.values(current.state.characters),pinned=current.pinned??[];
+    const shown=characters.filter(c=>(filter.value==='all'||(filter.value==='present')===c.present)&&[c.name,...(c.aliases??[]),String(c.values.identity??'')].some(s=>s.toLocaleLowerCase().includes(query)));
+    const nextSchema=JSON.stringify(current.schema),schemaChanged=nextSchema!==schemaSignature;schemaSignature=nextSchema;
+    const keep=new Set(characters.map(c=>c.id));for(const id of cards.keys())if(!keep.has(id))cards.delete(id);
+    const nodes=shown.map(c=>{const signature=JSON.stringify([c,pinned.includes(c.id)]),old=cards.get(c.id);if(old&&!schemaChanged&&old.signature===signature)return old.node;
+      const node=characterCard(c,current.schema,{expanded:!!old?.node.open,pinned:pinned.includes(c.id),document:doc,onEdit:id=>{try{api.openEditor(id,{scope:current.scope});}catch(error){showError(error);}}});
+      if(old){const groups=[...old.node.querySelectorAll('.csb-group')].map(g=>g.open);node.querySelectorAll('.csb-group').forEach((g,i)=>{if(groups[i]!==undefined)g.open=groups[i];});}
+      cards.set(c.id,{node,signature});return node;});
+    list.replaceChildren(...nodes);if(!nodes.length)list.append(e('div',{class:'csb-empty'},characters.length?'沒有符合條件的角色。':'尚未建立角色信息；可從管理介面新增或匯入。'));
+    count.textContent=`${characters.filter(c=>c.present).length} 人在場 · ${characters.length} 份持久角色信息 · 顯示 ${shown.length} 人`;
+  }
+  function refresh(){
+    if(!alive||refreshing)return;refreshing=true;
+    try{
+      const revision=api.getRevision?.();if(current&&revision&&revision===lastRevision)return;
+      const snapshot=api.getSnapshot();
+      if(!snapshot||(expectedScope!==undefined&&snapshot.scope!==expectedScope)){current=null;lastRevision='';cards.clear();list.replaceChildren();count.textContent='';inline.disabled=true;manage.disabled=true;message.textContent='請在目前聊天重新開啟角色信息。';return;}
+      current=snapshot;lastRevision=revision??'';inline.disabled=false;manage.disabled=false;inline.checked=current.inlineCards!==false;message.textContent='';message.classList.remove('is-error');draw();
+    }catch(error){showError(error);}finally{refreshing=false;}
+  }
+  search.addEventListener('input',draw);filter.addEventListener('change',draw);
+  manage.addEventListener('click',()=>{try{api.openManager({scope:current?.scope});}catch(error){showError(error);}});
+  inline.addEventListener('change',async()=>{inline.disabled=true;try{await api.setInlineCards(inline.checked,{scope:current?.scope});lastRevision='';refresh();}catch(error){inline.checked=current?.inlineCards!==false;showError(error);}finally{if(alive)inline.disabled=!current;}});
+  const unsubscribe=api.subscribe(refresh);refresh();
+  return {refresh,dispose(){if(!alive)return;alive=false;unsubscribe();cards.clear();root.remove();}};
 }

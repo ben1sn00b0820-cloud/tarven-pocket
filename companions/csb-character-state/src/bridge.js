@@ -12,9 +12,9 @@ export function characterStateScope(c) {
 }
 
 /** Read-only public contract. Mutations stay in the existing guarded editor. */
-export function createCharacterStateBridge({context, snapshot, openEditor, openManager, target = globalThis, onError = () => {}}) {
+export function createCharacterStateBridge({context, snapshot, openEditor, openManager, mountView, setInlineCards, target = globalThis, onError = () => {}}) {
   let alive = true, signature;
-  const listeners = new Set();
+  const listeners = new Set(), mounts = new Set();
   const stale = () => Object.assign(Error('角色狀態或對話已變動，請重新開啟角色資料。'), {code:'STALE'});
   function getSnapshot() {
     if (!alive) return null;
@@ -23,7 +23,7 @@ export function createCharacterStateBridge({context, snapshot, openEditor, openM
     const current = snapshot();
     const now = context();
     if (!alive || characterStateScope(now) !== scope || now.chatMetadata !== c.chatMetadata || now.chat !== c.chat) throw stale();
-    return clone({scope, enabled:current.settings?.enabled !== false,
+    return clone({scope, revision:current.revision??0, enabled:current.settings?.enabled !== false, inlineCards:current.settings?.inlineCards !== false,
       schema:current.db.schema, state:current.state, locks:current.db.locks ?? {}, pinned:current.db.pinned ?? []});
   }
   function edit(id, {scope:expectedScope} = {}) {
@@ -35,6 +35,7 @@ export function createCharacterStateBridge({context, snapshot, openEditor, openM
     openEditor(id, {scope:current.scope, metadata:c.chatMetadata, chat:c.chat});
     return true;
   }
+  function getRevision(){if(!alive)return '';const c=context(),scope=characterStateScope(c);if(!scope||!c?.chatMetadata||!Array.isArray(c.chat))return '';const current=snapshot();if(characterStateScope(context())!==scope||context().chatMetadata!==c.chatMetadata)throw stale();return `${scope}:${current.revision??JSON.stringify([current.db.schema,current.state,current.settings])}`;}
   function subscribe(listener) {
     if (!alive) return () => {};
     if (typeof listener !== 'function') throw TypeError('狀態訂閱者必須是函式');
@@ -50,16 +51,18 @@ export function createCharacterStateBridge({context, snapshot, openEditor, openM
   }
   function notify() {
     if (!alive) return false;
-    const current = getSnapshot(), next = JSON.stringify(current);
+    const next=getRevision();
     if (signature === next) return false;
     signature = next;
-    const detail = Object.freeze({scope:current?.scope ?? ''});
+    const detail = Object.freeze({scope:characterStateScope(context())});
     for (const listener of [...listeners]) { try { listener(detail); } catch (error) { onError(error); } }
     if (typeof target?.dispatchEvent === 'function' && typeof target?.CustomEvent === 'function') {
       target.dispatchEvent(new target.CustomEvent(CHANGE_EVENT, {detail}));
     }
     return true;
   }
-  const api = Object.freeze({apiVersion:BRIDGE_VERSION, getSnapshot, openEditor:edit, openManager:manage, subscribe});
-  return {api, notify, dispose() {alive=false;listeners.clear();signature=undefined;}};
+  async function setInline(enabled,{scope:expectedScope}={}){const current=getSnapshot();if(!current||(expectedScope!==undefined&&current.scope!==expectedScope))throw stale();if(typeof setInlineCards!=='function')throw Error('目前環境未提供正文顯示設定');if(typeof enabled!=='boolean')throw TypeError('正文顯示必須是布林值');return setInlineCards(enabled,{scope:current.scope});}
+  function mount(container,options={}){const current=getSnapshot();if(!current||(options.scope!==undefined&&current.scope!==options.scope))throw stale();if(typeof mountView!=='function')throw Error('目前環境未提供內嵌角色信息');const view=mountView(container,api,options);const wrapped={refresh:()=>view.refresh(),dispose(){view.dispose();mounts.delete(wrapped);}};mounts.add(wrapped);return wrapped;}
+  const api = Object.freeze({apiVersion:BRIDGE_VERSION, getSnapshot, getRevision, openEditor:edit, openManager:manage, subscribe, mount, setInlineCards:setInline});
+  return {api, notify, dispose() {alive=false;for(const view of [...mounts])view.dispose();mounts.clear();listeners.clear();signature=undefined;}};
 }

@@ -1,3 +1,4 @@
+import {formatSpiritAmount} from '../core/currency.js';
 import {parsePhoneEvents,parseUserPhoneCommands,parseRolePhoneCommands} from './events.js';
 import {buildState as readLegacyState} from './legacy-v02.js';
 
@@ -92,7 +93,7 @@ export async function sourceBundles(collected, {threads = [], space = '', journa
       if (nativeKind === 'gift' && event._isUser && !legacy) throw new Error('請在手機商城選擇禮物並確認付款後傳送。');
       if (paid.has(nativeKind) && event._isUser && !legacy) {
         const bundle=getBundle(event),id=await paymentKey(scope,event.id),saved=journal.find(r=>r.id==='send:'+id),done=saved?.status==='done';
-        const message={from:'me',kind:'system',text:`${done?'[已處理付款]':'[待確認付款]'} ${nativeKind==='redpacket'?'紅包':'轉帳'}給${event.to} · ¥${Number(event.amount||0).toFixed(2)}${event.text?' · '+event.text:''}${done?'':'（確認後才扣虛擬餘額）'}`};
+        const message={from:'me',kind:'system',text:`${done?'[已處理付款]':'[待確認付款]'} ${nativeKind==='redpacket'?'紅包':'轉帳'}給${event.to} · ${formatSpiritAmount(event.amount||0)}${event.text?' · '+event.text:''}${done?'':'（確認後才扣靈石）'}`};
         bundle.messages.push({eventId:event.id,sourceMessage:event._sourceMessage,message,at:event.at,route:bundle.key});continue;
       }
       const bundle = getBundle(event);
@@ -111,13 +112,13 @@ export async function sourceBundles(collected, {threads = [], space = '', journa
         if (nativeKind === 'gift') message.gift = {name: event.title, emoji: event.emoji || '🎁', price: 0};
         else message.amount = Number(event.amount).toFixed(2);
         if (legacy && event._isUser) {
-          message = {from: 'me', kind: 'system', text: `舊版${nativeKind === 'redpacket' ? '紅包' : '轉帳'}紀錄：${event.to} · ¥${Number(event.amount).toFixed(2)} · ${legacy.status === 'pending' ? '原帳本待處理' : legacy.status === 'accepted' ? '原帳本已領取' : '原帳本已退回'}。此歷史紀錄不再操作新錢包。`};
+          message = {from: 'me', kind: 'system', text: `舊版${nativeKind === 'redpacket' ? '紅包' : '轉帳'}紀錄：${event.to} · ${formatSpiritAmount(event.amount)} · ${legacy.status === 'pending' ? '原帳本待處理' : legacy.status === 'accepted' ? '原帳本已領取' : '原帳本已退回'}。此歷史紀錄不再操作新靈石袋。`};
         } else if (legacy?.status === 'accepted') {
           message.state = nativeKind === 'redpacket' ? 'opened' : 'accepted'; message.openedBy = actor(legacy.settledBy, userName);
         } else if (legacy?.status === 'refunded') {
           // Native red packets cannot be returned. Display the historical
           // refund as a system record instead of recreating a claimable card.
-          if (nativeKind === 'redpacket') message = {from: message.from, kind: 'system', text: `舊版紅包 ¥${Number(event.amount).toFixed(2)} 已退回，歷史紀錄保留。`};
+          if (nativeKind === 'redpacket') message = {from: message.from, kind: 'system', text: `舊版紅包 ${formatSpiritAmount(event.amount)} 已退回，歷史紀錄保留。`};
           else { message.state = 'returned'; message.openedBy = actor(legacy.settledBy, userName); }
         }
       }

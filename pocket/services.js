@@ -1,5 +1,6 @@
 import {buildWorldbookIndex,searchWorldbookIndex,readWorldbookIndexEntry,selectWorldbookContext} from './worldbook-index.js';
 import {stripStatusPanels} from './status.js';
+import {parseSpiritText, SPIRIT_MAX, SPIRIT_CURRENCY_RULE} from '../core/currency.js';
 /**
  * SillyTavern 1.19.0 public-context adapters for phone generation.
  * Saved connection profiles use the host's ConnectionManagerRequestService;
@@ -239,8 +240,9 @@ function parseCatalogue(response) {
         if (!isObject(item)) fail(`${label}格式錯誤，商品尚未更新。`);
         if (typeof item.title !== 'string' || !item.title.trim() || item.title.trim().length > 100) fail(`${label}名稱須為 1–100 字元，商品尚未更新。`);
         if (typeof item.text !== 'string' || !item.text.trim() || item.text.trim().length > 1000) fail(`${label}描述須為 1–1000 字元，商品尚未更新。`);
-        const amount = item.amount;
-        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1000000 || Math.round(amount * 100) / 100 !== amount) fail(`${label}價格須大於 0、最多兩位小數且不超過虛擬 ¥1,000,000，商品尚未更新。`);
+        let amount;
+        try { amount = parseSpiritText(item.amount, {zero: false, max: SPIRIT_MAX}); }
+        catch { fail(`${label}價格須為 1–${SPIRIT_MAX} 枚下品靈石，或能精確換算的明確中品／極品數量，商品尚未更新。`); }
         return { title: item.title.trim(), text: item.text.trim(), amount };
     });
     // Allocate identities only after every item passes validation. Model IDs
@@ -251,7 +253,7 @@ function parseCatalogue(response) {
 /** Generate merchandise only; this never spends money or appends chat events. */
 export async function generateShopCatalogue(c, { prompt = '', maxTokens = 1800, ...options } = {}) {
     if (typeof prompt !== 'string') fail('商城背景指令格式錯誤。');
-    const instruction = `${prompt}\n${CATALOGUE_MARKER}\n請根據目前角色、最近劇情與手機所選世界書，生成 1–8 件此刻合理出現在虛擬商城的商品，建議 4–6 件。名稱使用繁體中文，每件描述建議 30–80 字，交代物件用途及與劇情的關係；可為衣物、食物、道具、禮物或此世界合理的物件。價格為本遊戲虛擬人民幣，必須是大於 0、不超過 1000000 且最多兩位小數的 JSON 數字。不要聲稱使用者已購買或已扣款。不要生成付款、轉帳、手機事件或任何圖片網址。\n只回傳以下形狀的完整 JSON，無前後文、無 Markdown：{"items":[{"title":"商品名稱（1–100 字元）","text":"商品描述（1–1000 字元）","amount":12.34}]}。不生成 id；商品 ID 由手機系統配置。`;
+    const instruction = `${prompt}\n${CATALOGUE_MARKER}\n請根據目前角色、最近劇情與傳音玉符所選世界書，生成 1–8 件此刻合理出現在萬寶閣的商品，建議 4–6 件。名稱使用繁體中文，每件描述建議 30–80 字，交代物件用途及與劇情的關係；可為衣物、食物、道具、禮物或此世界合理的物件。${SPIRIT_CURRENCY_RULE} amount 必須是 1–${SPIRIT_MAX} 的 JSON 整數。不要聲稱使用者已購買或已扣款。不要生成付款、轉帳、手機事件或任何圖片網址。\n只回傳以下形狀的完整 JSON，無前後文、無 Markdown：{"items":[{"title":"商品名稱（1–100 字元）","text":"商品描述（1–1000 字元）","amount":12}]}。不生成 id；商品 ID 由手機系統配置。`;
     const response = await generatePhoneResponse(c, { ...options, prompt: instruction, maxTokens });
     return parseCatalogue(response);
 }

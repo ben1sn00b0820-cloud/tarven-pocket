@@ -23,7 +23,7 @@ await check('add a custom gauge through actual form',async()=>{
   const d=page.getByRole('dialog',{name:'新增欄位',exact:true});await d.getByLabel('欄位名稱',{exact:true}).fill('靈力');await d.getByLabel('欄位類型',{exact:true}).selectOption('bar');await d.getByLabel('最大值',{exact:true}).fill('1000');await d.getByLabel('單次變動上限',{exact:false}).fill('50');await d.getByLabel('分段標籤',{exact:false}).fill('0: 枯竭\n500: 充盈');await d.getByRole('button',{name:'儲存欄位'}).click();await d.waitFor({state:'detached'});assert.equal(await page.evaluate(()=>csbPreview.host.getSnapshot().db.schema.fields.find(f=>f.label==='靈力').max),1000);
 });
 await check('custom field appears in every character but edited values stay independent',async()=>{
-  const manager=page.getByRole('dialog',{name:'角色狀態工坊',exact:true});await manager.getByRole('button',{name:'角色庫',exact:true}).click();const card=manager.locator('[data-char="c_zhiwei"]');await card.locator(':scope > summary').click();await card.getByRole('button',{name:'編輯角色'}).click();
+  const manager=page.getByRole('dialog',{name:'角色信息',exact:true});await manager.getByRole('button',{name:'角色庫',exact:true}).click();const card=manager.locator('[data-char="c_zhiwei"]');await card.locator(':scope > summary').click();await card.getByRole('button',{name:'編輯角色'}).click();
   const editor=page.getByRole('dialog',{name:'編輯角色',exact:true});await editor.getByLabel('靈力',{exact:true}).fill('700');await editor.getByRole('button',{name:'儲存角色'}).click();await editor.waitFor({state:'detached'});
   const values=await page.evaluate(()=>{const s=csbPreview.host.getSnapshot(),f=s.db.schema.fields.find(f=>f.label==='靈力');return [s.state.characters.c_zhiwei.values[f.id],s.state.characters.c_xingzhou.values[f.id]??null];});assert.deepEqual(values,[700,null]);
   await manager.getByRole('button',{name:'關閉',exact:true}).click();
@@ -33,7 +33,7 @@ await check('untrusted text is displayed without HTML execution',async()=>{await
 await page.evaluate(()=>{delete csbPreview.context.chatMetadata.csb_character_state_v1.seed.characters.c_html;csbPreview.context.chatMetadata.csb_character_state_v1.manual=csbPreview.context.chatMetadata.csb_character_state_v1.manual.filter(e=>!e.payload.characters.some(c=>c.id==='c_html'));csbPreview.paint();});
 for(const width of [320,390,768,1280])await check(`responsive page and editor at ${width}px`,async()=>{
   await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-  await page.locator('#open-manager').click();const d=page.getByRole('dialog',{name:'角色狀態工坊',exact:true});assert.ok(await d.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+  await page.locator('#open-manager').click();const d=page.getByRole('dialog',{name:'角色信息',exact:true});assert.ok(await d.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
   await d.getByRole('button',{name:'欄位模板',exact:true}).click();assert.ok(await d.evaluate(el=>el.scrollWidth<=el.clientWidth+1));await d.getByRole('button',{name:'關閉',exact:true}).click();
 });
 fs.mkdirSync(new URL('./artifacts/',import.meta.url),{recursive:true});
@@ -47,6 +47,19 @@ await check('quiet generation clears the injected prompt',async()=>{await page.e
 await check('swipe generation prompt uses state before discarded answer',async()=>{await page.evaluate(async()=>csbCharacterStateIntercept([],8000,()=>{},'swipe'));assert.ok(!(await page.evaluate(()=>injected[1])).includes('測試角色'));});
 await check('host editing a reply applies new state and malformed update keeps old state',async()=>{
   await page.evaluate(async()=>{testHost.ctx.chat[0].mes='正文<CSB_UPDATE>'+JSON.stringify({version:1,present:['c_demo'],characters:[{id:'c_demo',name:'測試角色',set:{energy:29},reason:'重新生成'}]})+'</CSB_UPDATE>';await testHost.render();await testHost.ctx.eventSource.emit('MESSAGE_UPDATED',0);});await page.waitForTimeout(200);await page.evaluate(async()=>{await testHost.send({version:1,characters:[{id:'c_demo',set:{energy:'invalid'},reason:'壞資料'}]});});await page.waitForSelector('.csb-message-error');assert.ok((await page.locator('.csb-message-error').innerText()).includes('必須是數字'));
+});
+await check('editing character information survives message events without losing typed input',async()=>{
+  await page.evaluate(()=>CSBCharacterState.openEditor('c_demo'));
+  const editor=page.getByRole('dialog',{name:'編輯角色',exact:true});await editor.getByLabel('身分',{exact:true}).fill('持續保存的身份');
+  await page.evaluate(async()=>{testHost.ctx.chat.push({is_user:true,mes:'新的使用者訊息'});await testHost.ctx.eventSource.emit('USER_MESSAGE_RENDERED');await testHost.ctx.eventSource.emit('MESSAGE_UPDATED');});await page.waitForTimeout(200);
+  assert.equal(await editor.getByLabel('身分',{exact:true}).inputValue(),'持續保存的身份');await editor.getByRole('button',{name:'儲存角色'}).click();await editor.waitFor({state:'detached'});
+  await page.evaluate(async()=>{await testHost.send({version:1,characters:[],present:[]});});await page.waitForTimeout(200);
+  assert.equal(await page.evaluate(()=>CSBCharacterState.getSnapshot().state.characters.c_demo.values.identity),'持續保存的身份');
+  await page.getByRole('dialog',{name:'角色信息',exact:true}).getByRole('button',{name:'關閉',exact:true}).click();
+});
+await check('inline display toggle retains information and places cards within the message body',async()=>{
+  assert.ok(await page.locator('.mes_text > .csb-message-card').count()>0);await page.evaluate(()=>CSBCharacterState.setInlineCards(false));await page.waitForTimeout(200);assert.equal(await page.locator('.csb-message-card').count(),0);
+  assert.equal(await page.evaluate(()=>CSBCharacterState.getSnapshot().state.characters.c_demo.values.identity),'持續保存的身份');await page.evaluate(()=>CSBCharacterState.setInlineCards(true));await page.waitForTimeout(200);assert.ok(await page.locator('.mes_text > .csb-message-card').count()>0);
 });
 assert.deepEqual(errors,[]);fs.writeFileSync(new URL('./artifacts/ui-results.json',import.meta.url),JSON.stringify({passed:checks.length,checks,pageErrors:errors},null,2));console.log(`PASS ${checks.length} browser scenarios; no page errors`);
 }finally{await browser.close();server.close();}

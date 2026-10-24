@@ -27,8 +27,8 @@ export function rolesApp(ctx) {
           ? `<span>${plate(engines[r.engine])}</span><small>${esc(voiceLabel(r.voice))}<br>${esc(r.language ? languageName(r.language) : '跟隨預設語言')}</small>`
           : '<small class="unset">待選擇音色</small><small>出現在聊天裡時會等你配音</small>'}</span></button>`;
     }).join('');
-    v.draw(heading('角色', help('給聊天裡說話的角色配一個聲音。也可以直接點聊天裡的聲波，遇到沒配過的角色會帶你來這裡。') + btn('add-role', icon('add'), 'round-button', 'aria-label="新增角色"'), `Character · ${String(roles.length).padStart(2, '0')}`)
-      + (api.pocketContactProfiles ? `<div class="group">${btn('status-directory', `${icon('person')}<span><strong>劇情角色狀態</strong><small>讀取正文狀態、身體部位，並直接修改</small></span>${icon('next')}`, 'list-row')}</div>` : '')
+    v.draw(heading('聲律譜', help('給聊天裡說話的角色配一個聲音。也可以直接點聊天裡的聲波，遇到沒配過的角色會帶你來這裡。') + btn('add-role', icon('add'), 'round-button', 'aria-label="新增角色"'), `Character · ${String(roles.length).padStart(2, '0')}`)
+      + (api.pocketContactProfiles ? `<div class="group">${btn('status-directory', `${icon('person')}<span><strong>劇情角色信息</strong><small>讀取正文狀態、身體部位，並直接修改</small></span>${icon('next')}`, 'list-row')}</div>` : '')
       + `<div class="role-grid">${cards}<button class="role-card add" data-action="add-role">${icon('add')}新增角色</button></div>`
       );
   }
@@ -48,7 +48,7 @@ export function rolesApp(ctx) {
           <div class="barcode">${barcode((r.name || '') + r.engine + (r.voice || ''))}</div><span class="id-stamp">${voiced ? '已配音' : '待配音'}</span>
         </div>
         <div class="group pad">${field('角色名稱', input('name', r.name, 'text', 'placeholder="與臺詞裡的說話者一致"'))}</div>
-        ${api.pocketContactProfile && r.name ? `<div class="group">${btn('role-status', `${icon('person')}<span><strong>查看／修改角色狀態</strong><small>正文與微信共用的最新角色資料</small></span>${icon('next')}`, 'list-row')}</div>` : ''}
+        ${api.pocketContactProfile && r.name ? `<div class="group">${btn('role-status', `${icon('person')}<span><strong>查看／修改角色信息</strong><small>正文與千里傳音共用的最新角色資料</small></span>${icon('next')}`, 'list-row')}</div>` : ''}
         ${groupTitle('引擎', help('每個角色在各家引擎裡各自記住一套音色和模型，切過去再切回來不會丟。'))}
         <div class="engine-tabs">${Object.entries(engines).map(([k, label]) => {
           const bound = k === r.engine ? r.voice : r.bindings?.[k]?.voice;

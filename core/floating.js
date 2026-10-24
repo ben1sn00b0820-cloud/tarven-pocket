@@ -25,7 +25,7 @@ export class FloatingPlayer {
     this.root.id = 'sttts-floating';
     this.root.setAttribute('role', 'group');
     this.root.setAttribute('aria-label', 'ST-iPhonie');
-    this.root.innerHTML = `<div class="float" data-side="${this.side}" data-mode="rest" data-phase="idle" data-engine="fish"><span class="pulse"></span><button class="orb" type="button" aria-label="打开小手机，可拖动">${WAVE}<span class="edge-mark"></span></button>${SPARK}</div>`;
+    this.root.innerHTML = `<div class="float" data-side="${this.side}" data-mode="rest" data-phase="idle" data-engine="fish"><span class="pulse"></span><button class="orb" type="button" aria-label="打開傳音玉符，可拖曳">${WAVE}<span class="edge-mark"></span></button>${SPARK}</div>`;
     this.box = this.root.querySelector('.float');
     this.orb = this.root.querySelector('.orb');
     this.bars = [...this.root.querySelectorAll('.wave rect')];
@@ -89,7 +89,7 @@ export class FloatingPlayer {
   setMode(mode) {
     this.mode = mode === 'docked' ? 'docked' : 'rest';
     this.box.dataset.mode = this.mode;
-    const label = '打开小手机，可拖动';
+    const label = '打開傳音玉符，可拖曳';
     this.orb.setAttribute('aria-label', label);
     this.orb.title = this.mode === 'docked' ? label : this.message || label;
     this.arm();
@@ -137,7 +137,7 @@ export class FloatingPlayer {
     this.box.dataset.phase = value.phase;
     if (value.engine) this.box.dataset.engine = value.engine;
     this.message = value.message;
-    this.orb.title = this.mode === 'docked' ? '打开小手机，可拖动' : value.message || '打开小手机';
+    this.orb.title = this.mode === 'docked' ? '打開傳音玉符，可拖曳' : value.message || '打開傳音玉符';
     this.applyTheme();
     this.animate();
   }

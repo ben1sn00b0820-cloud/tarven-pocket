@@ -3,7 +3,7 @@ export const SHOP_PRESET_FORMAT = 'tavern-pocket-shop-presets';
 export const SHOP_PRESET_LIMITS = Object.freeze({presets: 32, name: 80, prompt: 24000, bytes: 1048576, segments: 128});
 export const DEFAULT_SHOP_PRESET_ID = 'explicit-fantasy';
 const builtins = Object.freeze([
-  Object.freeze({id: 'current-world', name: '當前世界', builtin: true, prompt: '優先遵守當前故事的世界觀、年代、科技、貨幣與角色生活條件。日用品直接依用途提供；劇情推薦以能立即派上用場的物件為主。使用者明確要求的超常物件可作為萬寶商城特例，但要交代融入當前場景的方式。不要自行擴充成無關的強力能力或昂貴套裝。'}),
+  Object.freeze({id: 'current-world', name: '當前世界', builtin: true, prompt: '優先遵守當前故事的世界觀、年代、科技、貨幣與角色生活條件。日用品直接依用途提供；劇情推薦以能立即派上用場的物件為主。使用者明確要求的超常物件可作為萬寶閣特例，但要交代融入當前場景的方式。不要自行擴充成無關的強力能力或昂貴套裝。'}),
   Object.freeze({id: 'explicit-fantasy', name: '依需求・跨世界幻想', builtin: true, prompt: '商城可跨越故事的時代、科技與一般取得條件。不得因當前世界缺少某種技術、資格或品項就刪除需求、拒絕上架或擅自改成別的東西。優先忠於使用者明確指定的虛構商品與效果；生活用品仍按日常用途提供。描述物件如何出現在目前劇情中。人物以虛構 NPC 的特徵與角色用途呈現，資格與能力只在故事內生效。'}),
 ]);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);

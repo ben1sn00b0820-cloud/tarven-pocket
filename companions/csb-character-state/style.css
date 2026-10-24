@@ -22,3 +22,19 @@
 @media(max-width:650px){.csb-dialog{width:calc(100vw - 12px);max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px);border-radius:15px}.csb-dialog-head{padding:16px}.csb-manager-body{padding:0 13px 18px}.csb-tabs{top:79px}.csb-roster{grid-template-columns:minmax(0,1fr)}.csb-section-heading{display:block}.csb-section-heading>.csb-btn{margin:2px 0 5px}.csb-form{padding:16px 13px}.csb-form-grid{gap:10px}.csb-schema-group{padding:12px 9px}.csb-schema-row{gap:7px;flex-wrap:wrap}.csb-schema-row>.csb-row-actions{margin-left:auto}.csb-schema-head{flex-wrap:wrap}.csb-character-head{padding:14px 11px}.csb-person strong{font-size:17px}.csb-presence{font-size:9px}.csb-character-body{padding:0 10px 11px}.csb-panel-body{padding:0 8px 10px}.csb-panel-head{padding:14px 12px}.csb-gauge{padding:10px 9px}.csb-group{padding:0 10px}.csb-gauge-top{flex-wrap:wrap;gap:3px}.csb-field-grid{gap:7px}.csb-dialog h2{font-size:19px}}
 @media(max-width:360px){.csb-form-grid{grid-template-columns:minmax(0,1fr)}.csb-avatar{width:34px;height:36px;font-size:20px}.csb-character-head{gap:7px}.csb-group{padding:0 8px}.csb-gauge{padding:9px 7px}.csb-tabs .csb-btn{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.csb *{transition:none!important}}
+
+/* Information app: render compact summaries first; detail nodes are created on demand. */
+.csb-information-app{padding:14px;box-sizing:border-box;min-width:0;color:var(--csb-text,#edf0fa);}
+.csb-information-app h2{margin:0 0 8px;font-size:22px;}
+.csb-information-app .csb-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.csb-information-app .csb-toolbar input[type="search"]{flex:1;min-width:120px;}
+.csb-information-app .csb-information-toggle{display:flex;align-items:center;gap:6px;font-size:12px;}
+.csb-information-roster{display:grid;gap:8px;}
+.csb-information-roster .csb-character{margin:0;contain:layout style;}
+.csb-message-card .csb-character:not([open]),.csb-information-roster .csb-character:not([open]){content-visibility:auto;contain-intrinsic-size:auto 76px;}
+.csb-message-card{overflow-anchor:none;}
+@media (pointer:coarse),(prefers-reduced-motion:reduce){
+  .csb,.csb *{scroll-behavior:auto!important;}
+  .csb .csb-bar-fill,.csb .csb-chevron{transition:none!important;}
+  .csb-dialog::backdrop{backdrop-filter:none!important;}
+}

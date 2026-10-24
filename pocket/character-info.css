@@ -1,0 +1,12 @@
+.character-info-intro{font-size:13px;line-height:1.7;color:var(--muted,#66766c);margin:0 0 16px}
+.character-info-toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:1px solid var(--border,#d5dfd8);border-radius:16px;margin-bottom:12px}
+.character-info-toggle span{display:grid;gap:5px}.character-info-toggle small{font-size:12px;color:var(--muted,#66766c);line-height:1.6}
+.character-info-feedback{font-size:12px;color:var(--muted,#66766c);overflow-wrap:anywhere}.character-info-feedback.error{color:#a33f3f}
+.character-info-host{min-width:0;contain:layout style}.character-info-host .csb-manager{position:relative;inset:auto;max-width:100%;max-height:none}
+.character-info-host>.csb-information-app{max-width:100%;padding:14px;background:var(--csb-bg,#11182b);border:1px solid var(--csb-line,rgba(174,185,225,.15));border-radius:16px}
+.character-info-host .csb-information-app .csb-information-toggle{display:none}
+.view[data-app="characterinfo"]{overflow-x:hidden}
+html[data-performance="fast"] *,html[data-performance="fast"] *::before,html[data-performance="fast"] *::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;scroll-behavior:auto!important}
+html[data-performance="fast"] .wall-motion,html[data-performance="fast"] .wallpaper .spark{display:none!important}
+html[data-performance="fast"] .apps-grid,html[data-performance="fast"] .app-icon,html[data-performance="fast"] .app-frame,html[data-performance="fast"] .widget,html[data-performance="fast"] .phone-dock,html[data-performance="fast"] .overlay,html[data-performance="fast"] .sheet{animation:none!important;transition:none!important}
+html[data-panel-hidden] *{animation-play-state:paused!important}

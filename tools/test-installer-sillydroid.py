@@ -20,6 +20,9 @@ installer = Path(sys.argv[1]).resolve()
 source = installer.read_text()
 payload = re.search(r"const PAYLOAD='([^']+)';", source).group(1)
 bundle = json.loads(gzip.decompress(base64.b64decode(payload)))
+manifest = json.loads(base64.b64decode(bundle['manifest.json']))
+version = manifest['version']
+preset_names = [f'TavernPocket_{kind}_v{version}.json' for kind in ('Regex', 'Worldbook')]
 checks = []
 
 
@@ -116,14 +119,14 @@ with tempfile.TemporaryDirectory(prefix='pocket-sillydroid-test-') as temp:
               'unrelated': snapshot(fixture.unrelated)}
     run = fixture.run()
     assert run.returncode == 0, run.stderr
-    assert 'v0.9.0' in run.stdout
+    assert f'v{version}' in run.stdout
     fixture.verify_payload()
     fixture.verify_stable(stable)
     backups = fixture.persistent / 'tavern-pocket-backups'
     previous = list(backups.glob('previous-*/tavern-pocket/previous.txt'))
     assert len(previous) == 1 and previous[0].read_text() == 'keep old extension backup\n'
-    assert (fixture.base / 'TavernPocket_Regex_v0.9.0.json').exists()
-    assert (fixture.base / 'TavernPocket_Worldbook_v0.9.0.json').exists()
+    for name in preset_names:
+        assert (fixture.base / name).read_bytes() == base64.b64decode(bundle[f'presets/{name}']), name
     checks.append('cwd install preserves host symlink, chat, config and unrelated extension; all bundle bytes verified')
 
     run = fixture.run()
@@ -203,4 +206,4 @@ with tempfile.TemporaryDirectory(prefix='pocket-sillydroid-test-') as temp:
     fixture.reject_unchanged()
     checks.append('mismatched optional TAVERN_DATA_ROOT refuses without changes')
 
-print(json.dumps({'passed': len(checks), 'checks': checks, 'files': len(bundle)}))
+print(json.dumps({'passed': len(checks), 'checks': checks, 'version': version, 'files': len(bundle)}))

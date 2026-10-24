@@ -3,16 +3,42 @@ import {validateSchema,validateState,applyUpdate,replay,anchorFor,makePrompt,mak
 export const KEY='csb_character_state_v1';
 
 export class StateController {
-  constructor(adapter){this.adapter=adapter;this.onChange=()=>{};this.mvuMessage='尚未同步';this.pendingChats=new WeakSet();}
+  constructor(adapter){this.adapter=adapter;this.onChange=()=>{};this.mvuMessage='尚未同步';this.pendingChats=new WeakSet();this.cache=null;this.revision=0;this.stats={replays:0,resumedMessages:0,cacheHits:0};}
+  invalidate(){this.cache=null;this.revision++;}
   context(){const c=this.adapter.context();if(!c?.chatMetadata||!Array.isArray(c.chat))throw Error('請先開啟一個聊天');return c;}
   settings(){const c=this.context();if(!c.extensionSettings[KEY])c.extensionSettings[KEY]=defaultSettings();return c.extensionSettings[KEY];}
   db(){const c=this.context();if(!c.chatMetadata[KEY])c.chatMetadata[KEY]=newDatabase(this.settings().template);return c.chatMetadata[KEY];}
-  getSnapshot(){const c=this.context(),db=this.db(),settings=this.settings();if(this.ensureIds(c))this.pendingChats.add(c.chatMetadata);const result=replay(db,c.chat,{capture:true,allowNew:settings.allowNew});return {db,settings,result,state:result.state};}
+  getSnapshot({readOnly=false}={}){
+    const c=this.context(),db=readOnly?(c.chatMetadata[KEY]??newDatabase(c.extensionSettings?.[KEY]?.template)):this.db(),settings=readOnly?(c.extensionSettings?.[KEY]??defaultSettings()):this.settings();
+    if(!readOnly){if(this.ensureIds(c))this.pendingChats.add(c.chatMetadata);this.migrateInformation(c,db);}
+    const entries=c.chat.map(m=>[m,m.mes,m.swipe_id??0,!!m.is_user,!!m.is_system,m.extra?.csb_uid,m.extra?.csb_order]);
+    const prior=this.cache,refs=[db,db.seed,db.schema,db.schema.fields.length,db.schema.groups.length,db.manual,db.manual.length,db.locks,db.pinned,db.ignoredIds,settings.allowNew,settings.enabled,settings.inlineCards];
+    const sameRefs=prior&&refs.every((v,i)=>v===prior.refs[i])&&(!readOnly?prior.capture:true);
+    const prefix=sameRefs&&prior.entries.length<=entries.length&&prior.entries.every((row,i)=>row.every((v,j)=>v===entries[i][j]));
+    if(prefix&&prior.entries.length===entries.length){this.stats.cacheHits++;return {...prior.snapshot,settings};}
+    const result=replay(db,c.chat,{capture:!readOnly,allowNew:settings.allowNew,...(prefix?{resume:prior.snapshot.result}:{})});
+    this.stats.replays++;if(prefix)this.stats.resumedMessages+=entries.length-prior.entries.length;
+    const snapshot={db,settings,result,state:result.state,revision:++this.revision};
+    this.cache={refs,entries,snapshot,capture:!readOnly};return snapshot;
+  }
+  migrateInformation(c,db){
+    if(db.informationVersion===1)return;
+    if(db.manual?.length){
+      db.legacyManualBackup??=clone(db.manual);
+      const orders=new Map(c.chat.map(m=>[m.extra.csb_uid,m.extra.csb_order]));
+      for(const event of db.manual){
+        if(event.kind==='information')continue;
+        const id=event.anchor?.split(':')[0];
+        event.kind='information';event.afterOrder=event.anchor==='start'?0:(orders.get(id)??Math.max(0,...orders.values()));
+      }
+    }
+    db.informationVersion=1;this.invalidate();
+  }
   assertContext(c){if(this.context().chatMetadata!==c.chatMetadata)throw Error('聊天已切換，取消對原聊天的操作');}
   async flush(c=this.context(),messagesChanged=false){this.assertContext(c);if(messagesChanged||this.pendingChats.has(c.chatMetadata)){await c.saveChat();this.pendingChats.delete(c.chatMetadata);}this.assertContext(c);await c.saveMetadata();this.assertContext(c);}
-  async persist(c=this.context(),messagesChanged=false){await this.flush(c,messagesChanged);this.onChange();}
-  ensureIds(c){let changed=false;for(const m of c.chat){m.extra??={};if(!m.extra.csb_uid){m.extra.csb_uid=uid('m');changed=true;}}return changed;}
-  addManual(payload){const c=this.context(),db=this.db();const changed=this.ensureIds(c);const anchor=c.chat.length?anchorFor(c.chat.at(-1)):'start';db.manual.push({id:uid('e'),anchor,payload:clone(payload),createdAt:Date.now()});return changed;}
+  async persist(c=this.context(),messagesChanged=false){this.invalidate();await this.flush(c,messagesChanged);this.onChange();}
+  ensureIds(c){let changed=false;const db=this.db();let order=Math.max(db.nextOrder??1,1,...c.chat.map(m=>Number.isSafeInteger(m.extra?.csb_order)?m.extra.csb_order+1:1));for(const m of c.chat){m.extra??={};if(!m.extra.csb_uid){m.extra.csb_uid=uid('m');changed=true;}if(!Number.isSafeInteger(m.extra.csb_order)||m.extra.csb_order<1){m.extra.csb_order=order++;changed=true;}}db.nextOrder=order;return changed;}
+  addManual(payload){const c=this.context(),db=this.db();const changed=this.ensureIds(c);const anchor=c.chat.length?anchorFor(c.chat.at(-1)):'start';const afterOrder=Math.max(0,...c.chat.map(m=>m.extra.csb_order));db.manual.push({id:uid('e'),kind:'information',anchor,afterOrder,payload:clone(payload),createdAt:Date.now()});this.invalidate();return changed;}
   async saveCharacter(update,locks,pinned,isNew){
     const c=this.context(),{db,state}=this.getSnapshot();
     // Validate the entire transaction before touching persisted data.
@@ -20,7 +46,8 @@ export class StateController {
     if(isNew&&Object.hasOwn(state.characters,update.id))throw Error('角色 ID 已存在');
     for(const [key,val]of Object.entries(locks))if(!db.schema.fields.some(f=>f.id===key))throw Error('鎖定欄位不存在');
     if(isNew){db.seed.characters[update.id]=clone(verified.state.characters[update.id]);db.seed.characters[update.id].present=false;}
-    const changed=this.addManual({version:1,characters:[update]});db.locks[update.id]=clone(locks);
+    const durableUpdate={...update,name:update.name??verified.state.characters[update.id].name};
+    const changed=this.addManual({version:1,characters:[durableUpdate]});db.locks[update.id]=clone(locks);
     db.pinned=db.pinned.filter(id=>id!==update.id);if(pinned)db.pinned.push(update.id);
     await this.persist(c,changed);
   }
@@ -53,7 +80,8 @@ export class StateController {
   promptInfo(){const {db,state,settings}=this.getSnapshot();const copy=clone(state);for(const c of Object.values(copy.characters))c.locked=Object.keys(db.locks[c.id]??{});
     return makePrompt(copy,db.schema,settings,{recentText:this.context().chat.slice(-4).map(m=>m.mes).join('\n'),pinned:db.pinned});
   }
-  async rebuild(){await this.persist();}
+  async rebuild(){this.invalidate();await this.persist();}
+  async setInlineCards(enabled){if(typeof enabled!=='boolean')throw Error('正文顯示必須是布林值');await this.saveSettings({...this.settings(),inlineCards:enabled});return enabled;}
   mvu(){const m=this.adapter.getMvu?.();return m&&typeof m.getMvuData==='function'&&typeof m.replaceMvuData==='function'?m:null;}
   mvuStatus(){return this.mvu()?`已偵測到 MVU · ${this.mvuMessage}`:'未偵測到 MVU；內建變量功能可獨立使用。';}
   async pushMvu(){

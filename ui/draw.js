@@ -114,7 +114,7 @@ export function drawApp(ctx) {
       <div class="group pad"><p class="hint" style="padding:6px 0">出圖塊長這樣（一張圖一塊）：${help('場景和每個人分開寫：人數、鏡頭、光線放場景；表情、視線、動作放各自的角色行。外掛把畫風固定串接在場景前面，把角色 App 裡的固定外貌補進對應的角色行，再交給選中的繪圖引擎（GPT 會整理成英文描述，ComfyUI 會合成一條提示詞）。新角色第一次出現時，模型寫的「新外貌」會自動存進角色 App。圖片會上傳到酒館，並存進相簿。')}</p><pre class="code-preview">${esc(api.picTagFormat)}</pre></div>
       <p class="hint">每條回覆固定出 ${(d.presets.find(p => p.id === d.activePreset) || d.presets[0]).count} 張圖，在出圖規則裡改張數。</p><div class="actions">${btn('open-presets', icon('edit') + '編輯出圖規則', 'secondary')}</div>`;
     const sub = e === 'gpt' ? d.gpt.model : e === 'comfy' ? (d.comfy.model || '還沒選模型').replace(/\.[^.]*$/, '') : subscription ? `${TIERS[subscription.tier] || '訂閱'} · ${subscription.anlas} Anlas` : keyed ? '讀取中' : '';
-    v.draw(heading('繪圖', keyed ? `<span class="chip">${esc(sub)}</span>` : '', engineName(e)) + `<div class="actions">${btn('pocket-image-settings','生圖預設管理','secondary')}</div>`
+    v.draw(heading('丹青閣', keyed ? `<span class="chip">${esc(sub)}</span>` : '', engineName(e)) + `<div class="actions">${btn('pocket-image-settings','生圖預設管理','secondary')}</div>`
       + `<div class="segmented draw-engines" role="group" aria-label="用哪個畫">${api.drawCatalog.engines.map(k => `<button data-action="draw-engine" data-pick="${k}" aria-pressed="${k === e}">${esc(engineName(k))}</button>`).join('')}</div>`
       + (keyed ? '' : `<div class="banner">${icon('key')}<span>${esc(api.drawMissing())}。</span>${btn('go-key', '去填寫', 'chip-button')}</div>`)
       + queueCard()

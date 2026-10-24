@@ -13,16 +13,19 @@
 // streak (聊天火花): days in a row, up to today or yesterday, on which both the user and the other side wrote.
 import {connectionLost, lostError} from './idb.js';
 import {safePhotoUrl} from './photo-url.js';
+import {legacyWalletAmount, SPIRIT_MAX} from './currency.js';
 
 export const CHAT_STORE_LIMITS = Object.freeze({messages: 1000, text: 4000, members: 20});
 const KINDS = ['text', 'voice', 'photo', 'system', 'redpacket', 'transfer', 'location', 'pat', 'dice', 'notice', 'recall', 'call', 'gift'];
 const CALL_STATES = ['answered', 'missed', 'declined', 'cancelled'];
 const spoken = (list, max, withFrom) => (Array.isArray(list) ? list : []).slice(-max).filter(l => l && String(l.text || l.translation || '').trim()).map(l => ({...(withFrom ? {from: clip(l.from, 40).trim() || 'me'} : {}), text: clip(l.text || l.translation, 1000), translation: clip(l.translation || l.text, 1000), emotion: clip(l.emotion || 'calm', 100)}));
 const STATES = {redpacket: ['sent', 'opened'], transfer: ['sent', 'accepted', 'returned'], gift: ['sent', 'accepted', 'returned']};
-/** Money as a string with two decimals, 0.01 to 200000; null when the value is not an amount. */
+/** Canonical legacy-compatible storage string; lower-grade stones with up to two old decimal places. */
 export function money(value) {
-  const n = Math.round(Number(String(value ?? '').replace(/[¥￥,，\s元]/g, '')) * 100) / 100;
-  return Number.isFinite(n) && n >= 0.01 && n <= 200000 ? n.toFixed(2) : null;
+  try {
+    const n = legacyWalletAmount(String(value ?? '').replace(/[¥￥,，\s元]/g, ''), {zero: false, max: SPIRIT_MAX});
+    return n.toFixed(2);
+  } catch { return null; }
 }
 const fail = (message, code = 'INVALID') => Object.assign(new Error(message), {code});
 const clip = (value, max) => String(value ?? '').slice(0, max);
@@ -56,7 +59,7 @@ export function editPhotoMessage(message, overrides, {fingerprint, isCurrent = (
 }
 
 export function attachPhotoToMessage(message, photoId, {fingerprint, isCurrent = () => true, replace = false, generation, attemptId} = {}) {
-  if (!isCurrent()) throw fail('對話已切換，照片沒有附加到微信訊息。', 'STALE');
+  if (!isCurrent()) throw fail('對話已切換，照片沒有附加到千里傳音訊息。', 'STALE');
   if (!message || message.kind !== 'photo') throw fail('這張照片訊息已不存在或已撤回。', 'MISSING');
   if (!fingerprint || photoMessageFingerprint(message) !== fingerprint) throw fail('照片內容已變更，沒有覆蓋目前訊息。', 'STALE');
   if (typeof photoId !== 'string' || !photoId.trim() || photoId.length > 512) throw fail('照片識別無效');
@@ -106,7 +109,7 @@ function cleanMessage(m, id, at) {
   }
   if (kind === 'gift') {
     const g = m.gift && typeof m.gift === 'object' ? m.gift : {};
-    out.gift = {name: clip(g.name, 20).trim(), emoji: [...clip(g.emoji, 16).trim()].slice(0, 2).join('') || '🎁', price: Math.max(0, Math.min(99999, Math.round(Number(g.price) * 100) / 100 || 0))};
+    out.gift = {name: clip(g.name, 20).trim(), emoji: [...clip(g.emoji, 16).trim()].slice(0, 2).join('') || '🎁', price: legacyWalletAmount(g.price ?? 0)};
     if (!out.gift.name) throw fail('礼物缺少名字');
   }
   if (STATES[kind]) {

@@ -1,0 +1,11 @@
+{
+  "characters": 54,
+  "fields": 69,
+  "messages": 250,
+  "initialReplayMs": 33.19,
+  "cachedReads": 100,
+  "cachedReadsTotalMs": 8.84,
+  "replays": 1,
+  "resumedMessages": 0,
+  "cacheHits": 100
+}

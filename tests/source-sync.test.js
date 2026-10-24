@@ -105,7 +105,7 @@ test('authenticated user text maps to me while outgoing payments create non-clai
   assert.equal(p.bundles[0].messages[0].message.from,'me');
   const draft=p.bundles[0].messages[1].message;
   assert.equal(draft.from,'me');assert.equal(draft.kind,'system');
-  assert.match(draft.text,/待確認付款/);assert.match(draft.text,/10\.00/);assert.match(draft.text,/確認後才扣虛擬餘額/);
+  assert.match(draft.text,/待確認付款/);assert.match(draft.text,/10 枚下品靈石/);assert.match(draft.text,/確認後才扣靈石/);
   for(const field of ['amount','state','paymentId']) assert.equal(draft[field],undefined);
   const saved=apply(p);assert.equal(saved.rows[0].messages[1].kind,'system');
 });
@@ -135,7 +135,7 @@ test('legacy settled cards stay settled without credit, outgoing legacy cards be
   assert.equal(p.legacyState.accounts['我'], 103000);
   assert.equal(p.bundles[0].messages[0].message.state, 'opened');
   assert.equal(p.bundles[0].messages[1].message.kind, 'system');
-  assert.match(p.bundles[0].messages[1].message.text, /不再操作新錢包/);
+  assert.match(p.bundles[0].messages[1].message.text, /不再操作新靈石袋/);
 });
 
 test('payment IDs are stable across repeated parsing and differ between main chats', async () => {

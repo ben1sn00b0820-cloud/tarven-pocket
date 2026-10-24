@@ -7,7 +7,7 @@ const roles = [['system', '系統'], ['user', '使用者'], ['assistant', '助�
 // Preset kinds: voice (dialogue tags), chat (phone chat replies, 朋友圈, and bringing chats into the story), drawing
 // (<img> tags in the chat text). A chat rule says where it is used: 私聊, 群聊, 朋友圈.
 const KINDS = [['tts', '配音', 'listen'], ['chat', '聊天', 'chat'], ['draw', '繪圖', 'draw']];
-const USES = [['dm', '私聊'], ['group', '群聊'], ['moments', '朋友圈'], ['call', '電話'], ['forum', '論壇'], ['peek', '查手機']];
+const USES = [['dm', '私聊'], ['group', '群聊'], ['moments', '朋友圈'], ['call', '電話'], ['forum', '論道臺'], ['peek', '查手機']];
 // Drawing rules: which engines an entry is sent with (none ticked or all ticked: every engine).
 const ENGINE_USES = [['nai', 'NovelAI'], ['gpt', 'GPT 生圖'], ['comfy', 'ComfyUI']];
 const engineScope = e => e.engines?.length ? ' · 只給 ' + ENGINE_USES.filter(([k]) => e.engines.includes(k)).map(([, l]) => l).join('、') : '';
@@ -54,7 +54,7 @@ export function presetsApp(ctx) {
           ? '聊天預設決定手機裡的聯絡人怎麼回訊息、朋友圈怎麼發、能看到多少劇情，以及“帶進劇情”時怎麼寫進下一次正文。每條規則可以選用在私聊、群聊還是朋友圈。手機聊天和朋友圈單獨生成，不會寫進正文。'
           : '配音預設讓模型把臺詞寫成帶 TTS 標籤的格式。角色配音不在預設裡，切換預設不會改動角色。'}</p>`;
     }
-    v.draw(heading('預設', btn('add-preset', icon('add'), 'round-button', `aria-label="新增${label}預設"`), 'Preset · 3 類') + tabs + body);
+    v.draw(heading('法式集', btn('add-preset', icon('add'), 'round-button', `aria-label="新增${label}預設"`), 'Preset · 3 類') + tabs + body);
   }
 
   /** The 世界书 line: how much is left out (picked in a sheet), and the tags cleaned away (status bars). */

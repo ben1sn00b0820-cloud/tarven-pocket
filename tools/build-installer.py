@@ -16,6 +16,8 @@ for path in sorted(root.rglob('*')):
     rel = path.relative_to(root)
     if not path.is_file() or path.is_symlink() or any(part.startswith('.') or part in ('node_modules', '__pycache__') for part in rel.parts):
         continue
+    if path.suffix.lower() in ('.zip', '.cjs') and rel.as_posix() != 'tools/installer-template.cjs':
+        continue
     if 'artifacts' in rel.parts and path.suffix != '.json':
         continue
     bundle[rel.as_posix()] = base64.b64encode(path.read_bytes()).decode('ascii')

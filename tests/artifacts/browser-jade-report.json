@@ -1,0 +1,342 @@
+{
+  "passed": true,
+  "viewports": [
+    {
+      "width": 430,
+      "height": 932
+    },
+    {
+      "width": 360,
+      "height": 800
+    }
+  ],
+  "elapsedMs": 11551,
+  "checks": [
+    "430px mobile home opens the real embedded character information app with two saved characters",
+    "character information has one visible inline switch, readable dark-panel contrast and no horizontal overflow at 360px/430px",
+    "manual edit survives two user messages, a partial narrative update and leaving the scene",
+    "inline display can be disabled and re-enabled without clearing or freezing the database",
+    "canceling delete confirmation keeps the contact",
+    "delete hides contact and DM; old/new narrative synchronization cannot resurrect it; original DM and character information remain saved",
+    "explicit restore recovers the original manual persona and DM history",
+    "legacy 12.34 transfer displays as 12.34 lower stones, accepts unchanged through UI and credits once",
+    "visible middle/supreme selectors send 2 middle = 200 lower and 1 supreme = 100000 lower; retries and recipient acceptance never debit twice or round legacy tails",
+    "old 45.67 incoming rejection moves no money; old 8.88 outgoing refund returns exactly 8.88 once and preserves original amounts",
+    "page reload restores saved character information, contact restoration, exact wallet balance and original legacy transaction amounts"
+  ],
+  "transactions": [
+    {
+      "case": "legacy incoming transfer accepted through UI",
+      "amount": "12.34",
+      "delta": 12.34,
+      "balance": 300012.34
+    },
+    {
+      "case": "new transfer sent through UI",
+      "quantity": "2",
+      "unit": "middle",
+      "storedAmount": "200.00",
+      "delta": -200,
+      "balance": 299812.34,
+      "retryBalance": 299812.34
+    },
+    {
+      "case": "new redpacket sent through UI",
+      "quantity": "1",
+      "unit": "supreme",
+      "storedAmount": "100000.00",
+      "delta": -100000,
+      "balance": 199812.34,
+      "retryBalance": 199812.34
+    },
+    {
+      "case": "legacy incoming transfer rejected through UI",
+      "amount": "45.67",
+      "delta": 0,
+      "balance": 199812.34
+    },
+    {
+      "case": "legacy outgoing transfer returned by contact via UI reply",
+      "amount": "8.88",
+      "debitBalance": 199803.46,
+      "refund": 8.88,
+      "balance": 199812.34
+    }
+  ],
+  "contrast": {
+    "background": "rgb(17, 24, 43)",
+    "headingRatio": 15.508500526681239,
+    "mutedRatio": 7.204289778634459
+  },
+  "layouts": [
+    {
+      "label": "character information at 430px",
+      "browserViewport": {
+        "width": 430,
+        "height": 932
+      },
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "documentOverflow": 0,
+      "elements": [
+        {
+          "selector": ".view[data-app=\"characterinfo\"]",
+          "width": 430,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".character-info-toggle",
+          "width": 398,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".csb-information-app",
+          "width": 398,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".csb-information-app .csb-toolbar",
+          "width": 368,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".csb-information-app .csb-toolbar",
+          "width": 368,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".csb-information-roster",
+          "width": 368,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        }
+      ]
+    },
+    {
+      "label": "character information at 360px",
+      "browserViewport": {
+        "width": 360,
+        "height": 800
+      },
+      "viewport": {
+        "width": 360,
+        "height": 800
+      },
+      "documentOverflow": 0,
+      "elements": [
+        {
+          "selector": ".view[data-app=\"characterinfo\"]",
+          "width": 360,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".character-info-toggle",
+          "width": 328,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".csb-information-app",
+          "width": 328,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".csb-information-app .csb-toolbar",
+          "width": 298,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".csb-information-app .csb-toolbar",
+          "width": 298,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".csb-information-roster",
+          "width": 298,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        }
+      ]
+    },
+    {
+      "label": "transfer amount/unit form at 430px",
+      "browserViewport": {
+        "width": 430,
+        "height": 932
+      },
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "documentOverflow": 0,
+      "elements": [
+        {
+          "selector": ".sheet",
+          "width": 410,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet-body",
+          "width": 410,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet [data-field=\"amount\"]",
+          "width": 374,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet [data-field=\"amount-unit\"]",
+          "width": 374,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        }
+      ]
+    },
+    {
+      "label": "transfer amount/unit form at 360px",
+      "browserViewport": {
+        "width": 360,
+        "height": 800
+      },
+      "viewport": {
+        "width": 360,
+        "height": 800
+      },
+      "documentOverflow": 0,
+      "elements": [
+        {
+          "selector": ".sheet",
+          "width": 340,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet-body",
+          "width": 340,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet [data-field=\"amount\"]",
+          "width": 304,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet [data-field=\"amount-unit\"]",
+          "width": 304,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        }
+      ]
+    },
+    {
+      "label": "redpacket amount/unit form at 430px",
+      "browserViewport": {
+        "width": 430,
+        "height": 932
+      },
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "documentOverflow": 0,
+      "elements": [
+        {
+          "selector": ".sheet",
+          "width": 410,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet-body",
+          "width": 410,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet [data-field=\"amount\"]",
+          "width": 374,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".sheet [data-field=\"amount-unit\"]",
+          "width": 374,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        }
+      ]
+    },
+    {
+      "label": "chat after payments at 430px",
+      "browserViewport": {
+        "width": 430,
+        "height": 932
+      },
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "documentOverflow": 0,
+      "elements": [
+        {
+          "selector": ".view[data-app=\"chat\"]",
+          "width": 430,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".composer",
+          "width": 430,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        }
+      ]
+    },
+    {
+      "label": "chat after payments at 360px",
+      "browserViewport": {
+        "width": 360,
+        "height": 800
+      },
+      "viewport": {
+        "width": 360,
+        "height": 800
+      },
+      "documentOverflow": 0,
+      "elements": [
+        {
+          "selector": ".view[data-app=\"chat\"]",
+          "width": 360,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        },
+        {
+          "selector": ".composer",
+          "width": 360,
+          "scrollOverflow": 0,
+          "viewportOverflow": 0
+        }
+      ]
+    }
+  ],
+  "pageErrors": [],
+  "realHost": false,
+  "realPhone": false
+}

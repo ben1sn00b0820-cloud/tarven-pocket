@@ -29,12 +29,12 @@ export function createPhotoBridge({context, backend, contacts, imagePresets, not
   const pending = new Map(), finished = new Map(), refining = new Map();
   let scanQueue = Promise.resolve(), seenScope = '', seenChat = null, seen = new Set(), automaticJobs = 0;
   const current = (snapshot) => !disposed && !backend.closed && context()?.chat === snapshot.chat && context()?.chatMetadata === snapshot.metadata && sourceScope(context()) === snapshot.scope && backend.spaceKey() === snapshot.space;
-  const check = snapshot => { if (!current(snapshot)) throw failure('對話已切換，照片沒有附加到微信訊息。', 'STALE'); };
+  const check = snapshot => { if (!current(snapshot)) throw failure('對話已切換，照片沒有附加到千里傳音訊息。', 'STALE'); };
   async function messageAt(threadId, messageId, snapshot) {
     check(snapshot);
     const thread = await backend.chats.get(threadId);
     check(snapshot);
-    if (!thread || (snapshot.space && (thread.space || '') !== snapshot.space)) throw failure('這段微信聊天已不存在或不在目前角色分區。', 'MISSING');
+    if (!thread || (snapshot.space && (thread.space || '') !== snapshot.space)) throw failure('這段千里傳音聊天已不存在或不在目前角色分區。', 'MISSING');
     const message = thread.messages.find(m => m.id === messageId);
     if (!message || message.kind !== 'photo' || (message.source?.scope && message.source.scope !== snapshot.scope) || message.source?.stale) throw failure('這張照片訊息已刪除、撤回或不屬於目前對話。', 'MISSING');
     return message;
@@ -153,8 +153,8 @@ export function createPhotoBridge({context, backend, contacts, imagePresets, not
           const input = generationInput(message);
           if (!input.prompt.trim()) throw failure('請先長按這張照片，填寫畫面提示詞後再生成。', 'EMPTY_PROMPT');
           check(snapshot);
-          made = await backend.generateImage({prompt: input.prompt, negative: input.negative, engine, params: input.params, allowPaid: automatic || options.allowPaid === true, key: `wechat-photo:${key}`, name: 'WeChat-photo', label: `微信照片 · ${message.from}`, beforeGenerate: async () => {
-            if (automatic && !autoEnabled()) throw failure('已關閉微信自動生圖。', 'DISABLED');
+          made = await backend.generateImage({prompt: input.prompt, negative: input.negative, engine, params: input.params, allowPaid: automatic || options.allowPaid === true, key: `wechat-photo:${key}`, name: 'WeChat-photo', label: `千里傳音照片 · ${message.from}`, beforeGenerate: async () => {
+            if (automatic && !autoEnabled()) throw failure('已關閉千里傳音自動生圖。', 'DISABLED');
             const latest = await messageAt(threadId, messageId, snapshot);
             if (photoMessageFingerprint(latest) !== fingerprint) throw failure('照片提示詞已變更，已取消舊圖片生成。', 'STALE');
             await record('generating');
@@ -169,7 +169,7 @@ export function createPhotoBridge({context, backend, contacts, imagePresets, not
         const updated = await backend.chatMutate(threadId, () => backend.chats.attachPhoto(threadId, messageId, made.photoId, {fingerprint, isCurrent: () => current(snapshot), replace: options.regenerate === true, generation, attemptId}));
         check(snapshot);
         const saved = updated.messages.find(m => m.id === messageId);
-        if (!saved?.photoId) throw failure('圖片已保存相簿，但微信訊息沒有更新。');
+        if (!saved?.photoId) throw failure('圖片已保存相簿，但千里傳音訊息沒有更新。');
         finished.delete(key);
         return {photoId: saved.photoId, threadId, messageId, existing: false};
       } catch (error) {
@@ -211,10 +211,10 @@ export function createPhotoBridge({context, backend, contacts, imagePresets, not
         if (automaticJobs >= 12) { overflow++; continue; }
         automaticJobs++; scheduled++;
         resolvePhoto(threadId, message.id, {generate: true, engine: 'nai', allowPaid: true, automatic: true}).catch(error => {
-          if (current(snapshot) && !['STALE', 'MISSING', 'ALREADY_ATTEMPTED'].includes(error?.code)) notice(`微信照片：${error?.message || error}`);
+          if (current(snapshot) && !['STALE', 'MISSING', 'ALREADY_ATTEMPTED'].includes(error?.code)) notice(`千里傳音照片：${error?.message || error}`);
         }).finally(() => { automaticJobs--; });
       }
-      if (overflow) notice(`微信已有 12 張照片在生成佇列，另外 ${overflow} 張保留描述，可在訊息上手動生成。`);
+      if (overflow) notice(`千里傳音已有 12 張照片在生成佇列，另外 ${overflow} 張保留描述，可在訊息上手動生成。`);
       return {scheduled, overflow};
     };
     const task = scanQueue.then(run); scanQueue = task.catch(() => {}); return task;

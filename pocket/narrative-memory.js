@@ -1,4 +1,5 @@
 import {sourceScope} from './source-sync.js';
+import {parseSpiritText, legacyWalletAmount, formatSpiritAmount, SPIRIT_MAX} from '../core/currency.js';
 
 const KEY = 'tavern_pocket_narrative_memory_v1';
 const LIMIT = 10000;
@@ -25,7 +26,7 @@ function safeProse(text) {
     const inner = value.slice(i + 1, close), before = value.slice(Math.max(0, i - 24), i);
     // A quoted item name belongs to a command; a quoted command is merely a quotation.
     const item = /(?:購買了|购买了|買下了|买下了|買到了|买到了|買了|买了|購得了?|购得了?|把|記住我的(?:能力|物品)[：:]|记住我的(?:能力|物品)[：:])\s*$/.test(before);
-    if (!item && /萬寶商城|万宝商城|購買了|购买了|加入我的|記住我的|记住我的/.test(inner)) {
+    if (!item && /萬寶閣|万宝阁|萬寶商城|万宝商城|購買了|购买了|加入我的|記住我的|记住我的/.test(inner)) {
       output += value.slice(cursor, i) + blank(value.slice(i, close + 1)); cursor = close + 1;
     }
     i = close;
@@ -35,7 +36,7 @@ function safeProse(text) {
 
 const notActual = sentence => /如果|假如|假設|假设|要是|例如|舉例|举例|例子|示範|示范|示例|比如|\b(?:if|example)\b/i.test(sentence)
   || /(?:沒有|没有|還沒|还没|尚未|並未|并未|不曾|不會|不会|不要|沒|没|未曾).{0,16}(?:購買|购买|買|买|進入|进入|加入|記住|记住)/.test(sentence)
-  || /我(?:只是)?(?:想要?|打算|準備|准备|計畫|计划|希望|可能|也許|也许|或許|或许).{0,60}(?:萬寶商城|万宝商城|購買|购买|買下|买下)/.test(sentence);
+  || /我(?:只是)?(?:想要?|打算|準備|准备|計畫|计划|希望|可能|也許|也许|或許|或许).{0,60}(?:萬寶閣|万宝阁|萬寶商城|万宝商城|購買|购买|買下|买下)/.test(sentence);
 
 function ownShop(prefix) {
   const clauses = prefix.split(/[，,；;]/).map(part => part.trim()).filter(Boolean);
@@ -53,15 +54,28 @@ function itemName(tail) {
   const value = tail.trim().replace(/^(?:一(?:個|个|件|項|项|種|种|份))\s*/, '');
   const quoted = /^[「『“"‘']([^」』”"’'\r\n]{1,80})[」』”"’']/.exec(value);
   const name = (quoted?.[1] || value.split(/[，,。；;！!？?…\r\n]/, 1)[0].split(/(?:然後|然后|接著|接着|並且|并且|用來|用来|用於|用于|於是|于是)/, 1)[0]).trim();
-  if (!name || name.length > 80 || /[<>\[\]{}\u0000-\u001f]/.test(name) || /(?:購買|购买|加入我的|萬寶商城|万宝商城)/.test(name)) return '';
+  if (!name || name.length > 80 || /[<>\[\]{}\u0000-\u001f]/.test(name) || /(?:購買|购买|加入我的|萬寶閣|万宝阁|萬寶商城|万宝商城)/.test(name)) return '';
   return name;
 }
 const kindOf = name => /(?:能力|技能|法術|法术|異能|异能|天賦|天赋)$/.test(name) || /^(?:時間停止|时间停止|時間暫停|时间暂停|瞬間移動|瞬间移动|隱身術|隐身术|讀心術|读心术)$/.test(name) ? 'abilities' : 'items';
 function explicitPrice(prefix) {
+  const declaration = [...prefix.matchAll(/(?:以|花費|花费|花了|支付)\s*/g)].at(-1);
+  const declared = declaration ? prefix.slice(declaration.index + declaration[0].length).trim() : '';
+  if (declared && /(?:品|靈石|灵石)/.test(declared)) {
+    let amount;
+    try { amount = parseSpiritText(declared, {zero: false, max: SPIRIT_MAX}); }
+    catch { throw failure('正文價格無法精確換算成整數下品靈石；這項取得沒有執行，請明確填寫下品、中品或極品數量。', 'INVALID_PRICE'); }
+    return {amount, description: `正文取得／明示價格：${formatSpiritAmount(amount)}。`};
+  }
+  // Keep the exact old payload shape/text for pre-upgrade acquisition receipts:
+  // their fingerprints include description. Retrying a pending legacy receipt
+  // must not look like a new item or silently change the amount already paid.
   const match = /(?:以|花費|花费|花了|支付)\s*[¥￥]?\s*(\d+(?:\.\d{1,2})?)\s*(?:元|圓|圆)?\s*$/.exec(prefix);
   if (!match) return undefined;
-  const amount = Number(match[1]);
-  return Number.isFinite(amount) && amount > 0 && amount <= 200000 ? amount : undefined;
+  try {
+    const amount = legacyWalletAmount(match[1], {zero: false, max: 200000});
+    return {amount, description: `正文取得／明示價格：¥${amount.toFixed(2)}。`};
+  } catch { return undefined; }
 }
 
 /** Strict first-person acquisition instructions. This parser never performs a payment or model request. */
@@ -73,8 +87,8 @@ export function parseNarrativeAcquisitions(text, {isUser = false, messageKey = '
   const add = (name, kind, acquisition, price) => {
     if (!name) { out.errors.push({message: '無法確定取得的物品或能力名稱；請使用「名稱」引號。'}); return; }
     if (out.events.length >= 16) { out.errors.push({message: '單則正文最多自動記錄 16 項取得內容。'}); return; }
-    const event = {id: `narrative:${messageKey}:${out.events.length}`, kind, name, description: price === undefined ? '正文取得／未記載價格。' : `正文取得／明示價格：¥${price.toFixed(2)}。`, acquisition};
-    if (price !== undefined) event.price = price;
+    const event = {id: `narrative:${messageKey}:${out.events.length}`, kind, name, description: price?.description || '正文取得／未記載價格。', acquisition};
+    if (price !== undefined) event.price = price.amount;
     out.events.push(event);
   };
   for (const sentence of prose.split(/[。！？!?\r\n]/)) {
@@ -86,14 +100,17 @@ export function parseNarrativeAcquisitions(text, {isUser = false, messageKey = '
       add(itemName(match[1]), match[2] === '能力' ? 'abilities' : 'items', 'remember');
     }
     for (const match of sentence.matchAll(/購買了|购买了|買下了|买下了|買到了|买到了|買了|买了|購得了?|购得了?/g)) {
-      const before = sentence.slice(0, match.index), shop = /萬寶商城|万宝商城/g;
+      const before = sentence.slice(0, match.index), shop = /萬寶閣|万宝阁|萬寶商城|万宝商城/g;
       const shops = [...before.matchAll(shop)], lastShop = shops.at(-1);
       if (!lastShop || !ownShop(before.slice(0, lastShop.index))) continue;
       // A third party's purchase after the user merely opened the shop is not the user's acquisition.
       const route = before.slice(lastShop.index + lastShop[0].length).trim();
-      if (/(?:他|她|對方|对方|角色|NPC|npc|[\p{Script=Han}]{2,8})(?:就|便|已經|已经|又)?\s*$/u.test(route) && !/(?:我|我就|我便|我已經|我已经|我又)\s*$/.test(route) && !/(?:以|花費|花费|花了|支付)\s*[¥￥]?\d+(?:\.\d{1,2})?\s*(?:元|圓|圆)?\s*$/.test(route)) continue;
-      const name = itemName(sentence.slice(match.index + match[0].length)), price = explicitPrice(before);
-      add(name, kindOf(name), 'purchase', price);
+      const marker = /(?:以|花費|花费|花了|支付)/.exec(route);
+      const actorRoute = marker ? route.slice(0, marker.index).trim() : route;
+      if (/(?:他|她|對方|对方|角色|NPC|npc|[\p{Script=Han}]{2,8})(?:就|便|已經|已经|又)?\s*$/u.test(actorRoute) && !/(?:我|我就|我便|我已經|我已经|我又)\s*$/.test(actorRoute)) continue;
+      const name = itemName(sentence.slice(match.index + match[0].length));
+      try { add(name, kindOf(name), 'purchase', explicitPrice(before)); }
+      catch (error) { out.errors.push({message: error.message, code: error.code || 'INVALID_PRICE'}); }
     }
   }
   return out;

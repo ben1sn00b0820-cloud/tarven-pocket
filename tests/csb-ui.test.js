@@ -85,13 +85,13 @@ test('CSB editor opens native plugin by current revision without creating legacy
   await openContactStatusEditor(f.ctx, '林澈');
   assert.deepEqual(f.calls, [{name: '林澈', revision: 'rev-1'}, 'close']);
   assert.equal(f.dialog.live, false);
-  assert.match(f.notifications[0], /狀態工坊/);
+  assert.match(f.notifications[0], /角色信息/);
 });
 
 test('missing CSB editor and ambiguous names fail explicitly instead of falling back to legacy writes', async () => {
   for (const [profile, overrides, expected] of [
-    [record([], {}), {pocketOpenContactState: undefined}, /確認角色狀態插件/],
-    [record([], {}, {editable: false}), {}, /確認角色狀態插件/],
+    [record([], {}), {pocketOpenContactState: undefined}, /確認角色信息插件/],
+    [record([], {}, {editable: false}), {}, /確認角色信息插件/],
     [{name: '同名', csbAmbiguous: true}, {}, /多位角色/],
   ]) {
     const f = editorFixture(profile, overrides);

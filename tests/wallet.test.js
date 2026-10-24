@@ -118,10 +118,10 @@ test('invalid prices and balances make no changes; manual adjustment is auditabl
     await assert.rejects(async () => b.pocketPurchase({...item, price: value}, 'invalid'));
   }
   assert.equal(b.wallet().balance, 520);
-  await b.walletSetBalance('1234.56', '新章节资金');
-  assert.equal(b.wallet().balance, 1234.56);
+  await b.walletSetBalance('1234', '新章节资金');
+  assert.equal(b.wallet().balance, 1234);
   assert.equal(b.wallet().ledger[0].kind, 'adjust');
-  assert.equal(b.wallet().ledger[0].amount, 714.56);
+  assert.equal(b.wallet().ledger[0].amount, 714);
   assert.equal(b.wallet().ledger[0].note, '新章节资金');
 });
 
@@ -210,7 +210,7 @@ test('model claims require a real thread actor and only one group member takes a
 
 test('source-only outgoing observation cannot manufacture a wallet refund', async () => {
   const b = host({messages: [{...incoming(), from: 'me', paymentId: 'source:user-transfer', source: {eventId: 'e1'}}]});
-  await assert.rejects(b.settleSent('t', 'm', 'A', 'return'), /沒有錢包扣款/);
+  await assert.rejects(b.settleSent('t', 'm', 'A', 'return'), /沒有靈石袋扣款/);
   assert.equal(b.wallet().balance, 520);
 });
 
@@ -239,4 +239,35 @@ test('queued narrative purchase cancels on story switch before changing wallet o
  const b=host();let release,current=true;b.walletQueue=new Promise(resolve=>{release=resolve;});
  const pending=b.pocketPurchase(item,'source-purchase',{isCurrent:()=>current});current=false;release();
  await assert.rejects(pending,/對話已切換/);assert.equal(b.wallet().balance,520);assert.equal(b.wallet().inventory.length,0);
+});
+
+test('explicit spirit denominations canonicalize every retry and settle once', async () => {
+  const b = host({wallet: {...defaultWallet(), balance: 200520.05}});
+  const middle = {kind: 'transfer', amount: '2', unit: 'middle', paymentId: 'middle-retry'};
+  await Promise.all(Array.from({length: 12}, () => b.sendPaid('t', middle)));
+  assert.equal(b.wallet().balance, 200320.05);
+  assert.equal(b.thread().messages.length, 1);
+  assert.equal(b.thread().messages[0].amount, '200.00');
+  const supreme = {kind: 'transfer', amount: '1', unit: 'supreme', paymentId: 'supreme-retry'};
+  b.appendThenThrow = true;
+  await assert.rejects(b.sendPaid('t', supreme), /訊息已儲存/);
+  await b.sendPaid('t', supreme);
+  assert.equal(b.wallet().balance, 100320.05);
+  const message = b.thread().messages.find(m => m.paymentId === 'supreme-retry');
+  assert.equal(message.amount, '100000.00');
+  await Promise.all(Array.from({length: 10}, () => b.settleSent('t', message.id, 'A', 'return')));
+  assert.equal(b.wallet().balance, 200320.05);
+  assert.equal(b.wallet().ledger.filter(e => e.kind === 'refund').length, 1);
+  await assert.rejects(b.sendPaid('t', {...middle, amount: '3'}), /另一筆交易/);
+  assert.equal(b.wallet().balance, 200320.05);
+});
+
+test('invalid new denomination values cannot change balances or messages', async () => {
+  const b = host();
+  for (const [amount, unit] of [['0.5','lower'], ['2','上品'], ['0.001','middle'], ['Infinity','supreme']]) {
+    await assert.rejects(b.sendPaid('t', {kind: 'transfer', amount, unit, paymentId: crypto.randomUUID()}), /靈石/);
+  }
+  assert.equal(b.wallet().balance, 520);
+  assert.equal(b.wallet().journal.length, 0);
+  assert.equal(b.thread().messages.length, 0);
 });

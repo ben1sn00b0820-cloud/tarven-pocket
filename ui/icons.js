@@ -32,7 +32,7 @@ const GLYPHS = {
 };
 
 // Glyph keys the backend accepts for custom icons that are drawn as another app's picture.
-const GLYPH_ALIASES = {book: 'presets', camera: 'gallery', note: 'notes', person: 'roles', microphone: 'engines', headphones: 'listen'};
+const GLYPH_ALIASES = {characterinfo: 'roles', me: 'roles', book: 'presets', camera: 'gallery', note: 'notes', person: 'roles', microphone: 'engines', headphones: 'listen'};
 
 export const GLYPH_NAMES = {default: '預設', wave: '聲波', book: '書本', music: '音符', camera: '相簿', sliders: '滑塊', note: '便籤', person: '人物', microphone: '麥克風', star: '星星', headphones: '耳機'};
 

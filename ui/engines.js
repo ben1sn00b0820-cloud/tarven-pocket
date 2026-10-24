@@ -66,7 +66,7 @@ export function enginesApp(ctx) {
       <span class="card-top"><span class="card-name">${name}</span><span class="card-kind">${IMAGE.includes(id) ? 'IMAGE' : llm ? 'TEXT' : 'VOICE'}${icon('nfc')}</span></span>
       <span class="card-chip"></span>
       <span class="card-number${number.startsWith('•') || comfy ? '' : ' none'}${comfy ? ' address' : ''}">${number}</span>
-      <span class="card-bottom">${fields.map(([k, value]) => `<span><span class="k">${k}</span><span class="v">${esc(value)}</span></span>`).join('')}<span class="card-brand">ST-iPhonie</span></span></${tag}>`;
+      <span class="card-bottom">${fields.map(([k, value]) => `<span><span class="k">${k}</span><span class="v">${esc(value)}</span></span>`).join('')}<span class="card-brand">傳音玉符</span></span></${tag}>`;
   }
 
   const relayNoSubscription = () => !subscription && subscriptionStatus === 404 && !!api.getState().draw.relay.url;
@@ -217,7 +217,7 @@ export function enginesApp(ctx) {
 
   function renderList() {
     delete v.root.dataset.engine;
-    v.draw(heading('引擎', help('每個服務一張卡：文字模型、四家語音引擎（Fish Audio、MiniMax、ElevenLabs、小米 MiMo），加上繪圖用的 NovelAI、GPT 生圖和 ComfyUI（繪圖 App 裡選用哪個畫）。點一張卡片把它抽到最前面，再點一下開啟，檢視連線和全部引數。ElevenLabs 和 Fish 的卡片上顯示剩餘額度。\n卡片只顯示金鑰是否儲存，不顯示內容；“已儲存”不代表鑑權成功。'), 'Wallet · 05')
+    v.draw(heading('靈樞', help('每個服務一張卡：文字模型、四家語音引擎（Fish Audio、MiniMax、ElevenLabs、小米 MiMo），加上繪圖用的 NovelAI、GPT 生圖和 ComfyUI（繪圖 App 裡選用哪個畫）。點一張卡片把它抽到最前面，再點一下開啟，檢視連線和全部引數。ElevenLabs 和 Fish 的卡片上顯示剩餘額度。\n卡片只顯示金鑰是否儲存，不顯示內容；“已儲存”不代表鑑權成功。'), 'Wallet · 05')
       + `<div class="wallet">${order.map(id => card(id)).join('')}</div>`);
     for (const id of PRICED) if (!balances.has(id)) loadBalance(id);
   }

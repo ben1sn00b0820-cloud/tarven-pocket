@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeEvent,parsePhoneEvents,parseUserPhoneCommands,parseRolePhoneCommands,encodePhoneEvents} from '../pocket/events.js';
 import {renderPhoneCards,renderPhoneCard,renderActivityCards} from '../pocket/cards.js';
+import {SPIRIT_MAX} from '../core/currency.js';
 const user={userName:'小雨',characterName:'阿澤',isUser:true,messageKey:'story-A:msg-7'};
 const actor={...user,isUser:false};
 
@@ -25,7 +26,7 @@ test('financial commands normalize exact amounts and render pending confirmation
     const {events}=parseUserPhoneCommands(raw,user);assert.equal(events[0].action,action);assert.equal(events[0].from,'小雨');
     const html=renderPhoneCards(raw,user);assert.match(html,/tp-story-card-amount/);assert.match(html,/待手機確認/);assert.match(html,/尚未扣款/);
   }
-  for(const raw of ['微信轉帳給阿澤：0','微信紅包給阿澤：200001','微信轉帳給阿澤：0.001','微信轉帳給阿澤：-5','微信紅包給阿澤：NaN']) assert.equal(parseUserPhoneCommands(raw,user).events.length,0);
+  for(const raw of ['微信轉帳給阿澤：0',`微信紅包給阿澤：${SPIRIT_MAX+1}`,'微信轉帳給阿澤：0.001','微信轉帳給阿澤：-5','微信紅包給阿澤：NaN']) assert.equal(parseUserPhoneCommands(raw,user).events.length,0);
 });
 test('natural Instagram and forum actions preserve types and exact references',()=>{
   const input='IG發文：「夜色很好。」\nInstagram發限動：「剛下班。」\nIG傳給阿澤：「看到了嗎？」\n論壇發文：「週末去哪？」\n論壇回覆post-3：「去河邊。」';
@@ -64,7 +65,7 @@ test('cards preserve prose, CSB, TTS and incomplete blocks while replacing valid
 });
 test('activity cards include real payment settlement and do not emit source-import protocol',()=>{
   const html=renderActivityCards([{id:'paid-1',app:'wechat',action:'transfer',from:'me',to:'阿澤',amount:'88.50',state:'accepted',text:'晚餐'}],{userName:'小雨'});
-  assert.match(html,/小雨/);assert.match(html,/88\.50/);assert.match(html,/已收款/);assert.ok(!html.includes('<phone>'));
+  assert.match(html,/小雨/);assert.match(html,/88\.5 枚下品靈石/);assert.match(html,/已收款/);assert.ok(!html.includes('<phone>'));
 });
 
 test('assistant natural commands use authenticated reply actor and resolve reader pronouns',()=>{

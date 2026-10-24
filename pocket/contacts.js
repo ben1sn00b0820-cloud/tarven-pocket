@@ -1,6 +1,7 @@
 import {collectCharacterProfiles, extractCharacterCard, serializeStatusProfile} from './status.js';
 import {collectSourceEvents, sourceScope} from './source-sync.js';
-import {readCharacterState, indexCharacterState, characterStatePrompt} from './csb-state.js';
+import {readCharacterState, indexCharacterState, characterStatePrompt, CSB_STATE_KEY} from './csb-state.js';
+import {deletedContactNames} from '../core/contact-book.js';
 
 const clone = value => structuredClone(value);
 const PROFILE_KEYS = Object.freeze(['age', 'identity', 'relation', 'height', 'weight', 'build', 'appearance']);
@@ -50,25 +51,59 @@ function phoneProfiles(events, c) {
  */
 export function createContactBridge({context, backend, notice = () => {}, publishStatus, openStateEditor}) {
   let alive = true, activeScope = '', registeredNames = new Set();
+  let cachedRead = null;
   const originalContacts = backend.contacts;
   const originalList = () => typeof originalContacts === 'function' ? originalContacts.call(backend) : [];
-  const state = () => backend.getState?.() || backend.settings || {routes: [], chat: {contacts: []}};
+  // The backend already owns an immutable settings replacement per save. Read
+  // it directly rather than cloning every preset/key/route for each character.
+  const state = () => backend.settings || backend.getState?.() || {routes: [], chat: {contacts: []}};
+
+  function readInputs(c, scope) {
+    const api = globalThis.CSBCharacterState, settings = state(), csbSettings = c.extensionSettings?.[CSB_STATE_KEY];
+    const hasApi = api?.apiVersion === 1 && typeof api.getSnapshot === 'function';
+    // New CSB exposes a cheap revision. A legacy native API without revisions
+    // remains uncached, so an unseen native edit can never return stale data.
+    if (hasApi && typeof api.getRevision !== 'function') return null;
+    let csbRevision;
+    try { csbRevision = hasApi ? api.getRevision() : JSON.stringify(c.chatMetadata?.[CSB_STATE_KEY] || null); }
+    catch { return null; }
+    const input = [scope, c.chat, c.chatMetadata, c.name1, c.name2, c.characterId, c.groupId, api, csbRevision, c.chatMetadata?.[CSB_STATE_KEY]?.enabled,
+      JSON.stringify([csbSettings || null, c.extensionSettings?.disabledExtensions || null]),
+      c.chatMetadata?.tavern_pocket_v1?.schema, c.chatMetadata?.tavern_pocket_v1?.userName, c.chatMetadata?.tavern_pocket_v1?.initialBalance,
+      activeScope, ...registeredNames, null, settings, backend.revision, backend.space?.key,
+      // Test/legacy hosts can mutate settings in place and have no revision.
+      Number.isFinite(backend.revision) ? '' : JSON.stringify([settings.routes, settings.chat?.contacts, settings.chat?.deletedContacts, settings.general?.defaultLanguage])];
+    // Compare original strings and selected swipe IDs, not just count or the
+    // tail. Editing an old same-length message must invalidate the cache too.
+    for (const m of Array.isArray(c.chat) ? c.chat : []) input.push(m, m?.mes, m?.swipe_id, m?.is_user, m?.is_system, m?.role, m?.name, m?.send_date,
+      m?.extra?.tavern_pocket_activity, m?.extra?.tavern_pocket_source_id, m?.extra?.tavern_pocket_parser_version);
+    input.push(null);
+    const cards = Array.isArray(c.characters) ? c.characters : Object.values(c.characters || {});
+    for (const card of cards) input.push(card, card?.name, card?.avatar, card?.description, card?.personality, card?.scenario,
+      card?.data?.name, card?.data?.description, card?.data?.personality, card?.data?.scenario);
+    input.push(JSON.stringify((Array.isArray(c.groups) ? c.groups : []).map(group => [group.id, group.members])));
+    return input;
+  }
 
   // Native contacts are globally unique by name, even when their saved record is
   // assigned to another card. A read-only overlay makes a current story sender
   // selectable without moving that record or overwriting its custom persona.
   function visibleContacts() {
-    const result = [...originalList()], c = context();
+    const s = state(), removed = deletedContactNames(s.chat);
+    const result = originalList().filter(contact => !removed.has(contact.name)), c = context();
     if (!alive || !activeScope || sourceScope(c) !== activeScope) return result;
-    const s = state();
+    const visible = new Set(result.map(contact => contact.name));
+    const manualByName = new Map((s.chat?.contacts || []).map(contact => [contact.name, contact]));
+    const routesByName = new Map((s.routes || []).map(contact => [contact.name, contact]));
     for (const name of registeredNames) {
-      if (result.some(contact => contact.name === name)) continue;
-      const manual = s.chat?.contacts?.find(contact => contact.name === name);
+      if (removed.has(name) || visible.has(name)) continue;
+      const manual = manualByName.get(name);
       if (manual) result.push({name, source: 'manual', id: manual.id, persona: manual.persona || '', voice: false, engine: 'none', language: ''});
       else {
-        const route = s.routes?.find(contact => contact.name === name);
+        const route = routesByName.get(name);
         if (route) result.push({name, source: 'role', persona: '', voice: !!route.voice, engine: route.voice ? route.engine : 'none', language: route.language || s.general?.defaultLanguage || ''});
       }
+      visible.add(name);
     }
     return result;
   }
@@ -77,6 +112,8 @@ export function createContactBridge({context, backend, notice = () => {}, publis
   function read() {
     const c = context(), scope = sourceScope(c);
     if (!alive || !scope) return {c, scope, profiles: [], errors: []};
+    const inputs = readInputs(c, scope);
+    if (inputs && cachedRead?.inputs.length === inputs.length && inputs.every((value, index) => value === cachedRead.inputs[index])) return {...cachedRead.result, c};
     const parsed = collectCharacterProfiles(c);
     let events = [], errors = [...(parsed.errors || [])];
     try { const source = collectSourceEvents(c); events = source.events; errors.push(...source.errors); }
@@ -86,11 +123,11 @@ export function createContactBridge({context, backend, notice = () => {}, publis
     const csbIndex = indexCharacterState(csbRead.snapshot, {editable: typeof openStateEditor === 'function' || typeof globalThis.CSBCharacterState?.openEditor === 'function'});
     const explicit = phoneProfiles(events, c), statuses = new Map(parsed.profiles.map(profile => [profile.name, profile]));
     const wanted = new Set([...statuses.keys(), ...contactNames(events, c), ...csbIndex.names]);
-    const native = visibleContacts();
+    const native = visibleContacts(), nativeByName = new Map(native.map(contact => [contact.name, contact]));
     const profiles = [];
     for (const name of wanted) {
       if (!isPerson(name, c)) continue;
-      const status = statuses.get(name), phone = explicit.get(name), contact = native.find(item => item.name === name);
+      const status = statuses.get(name), phone = explicit.get(name), contact = nativeByName.get(name);
       const imported = csbIndex.resolve(name);
       if (imported) {
         profiles.push(importedProfile(name, imported, contact, scope));
@@ -111,7 +148,9 @@ export function createContactBridge({context, backend, notice = () => {}, publis
         card: card ? {...clone(card.fields || {}), source: clone(card.source || {kind: 'card'})} : {},
         contact: contact ? {source: contact.source, persona: contact.persona || ''} : {source: 'story', persona: ''}, missing: '未提供'});
     }
-    return {c, scope, profiles, errors, native, csbIndex};
+    const result = {c, scope, profiles, errors, native, csbIndex};
+    cachedRead = inputs ? {inputs, result} : null;
+    return result;
   }
 
   function importedProfile(name, imported, contact, scope) {
@@ -183,7 +222,10 @@ export function createContactBridge({context, backend, notice = () => {}, publis
     const c = context(), chat = c?.chat, metadata = c?.chatMetadata;
     const current = () => alive && !!scope && sourceScope(context()) === scope && context().chat === chat && context().chatMetadata === metadata && isCurrent();
     if (!current()) return {created: [], errors: [], stale: true};
-    const names = contactNames(events, c), created = [], errors = [];
+    const saved = state(), removed = deletedContactNames(saved.chat);
+    const names = contactNames(events, c).filter(name => !removed.has(name)), created = [], errors = [];
+    const knownContacts = new Set((saved.chat?.contacts || []).map(contact => contact.name));
+    const knownRoutes = new Set((saved.routes || []).map(route => route.name));
     activeScope = scope;
     registeredNames = new Set(names);
     // These backend methods save synchronously. There is no yield between the
@@ -191,15 +233,15 @@ export function createContactBridge({context, backend, notice = () => {}, publis
     for (const name of names) {
       if (!current()) return {created, errors, stale: true};
       try {
-        const s = state();
-        if (s.routes?.some(route => route.name === name)) {
+        if (knownRoutes.has(name)) {
           backend.tagRoles?.([name], backend.space?.key);
           continue;
         }
-        if (s.chat?.contacts?.some(contact => contact.name === name)) continue;
-        if ((s.chat?.contacts?.length || 0) >= MAX_CONTACTS) throw Error('微信聯絡人已達 200 人，請先整理聯絡人。');
+        if (knownContacts.has(name)) continue;
+        if (knownContacts.size >= MAX_CONTACTS) throw Error('千里傳音聯絡人已達 200 人，請先整理聯絡人。');
         const card = extractCharacterCard(c, name);
         backend.saveContact({name, persona: String(card?.text || '').slice(0, 4000)});
+        knownContacts.add(name);
         created.push(name);
       } catch (error) { errors.push({name, message: String(error?.message || error)}); }
     }
@@ -238,5 +280,5 @@ export function createContactBridge({context, backend, notice = () => {}, publis
   }
 
   return {sync, profile, save, openEditor, profiles: () => { const result = read(); return result.profiles.map(record => withRevision(clone(record), result.c)); }, promptFor, errors: () => clone(read().errors),
-    dispose() { alive = false; activeScope = ''; registeredNames.clear(); if (backend.contacts === visibleContacts) backend.contacts = originalContacts; }};
+    dispose() { alive = false; cachedRead = null; activeScope = ''; registeredNames.clear(); if (backend.contacts === visibleContacts) backend.contacts = originalContacts; }};
 }

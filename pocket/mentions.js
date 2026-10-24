@@ -6,6 +6,8 @@ const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'
 const escapedText = value => escapeHTML(value).replace(/[\\\x60*_~[\]\r\n]/g,c=>'&#'+c.charCodeAt(0)+';');
 const list = value => Array.isArray(value) ? value : [];
 const str = value => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+// Read-only search aliases preserve original asset sources and reference tokens.
+const searchText = value => str(value).toLocaleLowerCase().replace(/萬寶商城|万宝商城|万宝阁/g, '萬寶閣').replace(/論壇|论坛|論道台|论道台/g, '論道臺').replace(/吾身录/g, '吾身錄');
 const encode = value => str(value).replace(/[\\｜【】\r\n]/g,c=>({'\\':'\\\\','｜':'\\|','【':'\\[','】':'\\]','\r':'\\r','\n':'\\n'}[c]));
 const decode = value => value.replace(/\\([\\|[\]rn])/g,(_,c)=>({'\\':'\\','|':'｜','[':'【',']':'】',r:'\r',n:'\n'}[c]));
 const tokenPattern = () => /[@＠]【(資訊|欄位|物品|能力|物品清單|能力清單)：((?:\\[\s\S]|[^\\｜】]){0,520})｜((?:\\[\s\S]|[^\\｜】]){1,520})｜([A-Za-z0-9_-]{1,256})】/gu;
@@ -17,7 +19,7 @@ const profilePreview = state => [...Object.entries(basicProfile(state)).filter((
 export function memoryMentionCandidates(state) {
   if (!str(state?.persona)) return [];
   const out = [
-    {kind:'profile',id:'all',title:'我的資訊',typeLabel:'我的資訊',preview:profilePreview(state)||'尚未填寫個人資料',searchText:'我 我的信息 我的資訊 我的资料 個人資料 '+str(state.persona)+' '+profilePreview(state),detail:profilePreview(state)},
+    {kind:'profile',id:'all',title:'我的資訊',typeLabel:'我的資訊',preview:profilePreview(state)||'尚未填寫個人資料',searchText:'我 吾身錄 吾身录 我的信息 我的資訊 我的资料 個人資料 '+str(state.persona)+' '+profilePreview(state),detail:profilePreview(state)},
     {kind:'items',id:'all',title:'我的物品',typeLabel:'物品清單',preview:'已記錄 '+list(state.items).length+' 件物品；插入清單摘要',searchText:'我 我的物品 道具 裝備',detail:'插入目前持有物品的摘要。需要完整描述時，請選取單件物品。'},
     {kind:'abilities',id:'all',title:'我的能力',typeLabel:'能力清單',preview:'已記錄 '+list(state.abilities).length+' 項能力；插入清單摘要',searchText:'我 我的能力 技能 異能',detail:'插入目前能力的摘要。需要完整效果時，請選取個別能力。'},
   ];
@@ -37,9 +39,15 @@ export function searchMemoryMentions(state, query='', {category='all',limit=MEMO
   let selected=category;
   if (selected==='all' && /^(我的)?能力[:：\s]/u.test(q)) {selected='abilities';q=q.replace(/^(我的)?能力[:：\s]*/u,'');}
   if (selected==='all' && /^(我的)?物品[:：\s]/u.test(q)) {selected='items';q=q.replace(/^(我的)?物品[:：\s]*/u,'');}
-  const tokens=q.split(/\s+/u).filter(Boolean), rows=memoryMentionCandidates(state);
-  return rows.filter(row=>(selected==='all'||row.category===selected)&&tokens.every(token=>(row.title+' '+row.typeLabel+' '+row.searchText).toLocaleLowerCase().includes(token)))
-    .map((row,index)=>({row,index,score:!q?0:row.title.toLocaleLowerCase()===q?100:row.title.toLocaleLowerCase().startsWith(q)?60:row.title.toLocaleLowerCase().includes(q)?30:0}))
+  const tokens=q.split(/\s+/u).filter(Boolean).map(value=>({value,alias:searchText(value)})), rows=memoryMentionCandidates(state), aliasQuery=searchText(q);
+  return rows.filter(row=>{
+    if(selected!=='all'&&row.category!==selected)return false;
+    const haystack=(row.title+' '+row.typeLabel+' '+row.searchText).toLocaleLowerCase(), alias=searchText(haystack);
+    return tokens.every(token=>haystack.includes(token.value)||alias.includes(token.alias));
+  }).map((row,index)=>{
+    const title=row.title.toLocaleLowerCase(), alias=searchText(title);
+    return {row,index,score:!q?0:title===q||alias===aliasQuery?100:title.startsWith(q)||alias.startsWith(aliasQuery)?60:title.includes(q)||alias.includes(aliasQuery)?30:0};
+  })
     .sort((a,b)=>b.score-a.score||a.index-b.index).slice(0,Math.max(1,Math.min(100,limit))).map(x=>x.row);
 }
 
@@ -81,7 +89,7 @@ export function parseMemoryMentions(value) {
     const row={start:m.index,end:m.index+m[0].length,raw:m[0],label:decode(m[2]),persona:decode(m[3]),id:m[4],kind:({'資訊':'profile','欄位':'field','物品':'items','能力':'abilities','物品清單':'items','能力清單':'abilities'})[m[1]],collection:m[1].endsWith('清單'),bound:true};
     if (!excluded.some(x=>startsInside(row,x))) out.push(row);
   }
-  const natural=/[@＠](?:(能力|物品)「([^」\r\n]{1,120})」|(我的資訊|我的信息|我的資料|我的资料|我的物品|我的能力|我)(?=$|[\s，。！？；：、,.!?;:）)\]」】]))/gu;
+  const natural=/[@＠](?:(能力|物品)「([^」\r\n]{1,120})」|(吾身錄|吾身录|我的資訊|我的信息|我的資料|我的资料|我的物品|我的能力|我)(?=$|[\s，。！？；：、,.!?;:）)\]」】]))/gu;
   for (const m of source.matchAll(natural)) {
     const before=source[m.index-1]||'';
     if (/[A-Za-z0-9_@./-]/u.test(before)) continue;

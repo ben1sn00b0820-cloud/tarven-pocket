@@ -9,6 +9,24 @@ const profileDatum = (label, value, blank = '未提供') => `<div class="tp-cont
 const isEmptyValue = value => value === null || value === undefined || value === '';
 const csbValue = (state, field) => Object.hasOwn(state.values || {}, field.id) ? state.values[field.id] : field.default;
 const csbLabel = field => [field.icon, field.label || field.id].filter(Boolean).join(' ');
+const deleting = new WeakSet();
+
+/** One confirmation, shared by manual contacts and discovered voice roles. */
+export async function deleteContactWithConfirmation(ctx, contact) {
+  if (deleting.has(ctx)) return false;
+  const name = typeof contact === 'string' ? contact : contact?.name;
+  const target = typeof contact === 'object' && contact?.id ? contact.id : name;
+  if (!name || typeof ctx.api?.deleteContact !== 'function') throw Error('目前無法刪除這位聯絡人。');
+  deleting.add(ctx);
+  try {
+    const account = ctx.api.getState?.()?.scope;
+    if (!await ctx.confirm(`刪除「${name}」？`, '會從千里傳音聯絡簿與私聊列表移除，正文同步也不會自動加回。原聊天記錄、角色信息、世界書與配音設定會保留；可在「已刪除聯絡人」恢復。')) return false;
+    if (ctx.api.getState?.()?.scope !== account) throw Error('帳戶已切換，請重新開啟聯絡簿。');
+    await ctx.api.deleteContact(target);
+    ctx.notify?.(`已刪除「${name}」，可在已刪除聯絡人中恢復。`);
+    return true;
+  } finally { deleting.delete(ctx); }
+}
 
 /** Keep the original schema and value types: zero, false and unknown are different states. */
 function csbDatum(field, value) {
@@ -39,12 +57,12 @@ function csbDetailsHTML(record) {
     return `<details class="tp-contact-section tp-csb-group" data-group="tp-csb-${esc(group.id)}"${group.collapsed ? '' : ' open'}><summary><span>${esc([group.icon, group.label || group.id].filter(Boolean).join(' '))}</span><small>${members.length} 個欄位</small></summary><div class="tp-csb-fields${group.layout === 'list' ? ' is-list' : ''}">${members.map(field => field.type === 'bar' ? csbMeter(field, csbValue(state, field)) : `<dl>${csbDatum(field, csbValue(state, field))}</dl>`).join('')}</div></details>`;
   }).join('');
   const aliases = (Array.isArray(state.aliases) ? state.aliases : []).filter(value => typeof value === 'string' && value).join('、');
-  return `<div class="tp-contact-data tp-csb-data"><section class="tp-contact-section"><div class="tp-contact-section-head"><h3>角色狀態工坊</h3><span class="tp-contact-tag">${state.present === false ? '離場' : state.present === true ? '在場' : '即時讀取'}</span></div><p class="tp-contact-source">${esc([record.time, '讀取目前聊天的最新角色變量'].filter(Boolean).join(' · '))}</p>${aliases ? `<p class="hint">別名：${esc(aliases)}</p>` : ''}<p class="hint">欄位、數值範圍與分區跟隨狀態工坊設定；修改會直接使用原插件的編輯器。</p></section>${sections || '<section class="tp-contact-section"><p class="hint">尚無可顯示欄位。可在角色狀態工坊新增或啟用欄位。</p></section>'}</div>`;
+  return `<div class="tp-contact-data tp-csb-data"><section class="tp-contact-section"><div class="tp-contact-section-head"><h3>角色信息</h3><span class="tp-contact-tag">${state.present === false ? '離場' : state.present === true ? '在場' : '即時讀取'}</span></div><p class="tp-contact-source">${esc([record.time, '讀取目前聊天的最新角色變量'].filter(Boolean).join(' · '))}</p>${aliases ? `<p class="hint">別名：${esc(aliases)}</p>` : ''}<p class="hint">欄位、數值範圍與分區跟隨狀態工坊設定；修改會直接使用原插件的編輯器。</p></section>${sections || '<section class="tp-contact-section"><p class="hint">尚無可顯示欄位。可在角色信息新增或啟用欄位。</p></section>'}</div>`;
 }
 
 export function contactDetailsHTML(record) {
-  if (!record) return '<section class="tp-contact-section"><h3>劇情狀態</h3><p class="hint">尚未讀到這位角色的狀態列。新的正文狀態與微信事件會自動同步到這裡。</p></section>';
-  if (record.csbAmbiguous) return '<section class="tp-contact-section"><h3>角色名稱需要確認</h3><p class="hint">狀態工坊有多位角色使用這個名字或別名，手機無法確認對應角色。請在角色狀態工坊調整名稱或別名後再開啟。</p></section>';
+  if (!record) return '<section class="tp-contact-section"><h3>劇情狀態</h3><p class="hint">尚未讀到這位角色的狀態列。新的正文狀態與千里傳音事件會自動同步到這裡。</p></section>';
+  if (record.csbAmbiguous) return '<section class="tp-contact-section"><h3>角色名稱需要確認</h3><p class="hint">狀態工坊有多位角色使用這個名字或別名，手機無法確認對應角色。請在角色信息調整名稱或別名後再開啟。</p></section>';
   if (record.csb) return csbDetailsHTML(record);
   const fields = record.fields || {}, card = {...record.card, ...fields}, body = Array.isArray(record.body) ? record.body : [];
   const source = record.source || {}, sourceParts = [];
@@ -60,7 +78,7 @@ export function contactDetailsHTML(record) {
   const knownCard = CONTACT_CARD_FIELDS.filter(([key]) => profileValue(card[key]));
   const status = CONTACT_FIELDS.map(([key, label]) => profileDatum(label, fields[key])).join('');
   return `<div class="tp-contact-data">
-    <section class="tp-contact-section"><div class="tp-contact-section-head"><h3>最新角色狀態</h3><span class="tp-contact-tag">自動讀取</span></div><p class="tp-contact-source">${esc(sourceParts.join(' · ') || '資料來自正文狀態列與角色卡')}</p>
+    <section class="tp-contact-section"><div class="tp-contact-section-head"><h3>最新角色信息</h3><span class="tp-contact-tag">自動讀取</span></div><p class="tp-contact-source">${esc(sourceParts.join(' · ') || '資料來自正文狀態列與角色卡')}</p>
       <div class="tp-contact-meters">${CONTACT_METERS.map(meter).join('')}</div><dl class="tp-contact-grid">${status}</dl></section>
     ${knownCard.length ? `<section class="tp-contact-section"><h3>身材與外貌</h3><dl class="tp-contact-grid">${knownCard.map(([key, label]) => profileDatum(label, card[key])).join('')}</dl></section>` : ''}
     <details class="tp-contact-section tp-contact-body" data-group="tp-contact-body"><summary><span>身材與身體部位</span><small>${body.length ? `${body.length} 個欄位` : '尚無資料'}</small></summary>${body.length ? `<dl class="tp-contact-grid">${body.map(row => profileDatum(profileValue(row.name) || '自訂部位', row.value, '空白')).join('')}</dl>` : '<p class="hint">狀態列的身體部位欄位會保留原名與空白，不自動推測。</p>'}</details>
@@ -72,7 +90,7 @@ const LABELS = Object.fromEntries([...CONTACT_FIELDS, ...CONTACT_METERS]);
 /** CSB keeps its native typed editor; legacy profiles keep the story-snapshot editor. */
 export async function openContactStatusEditor(ctx, name, {onSaved = () => {}} = {}) {
   const {api} = ctx;
-  const d = ctx.dialog(`${name} · 角色狀態`, '<p class="hint" role="status">正在讀取最新狀態…</p>');
+  const d = ctx.dialog(`${name} · 角色信息`, '<p class="hint" role="status">正在讀取最新狀態…</p>');
   let record, draft, busy = false;
   const readInputs = () => {
     draft.time = d.body.querySelector('[data-status-time]')?.value || '';
@@ -95,12 +113,12 @@ export async function openContactStatusEditor(ctx, name, {onSaved = () => {}} = 
     record = await api.pocketContactProfile(name);
     if (!d.live) return d;
     if (!record) throw Error('目前對話找不到這位角色的資料。');
-    if (record.csbAmbiguous) throw Error('有多位角色使用這個名字或別名，請先在角色狀態工坊調整後再修改。');
+    if (record.csbAmbiguous) throw Error('有多位角色使用這個名字或別名，請先在角色信息調整後再修改。');
     if (record.csb) {
-      if (record.csb.editable !== true || typeof api.pocketOpenContactState !== 'function') throw Error('目前無法開啟狀態工坊編輯器，請確認角色狀態插件已啟用並更新。');
+      if (record.csb.editable !== true || typeof api.pocketOpenContactState !== 'function') throw Error('目前無法開啟狀態工坊編輯器，請確認角色信息插件已啟用並更新。');
       await api.pocketOpenContactState(name, record.revision);
       if (d.live) d.close();
-      ctx.notify('已開啟角色狀態工坊，儲存後手機會讀取最新資料。');
+      ctx.notify('已開啟角色信息，儲存後手機會讀取最新資料。');
       return d;
     }
     draft = {revision: record.revision, time: record.time || '', fields: Object.fromEntries(STATUS_FIELDS.map(key => [key, String(record.fields?.[key] ?? (STATUS_METERS.includes(key) ? '未知' : ''))])), body: structuredClone(record.body || [])};
@@ -125,7 +143,7 @@ export async function openContactStatusEditor(ctx, name, {onSaved = () => {}} = 
     try {
       await api.pocketSaveContactProfile(name, draft);
       if (d.live) d.close();
-      ctx.notify('角色狀態已儲存並同步正文'); onSaved();
+      ctx.notify('角色信息已儲存並同步正文'); onSaved();
     } catch (error) {
       if (d.live) { errorBox.textContent = error.message || String(error); errorBox.hidden = false; }
     } finally { busy = false; if (d.live) for (const el of d.body.querySelectorAll('input, button')) el.disabled = false; }
@@ -134,23 +152,23 @@ export async function openContactStatusEditor(ctx, name, {onSaved = () => {}} = 
 }
 
 export async function openContactStatus(ctx, name) {
-  const d = ctx.dialog(`${name} · 角色狀態`, '<p class="hint" role="status">正在讀取角色狀態…</p>');
+  const d = ctx.dialog(`${name} · 角色信息`, '<p class="hint" role="status">正在讀取角色信息…</p>');
   try {
     const record = await ctx.api.pocketContactProfile(name);
     if (!d.live) return d;
     const canEdit = record && !record.csbAmbiguous && (record.csb ? record.csb.editable === true && typeof ctx.api.pocketOpenContactState === 'function' : typeof ctx.api.pocketSaveContactProfile === 'function');
-    d.body.innerHTML = contactDetailsHTML(record) + (canEdit ? `<div class="actions">${btn('status-edit', record.csb ? '在狀態工坊修改' : '修改角色狀態', 'primary')}</div>` : '');
+    d.body.innerHTML = contactDetailsHTML(record) + (canEdit ? `<div class="actions">${btn('status-edit', record.csb ? '在狀態工坊修改' : '修改角色信息', 'primary')}</div>` : '');
     d.body.addEventListener('click', e => { if (e.target.closest('[data-action=status-edit]')) openContactStatusEditor(ctx, name); });
   } catch (error) { if (d.live) d.body.innerHTML = `<p class="help-copy" role="alert">${esc(error.message || error)}</p>`; }
   return d;
 }
 
 export async function openStatusDirectory(ctx) {
-  const d = ctx.dialog('劇情角色狀態', '<p class="hint" role="status">正在讀取目前對話的角色…</p>');
+  const d = ctx.dialog('劇情角色信息', '<p class="hint" role="status">正在讀取目前對話的角色…</p>');
   try {
     const records = await ctx.api.pocketContactProfiles();
     if (!d.live) return d;
-    d.body.innerHTML = (typeof ctx.api.pocketOpenStateManager === 'function' ? `<div class="actions">${btn('status-manager', '開啟角色狀態工坊', 'secondary')}</div>` : '') + (records.length ? `<div class="group">${records.map(record => btn('status-open', `<span><strong>${esc(record.name)}</strong><small>${esc(record.csbAmbiguous ? '名稱或別名重複，請先確認角色' : record.fields?.mood || record.fields?.identity || (record.csb ? '查看狀態工坊的角色資料' : '檢視或修改狀態'))}</small></span>`, 'list-row', `data-status-name="${esc(record.name)}"`)).join('')}</div>` : '<p class="hint">目前對話尚無角色資料。可在角色狀態工坊新增角色，或讓正文狀態欄與微信事件同步到這裡。</p>');
+    d.body.innerHTML = (typeof ctx.api.pocketOpenStateManager === 'function' ? `<div class="actions">${btn('status-manager', '開啟角色信息', 'secondary')}</div>` : '') + (records.length ? `<div class="group">${records.map(record => btn('status-open', `<span><strong>${esc(record.name)}</strong><small>${esc(record.csbAmbiguous ? '名稱或別名重複，請先確認角色' : record.fields?.mood || record.fields?.identity || (record.csb ? '查看狀態工坊的角色資料' : '檢視或修改狀態'))}</small></span>`, 'list-row', `data-status-name="${esc(record.name)}"`)).join('')}</div>` : '<p class="hint">目前對話尚無角色資料。可在角色信息新增角色，或讓正文狀態欄與千里傳音事件同步到這裡。</p>');
     d.body.addEventListener('click', async e => {
       const b = e.target.closest('[data-status-name]'); if (b) { openContactStatus(ctx, b.dataset.statusName); return; }
       if (!e.target.closest('[data-action="status-manager"]')) return;

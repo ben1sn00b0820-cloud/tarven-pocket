@@ -1,6 +1,7 @@
 import {createView, esc, btn, heading, field, input, textArea, avatar, empty} from '../ui/common.js';
 import {icon} from '../ui/icons.js';
 import {saveFile} from '../download.js';
+import {formatSpiritAmount} from '../core/currency.js';
 
 const rows = value => Array.isArray(value) ? value : [];
 const clone = value => structuredClone(value);
@@ -16,7 +17,7 @@ export function meApp(ctx) {
   let state = null, branch = '', draft = null, dirty = false, running = false, epoch = 0, changedElsewhere = false;
   let archive = null, archiveError = '', archiveQuery = '', archiveQueryDraft = '', archiveFilter = 'all';
   const profile = () => state?.profile || {};
-  const branchLabel = () => BRANCHES.find(([id]) => id === branch)?.[1] || '我';
+  const branchLabel = () => BRANCHES.find(([id]) => id === branch)?.[1] || '吾身錄';
   const revision = () => state?.revision;
   function beginProfile() { draft = {kind: 'profile', revision: revision(), value: clone(profile())}; draft.value.customFields = rows(draft.value.customFields); dirty = false; changedElsewhere = false; }
   function updateDirty() {
@@ -25,7 +26,7 @@ export function meApp(ctx) {
     if (el) { el.textContent = '尚未儲存'; el.classList.add('dirty'); }
   }
   function header() {
-    return heading(branchLabel(), '', '你的故事，由你定義') + (branch ? `<div class="tp-me-subnav">${btn('me-home', icon('back') + '回到我', 'text-button')}<span>${esc(state?.persona || '目前使用者')}</span></div>` : '');
+    return heading(branchLabel(), '', '你的故事，由你定義') + (branch ? `<div class="tp-me-subnav">${btn('me-home', icon('back') + '回到吾身錄', 'text-button')}<span>${esc(state?.persona || '目前使用者')}</span></div>` : '');
   }
   function home() {
     return `<section class="tp-me-hero">${avatar(profile().name || state.persona || '我', 'none', 66, 'me')}<div><span class="eyebrow">屬於你的角色</span><h2>${esc(profile().name || state.persona || '我')}</h2><p>資訊、物品與能力，保存在這裡。</p></div></section><div class="tp-me-branches">${BRANCHES.map(([id, label, art, detail]) => `<button type="button" class="tp-me-branch" data-action="me-branch" data-branch="${id}"><span class="tp-me-branch-icon">${icon(art)}</span><span><strong>${label}</strong><small>${esc(detail)}</small></span>${icon('next')}</button>`).join('')}</div><p class="hint tp-me-footnote">資料跟隨目前使用者名稱保存。切換對話仍保留；切換使用者名稱會使用各自的資料。</p>`;
@@ -39,7 +40,7 @@ export function meApp(ctx) {
   }
   function assetList() {
     const list = rows(state[branch]), isItems = branch === 'items';
-    return `<div class="tp-me-section-head"><div><h2>${branchLabel()}</h2><p>${isItems ? '萬寶商城購買的物品會收進這裡' : '收藏你的技能、資格與特殊能力'}</p></div>${btn('me-entry-new', icon('add') + '新增', 'primary')}</div>${isItems ? `<div class="tp-me-list-actions">${btn('me-open-shop', icon('shop') + '前往萬寶商城', 'secondary')}${!state.migration?.walletImported ? btn('me-wallet-import', '匯入舊版我的物品', 'text-button') : ''}</div>` : ''}${list.length ? `<div class="tp-me-entry-list">${list.map(item => `<article class="tp-me-entry"><div class="tp-me-entry-title"><span class="tp-me-entry-art">${icon(isItems ? 'gift' : 'wand')}</span><div><h3>${esc(item.name)}</h3><small>${isItems ? '我的物品' : '我的能力'}${item.quantity ? ' · × ' + esc(item.quantity) : ''}</small></div>${btn('me-entry-edit', '編輯', 'text-button', `data-id="${esc(item.id)}"`)}</div>${item.description ? `<p>${esc(item.description)}</p>` : '<p class="tp-me-soft">尚未填寫描述。</p>'}${item.source ? `<small class="tp-me-source">來源：${esc(item.source)}</small>` : ''}</article>`).join('')}</div>` : empty(isItems ? '先收進一件屬於你的物品' : '寫下你的第一項能力', isItems ? '可以手動新增，或到萬寶商城購買。' : '名稱與說明由你決定，也可在萬寶商城查詢。', isItems ? 'gift' : 'wand')}`;
+    return `<div class="tp-me-section-head"><div><h2>${branchLabel()}</h2><p>${isItems ? '萬寶閣購買的物品會收進這裡' : '收藏你的技能、資格與特殊能力'}</p></div>${btn('me-entry-new', icon('add') + '新增', 'primary')}</div>${isItems ? `<div class="tp-me-list-actions">${btn('me-open-shop', icon('shop') + '前往萬寶閣', 'secondary')}${!state.migration?.walletImported ? btn('me-wallet-import', '匯入舊版我的物品', 'text-button') : ''}</div>` : ''}${list.length ? `<div class="tp-me-entry-list">${list.map(item => `<article class="tp-me-entry"><div class="tp-me-entry-title"><span class="tp-me-entry-art">${icon(isItems ? 'gift' : 'wand')}</span><div><h3>${esc(item.name)}</h3><small>${isItems ? '我的物品' : '我的能力'}${item.quantity ? ' · × ' + esc(item.quantity) : ''}</small></div>${btn('me-entry-edit', '編輯', 'text-button', `data-id="${esc(item.id)}"`)}</div>${item.description ? `<p>${esc(item.description)}</p>` : '<p class="tp-me-soft">尚未填寫描述。</p>'}${item.source ? `<small class="tp-me-source">來源：${esc(item.source)}</small>` : ''}</article>`).join('')}</div>` : empty(isItems ? '先收進一件屬於你的物品' : '寫下你的第一項能力', isItems ? '可以手動新增，或到萬寶閣購買。' : '名稱與說明由你決定，也可在萬寶閣查詢。', isItems ? 'gift' : 'wand')}`;
   }
   function entryEditor() {
     const p = draft.value;
@@ -49,11 +50,11 @@ export function meApp(ctx) {
     const wb = archive?.worldbook || {}, list = rows(archive?.records).filter(record => archiveFilter === 'all' || record.app === archiveFilter);
     const total = Number(archive?.count) || 0, matched = Number(archive?.matched ?? total) || 0;
     const syncLabel = wb.error ? '等待重新同步' : wb.lastSyncedAt ? '已寫入世界書' : '尚未寫入世界書';
-    return `<section class="tp-me-panel tp-me-archive" aria-label="論壇與商城記憶"><div class="tp-me-section-head"><div><span class="eyebrow">目前這段對話</span><h2>論壇與商城記憶</h2></div><span class="tp-me-archive-symbol">${icon('layers')}</span></div><p class="tp-me-soft">論壇貼文與商城記錄收在這裡，不另發到正文。需要時，可在正文提及論壇或萬寶商城，並說明要回憶的內容。</p><div class="tp-me-archive-counts"><span>${icon('bubble')}<strong>${Number(archive?.forum) || 0}</strong><small>論壇記錄</small></span><span>${icon('shop')}<strong>${Number(archive?.shop) || 0}</strong><small>商城記錄</small></span></div><div class="tp-me-archive-search">${input('me-archive-query', archiveQueryDraft, 'search', 'maxlength="300" placeholder="搜尋人物、商品或關鍵字" autocomplete="off"').replace('aria-label="me-archive-query"', 'aria-label="搜尋論壇與商城記憶"')}${btn('me-archive-search', icon('search'), 'secondary', 'aria-label="搜尋記憶"')}</div><div class="tp-me-archive-toolbar"><div class="tp-me-archive-filters" role="group" aria-label="記憶來源">${[['all', '全部'], ['forum', '論壇'], ['shop', '萬寶商城']].map(([key, label]) => btn('me-archive-filter', label, 'text-button', `data-filter="${key}" aria-pressed="${archiveFilter === key}"`)).join('')}</div>${btn('me-archive-refresh', icon('refresh'), 'text-button', 'aria-label="重新整理記憶"')}</div>${archiveError ? `<p class="tp-me-error" role="alert">${esc(archiveError)}</p>` : ''}${archive ? `<p class="tp-me-archive-result" role="status">${archiveQuery ? `「${esc(archiveQuery)}」符合 ${matched} 筆` : `已保存 ${total} 筆記憶`} · 顯示 ${list.length} 筆${rows(archive.records).length < matched ? '，可搜尋較早的內容' : ''}</p>` : ''}<div class="tp-me-archive-records">${list.map(record => {
-      const title = record.title || record.itemName || (record.app === 'forum' ? '論壇動態' : '商城記錄'), from = [record.from, record.to ? '→ ' + record.to : ''].filter(Boolean).join(' ');
-      const amount = record.amount != null && Number.isFinite(Number(record.amount)) ? Number(record.amount).toLocaleString('zh-TW', {maximumFractionDigits: 2}) : '';
-      return `<details class="tp-me-archive-record" data-group="tp-archive-${esc(record.id)}" data-archive-app="${record.app === 'forum' ? 'forum' : 'shop'}"><summary><span class="tp-me-archive-record-icon">${icon(record.app === 'forum' ? 'bubble' : 'shop')}</span><span><small>${record.app === 'forum' ? '論壇' : '萬寶商城'} · ${esc(ARCHIVE_ACTIONS[record.action] || '記錄')}</small><strong>${esc(title)}</strong><time>${esc(date(record.at))}</time></span>${icon('down')}</summary><div class="tp-me-archive-record-body">${from ? `<small>${esc(from)}</small>` : ''}${record.text ? `<p>${esc(record.text)}</p>` : '<p class="tp-me-soft">未附文字說明。</p>'}${amount !== '' ? `<span class="tp-me-archive-amount">記錄金額 · ${esc(amount)}</span>` : ''}</div></details>`;
-    }).join('') || `<div class="tp-me-archive-empty">${icon('book')}<strong>${archiveError ? '記憶暫時未載入' : archiveQuery || archiveFilter !== 'all' ? '沒有符合的記錄' : '這段對話還沒有記錄'}</strong><p>${archiveError ? '請按重新整理，再次取得已保存的內容。' : archiveQuery || archiveFilter !== 'all' ? '換個關鍵字，或切換到全部記憶。' : '使用論壇或萬寶商城後，會自動收錄在這裡。'}</p></div>`}</div><div class="tp-me-archive-worldbook"><div><strong>本對話專屬世界書</strong><span class="tp-me-badge">${syncLabel}</span></div><p class="tp-me-worldbook-name">${esc(wb.name || '寫入時建立本對話的記憶世界書')}</p>${wb.lastSyncedAt ? `<small>最近寫入：${esc(date(wb.lastSyncedAt))}</small>` : ''}${wb.error ? `<p class="tp-me-error" role="alert">${esc(wb.error)}</p>` : ''}<div class="tp-me-list-actions">${btn('me-archive-sync', icon('book') + '寫入世界書', 'secondary')}${btn('me-archive-export', icon('download') + '匯出 JSON', 'text-button')}</div><p class="hint">這裡的記錄跟隨目前對話保存。你的物品與能力仍保存在「我」的個人資料中。</p></div></section>`;
+    return `<section class="tp-me-panel tp-me-archive" aria-label="論道臺與商城記憶"><div class="tp-me-section-head"><div><span class="eyebrow">目前這段對話</span><h2>論道臺與商城記憶</h2></div><span class="tp-me-archive-symbol">${icon('layers')}</span></div><p class="tp-me-soft">論道臺貼文與商城記錄收在這裡，不另發到正文。需要時，可在正文提及論道臺或萬寶閣，並說明要回憶的內容。</p><div class="tp-me-archive-counts"><span>${icon('bubble')}<strong>${Number(archive?.forum) || 0}</strong><small>論道臺記錄</small></span><span>${icon('shop')}<strong>${Number(archive?.shop) || 0}</strong><small>商城記錄</small></span></div><div class="tp-me-archive-search">${input('me-archive-query', archiveQueryDraft, 'search', 'maxlength="300" placeholder="搜尋人物、商品或關鍵字" autocomplete="off"').replace('aria-label="me-archive-query"', 'aria-label="搜尋論道臺與商城記憶"')}${btn('me-archive-search', icon('search'), 'secondary', 'aria-label="搜尋記憶"')}</div><div class="tp-me-archive-toolbar"><div class="tp-me-archive-filters" role="group" aria-label="記憶來源">${[['all', '全部'], ['forum', '論道臺'], ['shop', '萬寶閣']].map(([key, label]) => btn('me-archive-filter', label, 'text-button', `data-filter="${key}" aria-pressed="${archiveFilter === key}"`)).join('')}</div>${btn('me-archive-refresh', icon('refresh'), 'text-button', 'aria-label="重新整理記憶"')}</div>${archiveError ? `<p class="tp-me-error" role="alert">${esc(archiveError)}</p>` : ''}${archive ? `<p class="tp-me-archive-result" role="status">${archiveQuery ? `「${esc(archiveQuery)}」符合 ${matched} 筆` : `已保存 ${total} 筆記憶`} · 顯示 ${list.length} 筆${rows(archive.records).length < matched ? '，可搜尋較早的內容' : ''}</p>` : ''}<div class="tp-me-archive-records">${list.map(record => {
+      const title = record.title || record.itemName || (record.app === 'forum' ? '論道臺動態' : '商城記錄'), from = [record.from, record.to ? '→ ' + record.to : ''].filter(Boolean).join(' ');
+      const amount = record.amount != null && Number.isFinite(Number(record.amount)) ? formatSpiritAmount(record.amount) : '';
+      return `<details class="tp-me-archive-record" data-group="tp-archive-${esc(record.id)}" data-archive-app="${record.app === 'forum' ? 'forum' : 'shop'}"><summary><span class="tp-me-archive-record-icon">${icon(record.app === 'forum' ? 'bubble' : 'shop')}</span><span><small>${record.app === 'forum' ? '論道臺' : '萬寶閣'} · ${esc(ARCHIVE_ACTIONS[record.action] || '記錄')}</small><strong>${esc(title)}</strong><time>${esc(date(record.at))}</time></span>${icon('down')}</summary><div class="tp-me-archive-record-body">${from ? `<small>${esc(from)}</small>` : ''}${record.text ? `<p>${esc(record.text)}</p>` : '<p class="tp-me-soft">未附文字說明。</p>'}${amount !== '' ? `<span class="tp-me-archive-amount">記錄金額 · ${esc(amount)}</span>` : ''}</div></details>`;
+    }).join('') || `<div class="tp-me-archive-empty">${icon('book')}<strong>${archiveError ? '記憶暫時未載入' : archiveQuery || archiveFilter !== 'all' ? '沒有符合的記錄' : '這段對話還沒有記錄'}</strong><p>${archiveError ? '請按重新整理，再次取得已保存的內容。' : archiveQuery || archiveFilter !== 'all' ? '換個關鍵字，或切換到全部記憶。' : '使用論道臺或萬寶閣後，會自動收錄在這裡。'}</p></div>`}</div><div class="tp-me-archive-worldbook"><div><strong>本對話專屬世界書</strong><span class="tp-me-badge">${syncLabel}</span></div><p class="tp-me-worldbook-name">${esc(wb.name || '寫入時建立本對話的記憶世界書')}</p>${wb.lastSyncedAt ? `<small>最近寫入：${esc(date(wb.lastSyncedAt))}</small>` : ''}${wb.error ? `<p class="tp-me-error" role="alert">${esc(wb.error)}</p>` : ''}<div class="tp-me-list-actions">${btn('me-archive-sync', icon('book') + '寫入世界書', 'secondary')}${btn('me-archive-export', icon('download') + '匯出 JSON', 'text-button')}</div><p class="hint">這裡的記錄跟隨目前對話保存。你的物品與能力仍保存在「吾身錄」的個人資料中。</p></div></section>`;
   }
   function memory() {
     const wb = state.worldbook || {}, known = [...SHORT, ...LONG].filter(([key]) => String(profile()[key] || '').trim()).length + rows(profile().customFields).filter(f => f.name && f.value).length;
@@ -75,7 +76,7 @@ export function meApp(ctx) {
         if (typeof api.pocketArchiveState !== 'function') throw Error('請重新整理酒館，載入新版記憶功能。');
         return {value: await api.pocketArchiveState(archiveQuery)};
       }
-      catch (error) { return {error: error?.message || '暫時無法載入論壇與商城記憶，請重新整理。'}; }
+      catch (error) { return {error: error?.message || '暫時無法載入論道臺與商城記憶，請重新整理。'}; }
     })() : null]);
     if (v.disposed || ticket !== epoch) return;
     if (state && state.persona !== next.persona) { draft = null; dirty = false; branch = ''; changedElsewhere = false; archive = null; archiveQuery = ''; archiveQueryDraft = ''; archiveFilter = 'all'; }
@@ -130,10 +131,10 @@ export function meApp(ctx) {
       if (v.disposed) return;
       await refresh();
       if (action === 'worldbook.export') {
-        const book = result.book || result, fileName = (result.name || 'TavernPocket_論壇與商城記憶').replace(/[\\/:*?"<>|]/g, '_') + '.json';
+        const book = result.book || result, fileName = (result.name || 'TavernPocket_論道臺與商城記憶').replace(/[\\/:*?"<>|]/g, '_') + '.json';
         await saveFile(ctx.doc, new ctx.win.Blob([JSON.stringify(book, null, 2)], {type: 'application/json'}), fileName);
-        ctx.notify('論壇與商城記憶已匯出');
-      } else ctx.notify('論壇與商城記憶已寫入世界書');
+        ctx.notify('論道臺與商城記憶已匯出');
+      } else ctx.notify('論道臺與商城記憶已寫入世界書');
     } finally { running = false; if (!v.disposed) draw(); }
   }
   v.refresh = refresh;

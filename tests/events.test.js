@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {parsePhoneEvents, normalizeEvent, stripPhoneBlocks, encodePhoneEvents, PHONE_LIMITS} from '../pocket/events.js';
+import {parsePhoneEvents, normalizeEvent, stripPhoneBlocks, encodePhoneEvents, PHONE_LIMITS, PHONE_VERSION} from '../pocket/events.js';
+import {SPIRIT_MAX} from '../core/currency.js';
 import {PHONE_PROMPT, PHONE_EXAMPLES} from '../pocket/prompt.js';
 import {parseChatReply, plainStory, defaultChat, normalizeChatPreset} from '../core/chat.js';
 
@@ -43,10 +44,11 @@ test('model cannot adjust balances, buy goods, settle cards, or forge payment st
   assert.equal(parse({...base,action:'transfer',amount:2,state:'accepted'}).events.length,0);
 });
 test('accepts only exact finite currency amounts inside native card limits', () => {
-  for(const value of [0,-1,Infinity,NaN,'1.23',1.001,200000.01]) {
+  assert.equal(PHONE_LIMITS.amount,SPIRIT_MAX);
+  for(const value of [0,-1,Infinity,NaN,'1.23',1.001,SPIRIT_MAX+0.01,SPIRIT_MAX+1]) {
     assert.throws(()=>normalizeEvent({...base,action:'transfer',amount:value},actor));
   }
-  for(const value of [0.01,88.5,200000]) assert.equal(normalizeEvent({...base,action:'transfer',amount:value},actor).amount,value);
+  for(const value of [0.01,88.5,200000,200000.01,SPIRIT_MAX]) assert.equal(normalizeEvent({...base,action:'transfer',amount:value},actor).amount,value);
 });
 test('rich media aliases normalize into source importer actions', () => {
   assert.equal(normalizeEvent({...base,kind:'photo'},actor).action,'photo');
@@ -143,7 +145,7 @@ test('every shipped protocol example passes the exact parser', () => {
   assert.ok(count>=19);
 });
 test('versioned worldbook contains exact injected prompt and all examples parse', () => {
-  const book=preset('TavernPocket_Worldbook_v0.9.0.json');
+  const book=preset(`TavernPocket_Worldbook_v${PHONE_VERSION}.json`);
   assert.equal(book.entries['0'].content,PHONE_PROMPT);
   assert.equal(book.entries['0'].constant,true);
   assert.equal(book.entries['0'].disable,false);
@@ -157,12 +159,12 @@ test('versioned worldbook contains exact injected prompt and all examples parse'
   assert.deepEqual(preset('worldbook-tavern-pocket.json'),book);
 });
 test('versioned display regex beautifies safe user commands without hiding JSON or status', () => {
-  const script=preset('TavernPocket_Regex_v0.9.0.json');
+  const script=preset(`TavernPocket_Regex_v${PHONE_VERSION}.json`);
   assert.equal(script.markdownOnly,true);
   assert.equal(script.promptOnly,false);
   assert.deepEqual(script.placement,[1,2]);
   assert.equal(script.disabled,false);
-  assert.match(script.scriptName,/0\.9\.0/);
+  assert.ok(script.scriptName.includes(PHONE_VERSION));
   const parts=/^\/(.*)\/([gimsuy]*)$/.exec(script.findRegex);
   const regex=new RegExp(parts[1],parts[2]);
   const text='她打開手機。<tts>保留語音</tts><img>保留照片</img>[CSB21_PANEL]保留狀態[/CSB21_PANEL]'+encodePhoneEvents(base,actor)+'<phone>{unfinished';

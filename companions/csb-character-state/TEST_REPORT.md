@@ -1,3 +1,13 @@
+# CSB 1.1.0 角色信息驗證
+
+- Node：56 個測試通過（原資料引擎 34、行為 6、橋接 7、新持久保存 9）。
+- Chromium：18 個實際瀏覽器情境通過，無 pageerror；包含 320、390、768、1280 像素，表單新增欄位、修改與重載、離場返回、非法更新、正文內快照及正文顯示開關。
+- 新增關鍵回歸：正在輸入角色身份時發生 USER_MESSAGE_RENDERED／MESSAGE_UPDATED，輸入與編輯器均保留；儲存後空更新和離場仍保留身份。
+- 與現有《玄衡界》2.1 初始備份相容：54 人、69 欄驗證及匯入通過。250 則模擬更新後，100 次相同資料讀取共用一次重播結果，具體耗時記錄於 tests/artifacts/persistence-performance-v11.json。
+- 未測試使用者實際 Android 裝置、真實 SillyTavern 帳號或各種第三方插件組合。模型對正文語義的理解不屬於程式可確定保證的部分。
+
+以下保留舊版驗證紀錄供追溯。
+
 # CSB 1.0.1 整合驗證
 
 本次新增版本化讀取介面、變更事件、可重複初始化、持有者檢查與訊息格式化介面。Node 測試 47 項通過（含新增橋接生命週期測試）。與 Tavern Pocket 的瀏覽器驗證使用實際插件與 IndexedDB、模擬酒館 API／模型；結果見倉庫根目錄 `docs/VALIDATION-GITHUB-0.10.0.json` 與 `tests/artifacts/browser-csb-report.json`。

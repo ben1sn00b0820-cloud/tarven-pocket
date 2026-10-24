@@ -29,7 +29,7 @@ const message=(id,text,extra={})=>({id,from:'Alice',kind:'text',text,at:Date.now
 test('source-origin messages do not loop; local settlement mirrors once without changing money',async()=>{
  const f=fixture();f.threads.push(thread());let walletCalls=0;f.backend.wallet=()=>{walletCalls++;throw Error('must not touch wallet');};
  try{await f.bridge.baseline();const m=message('paid','晚餐',{kind:'transfer',amount:'35.00',paymentId:'source:paid',state:'sent',source:{scope:sourceScope(f.c),id:'paid'}});f.threads[0].messages.push(m);await f.bridge.sync();assert.equal(f.c.chat.length,0);
- m.state='accepted';m.openedBy='me';f.threads[0].messages.push(message('notice','收下了{对方}的转账',{from:'me',kind:'notice',target:'Alice',paymentId:'notice:take:source:paid'}));await f.bridge.sync();await f.bridge.sync();assert.equal(f.c.chat.length,1);assert.match(f.c.chat[0].mes,/交易狀態.*使用者甲/s);assert.match(f.c.chat[0].mes,/35\.00/);assert.equal(walletCalls,0);
+ m.state='accepted';m.openedBy='me';f.threads[0].messages.push(message('notice','收下了{对方}的转账',{from:'me',kind:'notice',target:'Alice',paymentId:'notice:take:source:paid'}));await f.bridge.sync();await f.bridge.sync();assert.equal(f.c.chat.length,1);assert.match(f.c.chat[0].mes,/交易狀態.*使用者甲/s);assert.match(f.c.chat[0].mes,/35 枚下品靈石/);assert.equal(walletCalls,0);
  }finally{f.bridge.dispose();}
 });
 

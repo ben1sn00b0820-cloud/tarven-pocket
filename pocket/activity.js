@@ -1,3 +1,4 @@
+import {formatSpiritAmount} from '../core/currency.js';
 import {sourceScope} from './source-sync.js';
 import {renderActivityCards} from './cards.js';
 import {isQuietActivity, archiveState, recallActivity, exportArchiveWorldbook, mergeArchiveWorldbook} from './activity-memory.js';
@@ -12,7 +13,7 @@ const paid = new Set(['transfer', 'redpacket', 'gift']);
 const staleError = () => Object.assign(Error('對話已切換，手機紀錄沒有寫入其他對話。'), {code: 'STALE'});
 const userName = c => c.name1 || '我';
 const person = (name, c) => name === 'me' || name === '{{user}}' ? userName(c) : clip(name, 80);
-const labels = {wechat: '微信', instagram: 'Instagram', forum: '論壇', shop: '萬寶商城'};
+const labels = {wechat: '千里傳音', instagram: '浮光錄', forum: '論道臺', shop: '萬寶閣'};
 const actions = {message: '訊息', photo: '照片', voice: '語音', post: '貼文', story: '限時動態', comment: '回覆', dm: '私訊', like: '按讚', transfer: '轉帳', redpacket: '紅包', gift: '禮物', payment_status: '交易狀態', purchase: '購買', catalogue: '商品目錄'};
 const stateLabels = {sent: '待領取', accepted: '已收下', opened: '已領取', returned: '已退回', purchased: '已購買'};
 
@@ -33,7 +34,7 @@ function cleanEvent(value, c) {
 
 export function activityText(event) {
   const head = `[${labels[event.app] || event.app} · ${actions[event.action] || '動態'}] ${event.from}${event.group ? ` → 群組「${event.group}」` : event.to ? ` → ${event.to}` : ''}`;
-  const detail = [event.title, event.itemName, event.amount !== undefined ? `¥${Number(event.amount).toFixed(2)}` : '', stateLabels[event.state] || '', event.text, event.photoId || event.image ? '（已附圖片）' : ''].filter(Boolean).join(' · ');
+  const detail = [event.title, event.itemName, event.amount !== undefined ? formatSpiritAmount(event.amount) : '', stateLabels[event.state] || '', event.text, event.photoId || event.image ? '（已附圖片）' : ''].filter(Boolean).join(' · ');
   return head + (detail ? '\n' + detail : '') + (['post', 'story'].includes(event.action) ? `\n紀錄 ID：${event.postId || event.id}` : '');
 }
 

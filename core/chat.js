@@ -6,10 +6,12 @@
 import {normalizeWallet, defaultWallet, PREMIUM, guessEmoji, yuan} from './wallet.js';
 import {parseDialogue, isPlaceholderRole} from './protocol.js';
 import {money} from './chats.js';
+import {parseSpiritText, formatSpiritAmount, SPIRIT_CURRENCY_RULE} from './currency.js';
 import {safePhotoUrl} from './photo-url.js';
 import {stripStatusPanels} from '../pocket/status.js';
 import {callSummary} from './call.js';
 import {languageName} from './languages.js';
+import {normalizeDeletedContacts, deletedContactNames} from './contact-book.js';
 
 export const CHAT_LIMITS = Object.freeze({contacts: 200, persona: 4000, story: 40, history: 200});
 
@@ -19,7 +21,7 @@ export const DEFAULT_CHAT_ENTRIES = Object.freeze([
   {id: 'style', title: '短信口吻', text: '你在一个手机聊天软件里，以联系人本人的身份回复{{用户}}。像真的在发手机消息：口语，可以用语气词和颜文字，不写动作、旁白和心理描写，不加引号。发几条、每条多长，按这个人的性格、说话习惯和当下的心情来：话少的人可能只回一个字、一个表情；话多的人会连着发好几条；习惯打长段的人一条就是一大段；激动、委屈、兴奋或者有很多话想说的时候，可以一口气发很多条。不要每次都发差不多的条数和长度。', use: ['dm', 'group']},
   {id: 'persona', title: '守住人设', text: '严格按每个联系人的人设、和{{用户}}的关系、说话习惯来回复。最近的剧情只作背景：可以提到发生过的事，但不要复述剧情，也不要替{{用户}}说话。', use: ['dm', 'group']},
   {id: 'group', title: '群聊', text: '群聊里谁接话、几个人接话，看话题和各自性格：冷场时可能只有一个人回，热闹的话题可以好几个人抢着说；每个人发多少也按各自的说话习惯。成员之间也可以互相回应、吐槽。', use: ['group']},
-  {id: 'features', title: '手机功能', text: '你们是在手机上聊天，可以像真人一样用手机功能，但要有理由、看场合，大多数时候还是发文字：\n- 照片：分享正在看的东西、自拍、吃的、窗外的景色，或者{{用户}}问起时。已知真实图片地址时写成「名字：[图片 https://已知地址/照片.png] 照片描述」或「名字：[照片 /user/images/已知照片.png] 照片描述」，只用上下文确实存在的地址，不编造链接。没有真实地址时写成「名字：[图片] 一句话描述照片里拍到的画面」；手机检测到角色新发来的照片后，会自动调用用户已配置的 NovelAI API 生成实图并补回同一条消息，不需用户逐张点击生成；等待或出错状态由手机处理，不要声称尚未生成的图片已经完成。\n- 位置：约见面、说自己在哪、让{{用户}}来找时。写成「名字：[位置] 地点」。\n- 红包：节日、道谢、道歉、哄人、庆祝、开玩笑时，金额和身份、关系相称。写成「名字：[红包 ¥金额] 祝福语」。\n- 转账：还钱、付账、给零花钱这类真的涉及钱的事，只在私聊里用。写成「名字：[转账 ¥金额] 备注」。\n- 拍一拍：想引起注意、撒娇、打招呼，或者{{用户}}很久没回时。写成「名字：[拍一拍]」。\n- {{用户}}发来的红包和转账，收不收按人设来：客气的人可能先推辞，嘴硬的人嘴上说不要，正直的人会退还不该收的钱。收下红包写「名字：[领取红包]」，收下转账写「名字：[收款]」，退还转账写「名字：[退还]」，通常再跟一句话。\n- {{用户}}撤回消息、拍了拍谁、掷骰子、发来照片或位置时，可以自然地接话。\n一轮回复里最多用一次这些功能，不要连着几轮都发红包或照片。', use: ['dm', 'group']},
+  {id: 'features', title: '手机功能', text: '你们是在手机上聊天，可以像真人一样用手机功能，但要有理由、看场合，大多数时候还是发文字：\n- 照片：分享正在看的东西、自拍、吃的、窗外的景色，或者{{用户}}问起时。已知真实图片地址时写成「名字：[图片 https://已知地址/照片.png] 照片描述」或「名字：[照片 /user/images/已知照片.png] 照片描述」，只用上下文确实存在的地址，不编造链接。没有真实地址时写成「名字：[图片] 一句话描述照片里拍到的画面」；手机检测到角色新发来的照片后，会自动调用用户已配置的 NovelAI API 生成实图并补回同一条消息，不需用户逐张点击生成；等待或出错状态由手机处理，不要声称尚未生成的图片已经完成。\n- 位置：约见面、说自己在哪、让{{用户}}来找时。写成「名字：[位置] 地点」。\n- 红包：节日、道谢、道歉、哄人、庆祝、开玩笑时，金额和身份、关系相称。写成「名字：[红包 金额 下品靈石] 祝福语」。\n- 转账：还钱、付账、给零花钱这类真的涉及钱的事，只在私聊里用。写成「名字：[转账 金额 下品靈石] 备注」。\n- 拍一拍：想引起注意、撒娇、打招呼，或者{{用户}}很久没回时。写成「名字：[拍一拍]」。\n- {{用户}}发来的红包和转账，收不收按人设来：客气的人可能先推辞，嘴硬的人嘴上说不要，正直的人会退还不该收的钱。收下红包写「名字：[领取红包]」，收下转账写「名字：[收款]」，退还转账写「名字：[退还]」，通常再跟一句话。\n- {{用户}}撤回消息、拍了拍谁、掷骰子、发来照片或位置时，可以自然地接话。\n一轮回复里最多用一次这些功能，不要连着几轮都发红包或照片。', use: ['dm', 'group']},
   {id: 'voice', title: '语音消息', text: '情绪强烈、不方便打字，或者想让对方听到声音时，可以发语音消息，偶尔发就好。语音消息整条写成：{{语音格式}}\n能发语音的人和各自的语音语言：{{可发语音}}', use: ['dm', 'group']},
   {id: 'post', title: '顺手发朋友圈', use: ['dm', 'group'], text: '聊天里发生了让人有感触的事（开心、委屈、被逗笑、吵了架、想念对方），很偶尔可以顺手发一条朋友圈，大多数时候不发。朋友圈是给所有朋友看的，可以含蓄、意有所指，不要直接复述聊天内容。'},
   {id: 'm-style', title: '朋友圈口吻', use: ['moments'], text: '你在替联系人发朋友圈。像真人发动态：一两句话到一小段，写日常、心情、吐槽、见闻，或者对最近发生的事的感受。口语、自然，可以用表情和颜文字，不写旁白、动作描写和心理描写。每个人发的内容和语气都要符合自己的人设和说话习惯，彼此不要雷同。'},
@@ -55,7 +57,7 @@ export function normalizeVoiceText(v = {}) {
 }
 
 export function defaultChat() {
-  return {presets: [structuredClone(DEFAULT_PRESET)], activePreset: 'default', contacts: [], voiceText: {...DEFAULT_VOICE_TEXT}, profile: normalizeProfile(), starred: [], avatars: {}, partition: 'none', wallet: defaultWallet()};
+  return {presets: [structuredClone(DEFAULT_PRESET)], activePreset: 'default', contacts: [], deletedContacts: [], voiceText: {...DEFAULT_VOICE_TEXT}, profile: normalizeProfile(), starred: [], avatars: {}, partition: 'none', wallet: defaultWallet()};
 }
 
 const text = (value, max) => String(value ?? '').slice(0, max);
@@ -162,7 +164,7 @@ export function normalizeChat(value) {
   const presets = (Array.isArray(value.presets) && value.presets.length ? value.presets : base.presets).map(normalizeChatPreset);
   const contacts = (Array.isArray(value.contacts) ? value.contacts : []).slice(0, CHAT_LIMITS.contacts).map(normalizeContact).filter(c => c.name);
   const starred = [...new Set((Array.isArray(value.starred) ? value.starred : []).map(n => text(n, 40).trim()).filter(Boolean))].slice(0, CHAT_LIMITS.contacts);
-  return {presets, activePreset: presets.some(p => p.id === value.activePreset) ? value.activePreset : presets[0].id, contacts, voiceText: normalizeVoiceText(value.voiceText), profile: normalizeProfile(value.profile), wallet: normalizeWallet(value.wallet), starred, avatars: normalizeAvatars(value.avatars), partition: value.partition === 'card' ? 'card' : 'none'};
+  return {presets, activePreset: presets.some(p => p.id === value.activePreset) ? value.activePreset : presets[0].id, contacts, deletedContacts: normalizeDeletedContacts(value.deletedContacts), voiceText: normalizeVoiceText(value.voiceText), profile: normalizeProfile(value.profile), wallet: normalizeWallet(value.wallet), starred, avatars: normalizeAvatars(value.avatars), partition: value.partition === 'card' ? 'card' : 'none'};
 }
 
 export function validateChatPreset(p) {
@@ -194,8 +196,10 @@ export const activeSpace = (settings, space) => settings.chat?.partition === 'ca
 export function chatContacts(settings, space = null) {
   // A card's contacts: its own character(s), the roles that have spoken in its story, and contacts added under it.
   const here = r => !space?.key || (space.members || []).includes(r.name) || (Array.isArray(r.cards) && r.cards.includes(space.key));
-  const roles = settings.routes.filter(r => !isPlaceholderRole(r.name) && here(r)).map(r => ({name: r.name, source: 'role', voice: !!r.voice, engine: r.voice ? r.engine : 'none', language: r.language || settings.general.defaultLanguage, persona: ''}));
-  const manual = settings.chat.contacts.filter(c => !roles.some(r => r.name === c.name) && inSpace(c, space)).map(c => ({name: c.name, source: 'manual', id: c.id, voice: false, engine: 'none', language: '', persona: c.persona}));
+  const removed = deletedContactNames(settings.chat);
+  const roles = settings.routes.filter(r => !removed.has(r.name) && !isPlaceholderRole(r.name) && here(r)).map(r => ({name: r.name, source: 'role', voice: !!r.voice, engine: r.voice ? r.engine : 'none', language: r.language || settings.general.defaultLanguage, persona: ''}));
+  const roleNames = new Set(roles.map(role => role.name));
+  const manual = settings.chat.contacts.filter(c => !removed.has(c.name) && !roleNames.has(c.name) && inSpace(c, space)).map(c => ({name: c.name, source: 'manual', id: c.id, voice: false, engine: 'none', language: '', persona: c.persona}));
   return [...roles, ...manual];
 }
 
@@ -213,9 +217,9 @@ export function messageLine(m, user) {
     case 'system': return '';
     case 'voice': return `${who}：${quote}[语音] ${m.translation || m.text}`;
     case 'photo': return `${who}：[图片]${m.text ? ' ' + m.text : ''}`;
-    case 'redpacket': return `${who}：[红包 ¥${m.amount}] ${m.text || DEFAULT_BLESSING}（${m.state === 'opened' ? nameOf(m.openedBy, user) + '已领取' : '还没领取'}）`;
-    case 'transfer': return `${who}：[转账 ¥${m.amount}]${m.text ? ' ' + m.text : ''}（${TRANSFER_STATE[m.state] || '待收款'}）`;
-    case 'gift': return `${who}：[礼物 ${m.gift?.name || ''}${m.gift?.price ? ' ¥' + yuan(m.gift.price) : ''}]${m.text ? ' ' + m.text : ''}（${m.state === 'accepted' ? '已收下' : m.state === 'returned' ? '被退还了' : '还没收下'}）`;
+    case 'redpacket': return `${who}：[红包 ${formatSpiritAmount(m.amount)}] ${m.text || DEFAULT_BLESSING}（${m.state === 'opened' ? nameOf(m.openedBy, user) + '已领取' : '还没领取'}）`;
+    case 'transfer': return `${who}：[转账 ${formatSpiritAmount(m.amount)}]${m.text ? ' ' + m.text : ''}（${TRANSFER_STATE[m.state] || '待收款'}）`;
+    case 'gift': return `${who}：[礼物 ${m.gift?.name || ''}${m.gift?.price ? ' ' + formatSpiritAmount(m.gift.price) : ''}]${m.text ? ' ' + m.text : ''}（${m.state === 'accepted' ? '已收下' : m.state === 'returned' ? '被退还了' : '还没收下'}）`;
     case 'location': return `${who}：[位置] ${m.text}${m.detail ? '（' + m.detail + '）' : ''}`;
     case 'pat': return `（${patText(m, user)}）`;
     case 'dice': return `${who}：[骰子] ${m.text} 点`;
@@ -256,7 +260,7 @@ export function buildChatRequest({preset, thread, members, story = [], user = '�
       `只输出新消息，每条消息单独一行，写成「名字：消息内容」。名字只能是：${names}。`,
       `不要写${user}的消息，不要写时间、编号、引号或任何解释。`,
       speakers.length ? `语音消息的整行写成「名字：${voiceFormat}」，标签里的角色填同一个名字；标签里的原文（{文本}）是念出来的话，用这个人的语音语言写（${speakers.map(m => `${m.name}：${languageName(m.language || 'zh')}`).join('，')}），引号里的{译文}写中文。` : '',
-      `需要时也可以像真人一样用手机功能，每种单独一行，偶尔用，别每轮都用：「名字：[图片] 一句话描述拍的照片」「名字：[位置] 地点」「名字：[红包 ¥金额] 祝福语」「名字：[转账 ¥金额] 备注」「名字：[拍一拍]」（拍一拍${user}）；很偶尔（节日、纪念日、道歉、想对${user}好的时候）可以送${user}礼物：「名字：[礼物 物品名] 附言」。`,
+      `需要时也可以像真人一样用手机功能，每种单独一行，偶尔用，别每轮都用：「名字：[图片] 一句话描述拍的照片」「名字：[位置] 地点」「名字：[红包 金额 下品靈石] 祝福语」「名字：[转账 金额 下品靈石] 备注」「名字：[拍一拍]」（拍一拍${user}）；很偶尔（节日、纪念日、道歉、想对${user}好的时候）可以送${user}礼物：「名字：[礼物 物品名] 附言」。`,
       '照片已有真实图片地址时，格式为「名字：[图片 https://已知地址/照片.png] 描述」或「名字：[照片 /user/images/已知照片.png] 描述」。只引用上下文确实存在的地址；不能编造链接。没有地址就使用 [图片] 清楚描述画面，手机会自动使用用户已配置的 NovelAI API 生成图片并填回同一条消息；未生成完成时不要声称已获得真实图片。',
       `${user}发来红包或转账时，收下红包单独写一行「名字：[领取红包]」，收下转账写「名字：[收款]」，退还转账写「名字：[退还]」；${user}送来礼物时，收下写「名字：[收下礼物]」，不收写「名字：[退还礼物]」；收不收按人设决定。`,
       dialing ? `很偶尔可以直接给${user}打语音电话：这一轮最后单独一行写成「名字：[打电话] 为什么打」，大多数回复都不要打。` : '',
@@ -268,13 +272,17 @@ export function buildChatRequest({preset, thread, members, story = [], user = '�
     : last.from === 'me' ? `（现在轮到${group ? '群里的成员' : partner}回复${user}。）`
     : `（${group ? '群里' : partner}可以继续说，或者换个话题。）`;
   const transcript = history.length ? `【${group ? thread.name + '（群聊）' : '和' + partner}的聊天记录】\n${history.map(m => messageLine(m, user)).filter(Boolean).join('\n')}\n\n` : '';
-  return [{role: 'system', content: system}, {role: 'user', content: transcript + turn}];
+  return [{role: 'system', content: system + '\n' + SPIRIT_CURRENCY_RULE}, {role: 'user', content: transcript + turn}];
 }
 
 const NAME_LINE = /^\s*(?:\*\*)?[[【]?([^\]】:：\n]{1,40}?)[\]】]?(?:\*\*)?\s*[:：]\s*(.*)$/;
 const unquote = s => s.trim().replace(/^[「“"『](.*)[」”"』]$/s, '$1').trim();
-const SPECIAL = /^\s*[[【]\s*(收下礼物|退还礼物|礼物|送礼|图片|照片|位置|定位|红包|转账|拍一拍|领取红包|领取|收下|收款|退还|退回|朋友圈|发朋友圈|动态|打电话|语音通话|来电)\s*([^\]】]*)[\]】]\s*(.*)$/;
-const LUCKY = ['6.66', '8.88', '5.20', '13.14', '16.80', '1.88'];
+const SPECIAL = /^\s*[[【]\s*(收下禮物|退還禮物|禮物|送禮|圖片|收下礼物|退还礼物|礼物|送礼|图片|照片|位置|定位|紅包|轉帳|轉賬|红包|转账|拍一拍|領取紅包|領取|退還|领取红包|领取|收下|收款|退还|退回|朋友圈|发朋友圈|动态|打电话|语音通话|来电)\s*([^\]】]*)[\]】]\s*(.*)$/;
+const LUCKY = ['6.00', '8.00', '52.00', '1314.00', '168.00', '18.00'];
+const featureAmount = value => {
+  if (/靈石|灵石|下品|中品|極品|极品/.test(value)) { try { return parseSpiritText(value.trim(), {zero: false}).toFixed(2); } catch { return null; } }
+  return money(value);
+};
 /**
  * A phone-feature line (「[红包 ¥8.88] 祝福」 and the like) as a message; {kind:'claim', action} for taking or returning
  * the user's red packet or transfer. null when the line is ordinary text.
@@ -282,7 +290,7 @@ const LUCKY = ['6.66', '8.88', '5.20', '13.14', '16.80', '1.88'];
 function special(from, content, {names, user}) {
   const m = content.match(SPECIAL);
   if (!m) return null;
-  const [, what, arg, rest] = m, text = unquote(rest || '').replace(/<[^>]+>/g, '');
+  const [, rawWhat, arg, rest] = m, what = ({'紅包':'红包','轉帳':'转账','轉賬':'转账','領取紅包':'领取红包','領取':'领取','退還':'退还','收下禮物':'收下礼物','退還禮物':'退还礼物','禮物':'礼物','送禮':'送礼','圖片':'图片'})[rawWhat] || rawWhat, text = unquote(rest || '').replace(/<[^>]+>/g, '');
   switch (what) {
     // A 朋友圈 post made while chatting: it goes to 朋友圈, not into the chat.
     case '朋友圈': case '发朋友圈': case '动态': { const said = (text || arg.trim()).slice(0, 2000); return said ? {from, kind: 'moment', text: said} : null; }
@@ -294,8 +302,11 @@ function special(from, content, {names, user}) {
       return caption || image ? {from, kind: 'photo', text: caption, ...(image ? {image} : {})} : null;
     }
     case '位置': case '定位': { const place = arg.trim() || text; return place ? {from, kind: 'location', text: place.slice(0, 100)} : null; }
-    case '红包': return {from, kind: 'redpacket', amount: money(arg) || LUCKY[[...from + text].length % LUCKY.length], text: text.slice(0, 40) || DEFAULT_BLESSING, state: 'sent'};
-    case '转账': { const amount = money(arg); return amount ? {from, kind: 'transfer', amount, text: text.slice(0, 40), state: 'sent'} : null; }
+    case '红包': {
+      const amount = arg.trim() ? featureAmount(arg) : LUCKY[[...from + text].length % LUCKY.length];
+      return amount ? {from, kind: 'redpacket', amount, text: text.slice(0, 40) || DEFAULT_BLESSING, state: 'sent'} : null;
+    }
+    case '转账': { const amount = featureAmount(arg); return amount ? {from, kind: 'transfer', amount, text: text.slice(0, 40), state: 'sent'} : null; }
     case '拍一拍': { const target = arg.trim(); return {from, kind: 'pat', target: target && target !== from && target !== user && names.includes(target) ? target : 'me'}; }
     // A present for the user (「[礼物 花束] 附言」); taking or returning the user's present.
     case '礼物': case '送礼': { const name = (arg.trim() || text).slice(0, 20).trim(); return name ? {from, kind: 'gift', gift: {name, emoji: guessEmoji(name), price: 0}, text: arg.trim() ? text.slice(0, 60) : '', state: 'sent'} : null; }

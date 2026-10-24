@@ -5,20 +5,20 @@ import {saveFile} from '../download.js';
 export async function openImageSettings(ctx) {
   const {api}=ctx, scope=(await api.pocketState()).scope;
   let state=await api.pocketImageState(), draft=null, running=false, note='';
-  const d=ctx.dialog('生圖預設與微信模型','');
+  const d=ctx.dialog('生圖預設與千里傳音模型','');
   d.body.classList.add('pocket-image-settings');
   const models=()=>[['','沿用目前設定'],...state.catalogue.models.map(id=>[id,state.catalogue.modelNames[id]||id])];
   async function valid(){if(!d.live)return false;if((await api.pocketState()).scope!==scope){d.close();throw Error('對話已切換，請重新開啟生圖設定。');}return d.live;}
   function render(){
     if(!d.live)return;
     const p=draft, presets=state.presets||[];
-    d.body.innerHTML=`<p class="hint">管理 NovelAI 的畫師串、正面與負面提示詞。微信可獨立選擇模型與預設；API Key 沿用「引擎 → NovelAI」。</p>
+    d.body.innerHTML=`<p class="hint">管理 NovelAI 的畫師串、正面與負面提示詞。千里傳音可獨立選擇模型與預設；API Key 沿用「引擎 → NovelAI」。</p>
       ${note?`<p class="pocket-preset-note" role="status">${esc(note)}</p>`:''}
-      <div class="pocket-settings-card"><h3>微信自動生圖</h3>
-        ${field('微信使用的預設',select('wechat-preset',state.wechat.presetId,[['','沿用繪圖目前畫風'],...presets.map(x=>[x.id,x.name])]))}
-        ${field('微信使用的模型',select('wechat-model',state.wechat.model,[['','依預設／繪圖目前模型'],...models().slice(1)]))}
-        <p class="hint">指定的微信模型優先於預設模型。只影響之後生成的圖片。</p>
-        ${btn('wechat-image-save','儲存微信生圖設定','primary')}
+      <div class="pocket-settings-card"><h3>千里傳音自動生圖</h3>
+        ${field('千里傳音使用的預設',select('wechat-preset',state.wechat.presetId,[['','沿用繪圖目前畫風'],...presets.map(x=>[x.id,x.name])]))}
+        ${field('千里傳音使用的模型',select('wechat-model',state.wechat.model,[['','依預設／繪圖目前模型'],...models().slice(1)]))}
+        <p class="hint">指定的千里傳音模型優先於預設模型。只影響之後生成的圖片。</p>
+        ${btn('wechat-image-save','儲存千里傳音生圖設定','primary')}
       </div>
       <div class="pocket-preset-toolbar">${btn('image-preset-new','新增預設','secondary')}<label class="secondary file-button">匯入 JSON<input type="file" data-image-preset-import accept=".json,application/json" aria-label="匯入生圖預設"></label>${btn('image-preset-export-all','匯出全部','secondary')}</div>
       <div class="pocket-preset-list">${presets.map(x=>`<button type="button" class="list-row" data-action="image-preset-pick" data-id="${esc(x.id)}" aria-pressed="${p?.id===x.id}"><span><strong>${esc(x.name)}</strong><small>${esc(state.catalogue.modelNames[x.model]||x.model||'沿用繪圖模型')}</small></span><span>編輯</span></button>`).join('')||'<p class="hint">尚無預設，新增或匯入一份開始。</p>'}</div>
@@ -44,7 +44,7 @@ export async function openImageSettings(ctx) {
   d.body.addEventListener('click',event=>{const el=event.target.closest('[data-action]');if(!el||running)return;event.preventDefault();const action=el.dataset.action;
     if(action==='image-preset-new'){draft={name:'新生圖預設',artist:'',positive:'',negative:'',model:'',params:{}};note='';render();return;}
     if(action==='image-preset-pick'){draft=structuredClone(state.presets.find(p=>p.id===el.dataset.id));note='';render();return;}
-    if(action==='wechat-image-save'){const payload={presetId:read('wechat-preset'),model:read('wechat-model')};perform(async()=>{await api.pocketAction('wechatImage.save',payload);note='微信生圖設定已儲存。';});}
+    if(action==='wechat-image-save'){const payload={presetId:read('wechat-preset'),model:read('wechat-model')};perform(async()=>{await api.pocketAction('wechatImage.save',payload);note='千里傳音生圖設定已儲存。';});}
     else if(action==='image-preset-save'){const payload=readDraft();perform(async()=>{const result=await api.pocketAction('imagePreset.save',payload);draft=result.presets?.find(p=>p.id===(result.savedId||result.affectedId||payload.id))||null;note='預設已儲存。';});}
     else if(action==='image-preset-export-all')perform(()=>download());
     else if(action==='image-preset-export')perform(()=>download(draft.id));

@@ -18,10 +18,12 @@ import {callScreen} from './call.js';
 import {installMotion} from './motion.js';
 import {instagramApp, diaryApp, storyshopApp, pocketsettingsApp} from '../pocket/apps.js';
 import {meApp} from '../pocket/me-ui.js';
+import {characterInfoApp} from '../pocket/character-info.js';
+import {createViewRefreshQueue} from '../core/view-refresh.js';
 
 // App factories, keyed by the ids in apps.js.
-const FACTORIES = {me: meApp, roles: rolesApp, engines: enginesApp, presets: presetsApp, library: libraryApp, gallery: galleryApp, notes: notesApp, listen: listenApp, settings: settingsApp, draw: drawApp, chat: chatApp, forum: forumApp, peek: peekApp, instagram: instagramApp, diary: diaryApp, storyshop: storyshopApp, pocketsettings: pocketsettingsApp};
-const POCKET_APPS = new Set(['me', 'instagram', 'diary', 'storyshop', 'pocketsettings']);
+const FACTORIES = {characterinfo: characterInfoApp, me: meApp, roles: rolesApp, engines: enginesApp, presets: presetsApp, library: libraryApp, gallery: galleryApp, notes: notesApp, listen: listenApp, settings: settingsApp, draw: drawApp, chat: chatApp, forum: forumApp, peek: peekApp, instagram: instagramApp, diary: diaryApp, storyshop: storyshopApp, pocketsettings: pocketsettingsApp};
+const POCKET_APPS = new Set(['characterinfo', 'me', 'instagram', 'diary', 'storyshop', 'pocketsettings']);
 const ACTIVE_PHASES = ['playing', 'paused', 'generating', 'waiting'];
 
 // Network and battery in the status bar come from the user's own device (where the browser tells them).
@@ -50,10 +52,16 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   let panelVisible = true, active = null, locked = false, sheet = null, disposed = false;
   let lastPhase = '', preferences = null, appearanceKey = '', appearanceEpoch = 0, toastTimer, animation, openTimer, unread = 0, unreadTimer, fresh = 0, freshTimer;
   let playback = api.status();
+  const refreshQueue = createViewRefreshQueue({
+    visible: name => !disposed && panelVisible && !doc.hidden && !locked && active === name,
+    run: (name, task) => { const view = views.get(name); return task.kind === 'chat' && view?.onChat ? view.onChat(task.event || {}) : view?.refresh?.(); },
+    setTimer: (fn, ms) => win.setTimeout(fn, ms), clearTimer: id => win.clearTimeout(id), onError: error => fail(error),
+  });
+  const refreshView = (name, kind = 'refresh', event = {}) => refreshQueue.request(name, {kind, event});
 
   mount.innerHTML = `
     <div class="stage">
-      <div class="stage-bar" title="按住這裡拖動手機，雙擊放回原處"><span>ST-iPhonie</span><div class="stage-actions"><button class="size-button" data-system="size" aria-label="換手機大小" hidden></button><button class="info" data-system="help" aria-label="手機介面說明">i</button><button class="close" data-system="close" aria-label="返回酒館">${icon('close')}</button></div></div>
+      <div class="stage-bar" title="按住這裡拖動手機，雙擊放回原處"><span>傳音玉符</span><div class="stage-actions"><button class="size-button" data-system="size" aria-label="換手機大小" hidden></button><button class="info" data-system="help" aria-label="手機介面說明">i</button><button class="close" data-system="close" aria-label="返回酒館">${icon('close')}</button></div></div>
       <div class="device">
         <button class="power-key" data-system="power" aria-label="鎖屏或喚醒"></button>
         <div class="screen" data-view="home">
@@ -211,7 +219,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     active = name;
     let v = views.get(name);
     if (!v) { v = FACTORIES[name](ctx); views.set(name, v); content.append(v.root); }
-    else run(() => v.refresh());
+    else refreshView(name);
     for (const [id, view] of views) view.root.hidden = id !== name;
     home.hidden = true;
     frame.hidden = false;
@@ -222,6 +230,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     syncInert();
     $('.app-nav [data-system=back]').focus({preventScroll: true});
     if (roleId && v.edit) v.edit(roleId);
+    refreshQueue.resume();
     v.onPlayback?.(playback);
   }
   function showHome() {
@@ -263,6 +272,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     locked = false;
     lockscreen.hidden = true;
     syncInert();
+    refreshQueue.resume();
     if (!active) homeIn();
     if (active) $('.app-nav [data-system=back]').focus({preventScroll: true});
     else home.querySelector('.app-icon')?.focus({preventScroll: true});
@@ -276,6 +286,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
 
   // ---------- Clock and theme ----------
   function clock() {
+    if (disposed || !panelVisible || doc.hidden) return;
     const now = new Date();
     const time = now.toLocaleTimeString('zh-TW', {hour: '2-digit', minute: '2-digit', hour12: false});
     const date = now.toLocaleDateString('zh-TW', {month: 'long', day: 'numeric', weekday: 'long'});
@@ -286,6 +297,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     const mode = preferences?.theme || api.getState().theme;
     doc.documentElement.dataset.theme = mode === 'system' ? (media.matches ? 'dark' : 'light') : mode;
     doc.documentElement.dataset.skin = preferences?.skin || 'sky';
+    doc.documentElement.dataset.performance = api.getState().general.fastMode !== false ? 'fast' : 'balanced';
   }
   function theme() {
     applyThemeMode();
@@ -313,6 +325,16 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     $('.phone-dock').innerHTML = HOME.dock.map(appIcon).join('');
     clock();
     renderWidgets();
+  }
+  function renderBadges() {
+    for (const button of mount.querySelectorAll('.app-icon[data-app="chat"]')) {
+      button.querySelector('.app-badge')?.remove();
+      button.setAttribute('aria-label', APPS.chat.name + (unread ? `，${unread} 條未讀` : fresh ? '，有新動態' : ''));
+      if (unread || fresh) {
+        const badge = doc.createElement('span'); badge.className = 'badge app-badge' + (unread ? '' : ' dot');
+        badge.textContent = unread ? (unread > 99 ? '99+' : String(unread)) : ''; button.append(badge);
+      }
+    }
   }
   function renderWidgets() {
     const playing = $('[data-widget=playing]'), cast = $('[data-widget=cast]');
@@ -366,14 +388,14 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   }
 
   /** 动态壁纸 on or off (settings); the CSS also stops it for reduced motion and while an app is open. */
-  function wallMotion() { screen.dataset.wallMotion = api.getState().general.wallpaperMotion === false ? 'off' : 'on'; }
+  function wallMotion() { const general = api.getState().general; screen.dataset.wallMotion = general.wallpaperMotion === false || general.fastMode !== false ? 'off' : 'on'; }
 
   // ---------- Playback ----------
   function animate() {
     win.cancelAnimationFrame(animation);
     for (const bar of mount.querySelectorAll('.wave i,.visualizer i')) bar.style.removeProperty('transform');
     for (const el of mount.querySelectorAll('.portrait')) el.style.removeProperty('--level');
-    if (disposed || !panelVisible || doc.hidden || motion.matches || playback.phase !== 'playing' || !api.getState().general.waveformEnabled) return;
+    if (disposed || !panelVisible || doc.hidden || motion.matches || api.getState().general.fastMode !== false || playback.phase !== 'playing' || !api.getState().general.waveformEnabled) return;
     let before = 0;
     const draw = time => {
       if (time - before > 32) {
@@ -481,7 +503,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   function control({pulling = false} = {}) {
     const s = api.getState(), p = preferences || {volume: api.getVolume(), theme: s.theme};
     const on = ACTIVE_PHASES.includes(playback.phase) && playback.speaker;
-    const toggles = [['floating', 'float', '懸浮入口', s.general.floatingEnabled], ['waves', 'wave', '聲波動畫', s.general.waveformEnabled], ['motion', 'image', '動態桌布', s.general.wallpaperMotion !== false]];
+    const toggles = [['fast', 'settings', '流暢模式', s.general.fastMode !== false], ['floating', 'float', '懸浮入口', s.general.floatingEnabled], ['waves', 'wave', '聲波動畫', s.general.waveformEnabled], ['motion', 'image', '動態桌布', s.general.wallpaperMotion !== false]];
     const d = dialog('控制中心', `<div class="control-grid">
       <div class="control-tile wide cc-device"><span class="net" data-net></span><span data-net-label></span><span class="cc-battery"><span class="battery" data-battery aria-hidden="true"></span><span data-battery-label></span></span></div>
       <div class="control-tile wide live-wave" data-engine="${on ? engineOf(playback.speaker) : 'none'}">${on ? avatar(playback.speaker, engineOf(playback.speaker), 42) : wave}<div><strong data-playing-speaker></strong><small data-playing-message></small></div><button class="play-round" data-system="toggle" aria-label="暫停或繼續">${icon('play', true)}</button></div>
@@ -503,7 +525,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
           await api.savePhone({theme: el.dataset.theme});
           if (d.live) for (const b of d.body.querySelectorAll('[data-theme]')) b.setAttribute('aria-pressed', String(b === el));
         }
-        const flip = {floating: 'floatingEnabled', waves: 'waveformEnabled', motion: 'wallpaperMotion'}[el.dataset.control];
+        const flip = {fast: 'fastMode', floating: 'floatingEnabled', waves: 'waveformEnabled', motion: 'wallpaperMotion'}[el.dataset.control];
         if (flip) {
           const enabled = el.getAttribute('aria-pressed') !== 'true';
           api.updateGeneral({[flip]: enabled});
@@ -666,7 +688,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     }
   }, {signal});
   doc.addEventListener('pointerdown', () => delete doc.documentElement.dataset.keyboard, {signal});
-  doc.addEventListener('visibilitychange', animate, {signal});
+  doc.addEventListener('visibilitychange', () => { animate(); if (!doc.hidden) { clock(); countUnread(); countMoments(); refreshQueue.resume(); } }, {signal});
   media.addEventListener('change', theme, {signal});
   motion.addEventListener('change', animate, {signal});
 
@@ -687,14 +709,14 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     if (event.type === 'audio-ready') views.get('listen')?.onPlayback?.(api.status());
     if (event.type === 'draw') views.get('draw')?.onDraw?.(event);
     if (event.type === 'balance') run(() => views.get('engines')?.onBalance?.(event));
-    if (event.type === 'chat') { run(() => views.get('chat')?.onChat?.(event)); countUnread(); }
-    if (event.type === 'moments') { views.get('chat')?.onMoments?.(event); countMoments(); }
+    if (event.type === 'chat') { refreshView('chat', 'chat', event); countUnread(); }
+    if (event.type === 'moments') { refreshView('chat'); countMoments(); }
     if (event.type === 'call') calls.update(event.call);
     if (event.type === 'forum' || event.type === 'peek') { const app = event.type; if (active === app) run(() => views.get(app)?.refresh()); }
-    if (event.type === 'pocket' && active === 'chat') run(() => views.get('chat')?.onChat?.({}));
-    if (event.type === 'pocket' && POCKET_APPS.has(active)) run(() => views.get(active)?.refresh());
+    if (event.type === 'pocket') refreshView('chat', 'chat');
+    if (event.type === 'pocket' || event.type === 'csb') for (const name of POCKET_APPS) refreshView(name);
     // 分区: another card was opened in the tavern; the open app and the badges follow it.
-    if (event.type === 'space') { if (active && views.get(active)?.refresh) run(() => views.get(active).refresh()); countUnread(); countMoments(); }
+    if (event.type === 'space') { for (const name of views.keys()) refreshView(name); countUnread(); countMoments(); }
     if (event.type === 'sync') {
       views.get('settings')?.onSync?.();
       // Content from another device: say so once, when that sync is over.
@@ -702,27 +724,29 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
       if (!event.busy && event.lastAt !== lastSyncAt && (r?.pulled?.length || r?.merged?.length)) notify(r.merged?.length ? '兩臺裝置都有改動，已經合併好了' : '已讀取別的裝置的新內容');
       if (!event.busy) lastSyncAt = event.lastAt;
     }
-    if (event.type === 'settings') run(() => views.get('chat')?.onChat?.({}));
+    if (event.type === 'settings') refreshView('chat', 'chat');
   });
 
   // Unread chat messages, shown as a badge on the chat icon.
   // New 朋友圈 posts and comments by others since the user last opened it.
   function countMoments() {
+    if (disposed || !panelVisible || doc.hidden) return;
     win.clearTimeout(freshTimer);
     freshTimer = win.setTimeout(() => run(async () => {
       const n = momentsNew(await api.listMoments(), momentsSeen(win));
       if (disposed || n === fresh) return;
       fresh = n;
-      renderHome();
+      renderBadges();
     }), 150);
   }
   function countUnread() {
+    if (disposed || !panelVisible || doc.hidden) return;
     win.clearTimeout(unreadTimer);
     unreadTimer = win.setTimeout(() => run(async () => {
       const n = await api.chatUnread();
       if (disposed || n === unread) return;
       unread = n;
-      renderHome();
+      renderBadges();
     }), 120);
   }
 
@@ -739,7 +763,8 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   win.stTtsOpenDraw = () => run(takeDraw);
   win.stTtsPanelVisibility = visible => {
     panelVisible = visible;
-    if (visible) { callState(); run(refreshAvatars); floatingBar(); }
+    doc.documentElement.toggleAttribute('data-panel-hidden', !visible);
+    if (visible) { callState(); run(refreshAvatars); floatingBar(); clock(); countUnread(); countMoments(); refreshQueue.resume(); if (active) refreshView(active); }
     if (!visible) sheet?.close(null);
     else if (takeDraw()) { /* opened from a chat picture */ }
     else if (preferences?.lockOnOpen && !api.pendingRole()) lock();
@@ -750,6 +775,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     disposed = true;
     appearanceEpoch++;
     unsubscribe();
+    refreshQueue.dispose();
     controller.abort();
     sheet?.close(null);
     for (const v of views.values()) v.dispose();

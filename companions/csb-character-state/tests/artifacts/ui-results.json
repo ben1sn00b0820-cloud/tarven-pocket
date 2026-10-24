@@ -1,5 +1,5 @@
 {
-  "passed": 16,
+  "passed": 18,
   "checks": [
     "preview loads two characters with independent values",
     "rest event changes energy and hydration, keeps injury",
@@ -16,7 +16,9 @@
     "host response shows folded status and hides raw JSON without editing source",
     "quiet generation clears the injected prompt",
     "swipe generation prompt uses state before discarded answer",
-    "host editing a reply applies new state and malformed update keeps old state"
+    "host editing a reply applies new state and malformed update keeps old state",
+    "editing character information survives message events without losing typed input",
+    "inline display toggle retains information and places cards within the message body"
   ],
   "pageErrors": []
 }
