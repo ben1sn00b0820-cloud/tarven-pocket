@@ -164,6 +164,7 @@ export class ScanService{
   assertCapture(cap,{state=false}={}){
     const c=this.host.context();
     if(this.disposed||c.chatMetadata!==cap.context.chatMetadata||c.chat!==cap.context.chat||(c.getCurrentChatId?.()??c.chatId)!==cap.chatId||c.chat.length!==cap.length||cap.collected.sources.some(s=>c.chat[s.index]!==s.ref||String(s.ref.mes??'')!==s.raw||(s.ref.swipe_id??0)!==s.swipe))throw Error('聊天、正文或回覆分支已變更，已取消本次掃描；請重新掃描');
+    if(this.host.adapter.isBusy?.())throw Error('正文正在生成，請待本輪完成再掃描');
     if(state){const s=this.host.getSnapshot();if(JSON.stringify([s.state,s.db.schema,s.db.locks])!==cap.stamp)throw Error('角色資料或欄位已變更，未套用過時結果；請重新掃描');}
   }
   cancel(){if(this.job)this.job.cancelled=true;}
@@ -237,7 +238,7 @@ export class ScanService{
     }finally{pending.committing=false;}
   }
   async automatic(index){
-    if(this.job||this.disposed)return;
+    if(this.job||this.disposed||this.host.adapter.isBusy?.())return;
     const c=this.host.context(),s=this.host.settings(),message=c.chat[index];
     if(s.enabled===false||!message||message.is_user||message.is_system||s.autoScan==='off')return;
     const signature=`${message.swipe_id??0}:${String(message.mes??'')}`,seen=this.lastAuto.get(message);

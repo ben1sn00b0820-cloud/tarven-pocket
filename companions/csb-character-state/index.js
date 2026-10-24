@@ -2,12 +2,38 @@ import {StateController,KEY} from './src/controller.js';
 import {replay,makePrompt,stripUpdate} from './src/core.js';
 import {el,openManager,statusPanel,mountInformation,openScanner} from './src/ui.js';
 import {createCharacterStateBridge,characterStateScope} from './src/bridge.js';
+import {createGenerationGuard} from './src/generation.js';
 
-let controller,manager,bridge,messageFormatter=null,scheduled=null,busy=false,dirty=false,lastSaved='',lastSynced='',started=false,epoch=0,slashRegistered=false;
+let controller,manager,bridge,messageFormatter=null,scheduled=null,generation=null,dirty=false,lastSaved='',lastSynced='',started=false,epoch=0,slashRegistered=false;
 const listeners=[];
 let pendingScanIndex=-1;
 let formattedNodes=new WeakMap(),cardSnapshots=new WeakMap(),managerRevision='';
 const context=()=>globalThis.SillyTavern.getContext();
+let hostScript=null,hostGroups=null;
+function readHostGeneration(){
+  const c=context();
+  if(typeof c.isGenerating==='function')return c.isGenerating();
+  if(typeof c.isGenerating==='boolean')return c.isGenerating;
+  if(typeof hostScript?.isGenerating==='function')return hostScript.isGenerating();
+  if(typeof hostScript?.is_send_press==='boolean')return hostScript.is_send_press||hostGroups?.is_group_generating===true;
+  return null;
+}
+function loadHostGeneration(){
+  // Reuse the host's ESM singleton; optional for forks and offline fixtures.
+  // Loading is asynchronous to avoid a script.js/extension initialization cycle.
+  try{
+    const url=new URL('script.js',document.baseURI);
+    if(!['http:','https:'].includes(url.protocol))return;
+    import(url.href).then(async module=>{
+      hostScript=module;
+      if(typeof module.isGenerating!=='function'){
+        try{hostGroups=await import(new URL('scripts/group-chats.js',url).href);}catch{}
+      }
+      if(started)schedule();
+    }).catch(()=>{});
+  }catch{}
+}
+const isBusy=()=>generation?.isBusy()??false;
 const report=e=>{console.error('[CSB]',e);globalThis.toastr?.error(e.message??String(e),'角色信息');};
 function closeDialogs(){
   for(const dialog of document.querySelectorAll('dialog.csb-dialog')){try{dialog.close();}catch{}dialog.remove();}
@@ -55,7 +81,7 @@ function formatMessage(text,message,index,c){
 function render(snapshot=null){
   if(!started||!controller)return;
   mount();const c=context();if(!c.chatMetadata||!Array.isArray(c.chat))return;
-  const s=snapshot??controller.getSnapshot(),pinned=s.db.pinned.join('|');
+  const s=snapshot??controller.getSnapshot(),pinned=s.db.pinned.join('|'),busy=isBusy();
   for(const mes of document.querySelectorAll('#chat .mes[mesid]')){
     const index=Number(mes.getAttribute('mesid')),message=c.chat[index];if(!message||message.is_user||message.is_system)continue;
     const textNode=mes.querySelector('.mes_text');if(!textNode)continue;
@@ -83,7 +109,7 @@ function render(snapshot=null){
   if(manager?.dialog.isConnected&&managerRevision!==s.revision){manager.refresh();managerRevision=s.revision;}
 }
 async function settle(session=epoch){
-  if(session!==epoch||!started)return;scheduled=null;if(!controller||busy)return;
+  if(session!==epoch||!started)return;scheduled=null;if(!controller)return;if(isBusy()){schedule();return;}
   const owner=controller;
   try{
     const c=context(),scope=characterStateScope(c);if(!scope){bridge?.notify();return;}
@@ -100,7 +126,7 @@ async function settle(session=epoch){
     if(pendingScanIndex>=0&&!owner.scanner.job){const i=pendingScanIndex;pendingScanIndex=-1;await owner.scanner.automatic(i);if(current())bridge?.notify();}
   }catch(e){if(started&&session===epoch)report(e);}
 }
-function schedule(changed=false){if(!started)return;dirty||=changed;if(busy)return;if(scheduled!==null)clearTimeout(scheduled);const session=epoch;scheduled=setTimeout(()=>settle(session),80);}
+function schedule(changed=false){if(!started)return;dirty||=changed;if(scheduled!==null)clearTimeout(scheduled);const session=epoch;scheduled=setTimeout(()=>settle(session),isBusy()?500:80);}
 
 export async function intercept(chat,contextSize,abort,type){
   if(!started||!controller)return;
@@ -124,14 +150,14 @@ export function initialize(){
   if(globalThis.CSBCharacterState||globalThis.csbCharacterStateIntercept&&globalThis.csbCharacterStateIntercept!==intercept)return null;
   const c=context(),events=c.eventTypes??c.event_types??{};
   if(!c.eventSource?.on)return null;
-  started=true;epoch++;controller=new StateController({context,getMvu:()=>globalThis.Mvu,isBusy:()=>busy});
+  started=true;epoch++;generation=createGenerationGuard({context,document,readHostState:readHostGeneration});loadHostGeneration();controller=new StateController({context,getMvu:()=>globalThis.Mvu,isBusy});
   bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,openScanner:showScanner,mountView:mountInformation,setInlineCards:enabled=>guardedController().setInlineCards(enabled),onError:report});
   globalThis.CSBCharacterState=bridge.api;globalThis.csbCharacterStateIntercept=intercept;
   controller.scanner.onStatus=message=>{if(started&&/等待確認|已新增/.test(message))globalThis.toastr?.info?.(message,'角色信息掃描',{preventDuplicates:true});};
   controller.onChange=()=>{if(!started)return;dirty=true;schedule(true);};
   const listen=(name,fn)=>{if(!events[name])return;c.eventSource.on(events[name],fn);listeners.push({source:c.eventSource,event:events[name],fn});};
   for(const name of ['CHAT_CHANGED','CHAT_CREATED'])listen(name,()=>{
-    closeDialogs();controller.cancelScan();controller.scanner.pending=null;pendingScanIndex=-1;controller.invalidate();managerRevision='';lastSaved='';lastSynced='';dirty=false;busy=false;context().setExtensionPrompt(KEY,'',1,0,false,0);schedule();
+    closeDialogs();controller.cancelScan();controller.scanner.pending=null;pendingScanIndex=-1;controller.invalidate();managerRevision='';lastSaved='';lastSynced='';dirty=false;generation.reset();context().setExtensionPrompt(KEY,'',1,0,false,0);schedule();
     // Clear consumers immediately, even when the new selection has no chat.
     try{bridge?.notify();}catch(e){report(e);}
   });
@@ -139,8 +165,8 @@ export function initialize(){
     if(['MESSAGE_RECEIVED','MESSAGE_UPDATED','MESSAGE_EDITED','MESSAGE_SWIPED'].includes(name)){const i=Number.isInteger(Number(index))&&index!==undefined?Number(index):context().chat.length-1;if(!context().chat[i]?.is_user&&!context().chat[i]?.is_system)pendingScanIndex=i;}
     schedule(true);
   });
-  listen('GENERATION_STARTED',()=>{busy=true;});
-  for(const name of ['GENERATION_ENDED','GENERATION_STOPPED'])listen(name,()=>{busy=false;schedule(true);});
+  listen('GENERATION_STARTED',(type,options,dryRun)=>{generation.start(type,options,dryRun);schedule();});
+  for(const name of ['GENERATION_ENDED','GENERATION_STOPPED'])listen(name,()=>{generation.finish();schedule(true);});
   listen('APP_READY',()=>schedule());listen('MORE_MESSAGES_LOADED',()=>schedule());
   if(!slashRegistered&&c.SlashCommandParser&&c.SlashCommand){c.SlashCommandParser.addCommandObject(c.SlashCommand.fromProps({name:'csb',callback:async()=>{if(started)launchManager();return '';},helpString:'開啟角色信息。'}));slashRegistered=true;}
   mount();schedule();return bridge.api;
@@ -164,6 +190,6 @@ export function dispose(){
   }
   if(globalThis.CSBCharacterState===bridge?.api)delete globalThis.CSBCharacterState;
   if(globalThis.csbCharacterStateIntercept===intercept){delete globalThis.csbCharacterStateIntercept;c.setExtensionPrompt?.(KEY,'',1,0,false,0);}
-  controller?.scanner.dispose();pendingScanIndex=-1;bridge?.dispose();bridge=null;if(controller)controller.onChange=()=>{};controller=null;messageFormatter=null;busy=false;dirty=false;lastSaved='';lastSynced='';formattedNodes=new WeakMap();cardSnapshots=new WeakMap();managerRevision='';
+  controller?.scanner.dispose();pendingScanIndex=-1;bridge?.dispose();bridge=null;if(controller)controller.onChange=()=>{};controller=null;messageFormatter=null;generation?.reset();generation=null;dirty=false;lastSaved='';lastSynced='';formattedNodes=new WeakMap();cardSnapshots=new WeakMap();managerRevision='';
 }
 initialize();
