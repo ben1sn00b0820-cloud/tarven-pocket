@@ -1,0 +1,94 @@
+{
+  "release": {
+    "pocket": "0.12.0",
+    "csb": "1.2.0",
+    "date": "2026-10-24",
+    "github_pushed": false
+  },
+  "baseline": {
+    "archive": "傳音玉符_v0.11.0_完整原始碼.zip",
+    "github_manifest_verified": "0.11.0",
+    "github_core_blob_sha": "d6da61bd9bd201c8cf9bbee3b5fe6385ccfb92f4"
+  },
+  "unit_tests": {
+    "pocket": {
+      "tests": 468,
+      "pass": 468,
+      "fail": 0,
+      "skipped": 0
+    },
+    "csb": {
+      "tests": 96,
+      "pass": 96,
+      "fail": 0,
+      "skipped": 0
+    },
+    "new_scan_regression_tests": 40
+  },
+  "syntax": {
+    "checked": 167,
+    "failed": 0,
+    "errors": []
+  },
+  "browser": {
+    "fixture": "inline actual modules, mocked SillyTavern host and AI; no external navigation",
+    "passed": 16,
+    "checks": [
+      "runtime initializes, exposes scan entry, and the raw original message is kept",
+      "selected local proposal persists and renders the expected fields",
+      "repeated local scan does not duplicate the same character",
+      "phone-style mounted information view has scan and AI buttons",
+      "AI extraction previews a valid role, quarantines a malformed name, and uses exact evidence",
+      "replacing an existing value is opt-in per field and not prechecked",
+      "a cancelled AI request cannot write a late result",
+      "new user messages preserve information while not being auto-scanned",
+      "finished assistant response triggers no-cost local detection once",
+      "settings expose automatic AI separately with auto-apply disabled by default",
+      "automatic AI call queues a review without unapproved writes or recursive calls",
+      "switching chats while AI is running closes the dialog and rejects its late result",
+      "scan dialog remains horizontally contained at 320px",
+      "scan dialog remains horizontally contained at 390px",
+      "scan dialog remains horizontally contained at 768px",
+      "scan dialog remains horizontally contained at 1280px"
+    ],
+    "pageErrors": []
+  },
+  "installer": {
+    "standard": {
+      "passed": 4,
+      "checks": [
+        "upgrade with byte verification, old extension backup and unchanged chat/config",
+        "unsupported host refuses before replacing",
+        "corrupted payload refuses before replacing",
+        "duplicate ST-iPhonie refuses without changes"
+      ],
+      "version": "0.12.0",
+      "files": 250
+    },
+    "sillydroid": {
+      "passed": 11,
+      "checks": [
+        "cwd install preserves host symlink, chat, config and unrelated extension; all bundle bytes verified",
+        "repeat install backs up complete previous version under persistent data root",
+        "SERVER_DIR locates host when cwd is the private terminal home",
+        "persistent installation lock prevents writes",
+        "personal ST-iPhonie is detected in runtime data root despite different config dataRoot",
+        "personal ST-iPhonie in a symlinked user directory refuses without changes",
+        "personal Tavern Pocket prevents duplicate global installation",
+        "unexpected third-party symlink destination refuses without changes",
+        "plugin folder symlink refuses without changing its target",
+        "mismatched APP_DATA_ROOT refuses without changes",
+        "mismatched optional TAVERN_DATA_ROOT refuses without changes"
+      ],
+      "version": "0.12.0",
+      "files": 250
+    }
+  },
+  "limitations": [
+    "Browser test used an offline inline fixture with real CSB source and mocked host/model; normal localhost/HTTPS navigation was blocked by environment policy.",
+    "No live user API, no paid model call, no real Android or SillyTavern session tested.",
+    "Exact source quote validation cannot establish semantic truth; AI misattribution remains possible.",
+    "A cancelled in-flight API request may still be billed.",
+    "This local release was not pushed to GitHub."
+  ]
+}

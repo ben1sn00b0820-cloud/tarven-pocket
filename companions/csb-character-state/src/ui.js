@@ -106,7 +106,7 @@ export function openManager(host,initialTab='characters'){
     };
     q.addEventListener('input',()=>{search=q.value;refresh();});which.addEventListener('change',()=>{filter=which.value;refresh();});
     area.append(el('div',{class:'csb-section-heading'},el('div',{},el('h3',{},'每個角色，都有自己的故事。'),note(`${chars.filter(c=>c.present).length} 人在場 · ${chars.length} 份角色檔案`)),btn('＋ 新增角色',()=>editCharacter(null),'csb-primary')),
-      el('div',{class:'csb-toolbar'},q,which),grid);refresh();
+      el('div',{class:'csb-toolbar'},btn('掃描正文',()=>openScanner(host,{mode:'local'})),btn('AI 填表',()=>openScanner(host,{mode:'ai'}),'csb-primary')),el('div',{class:'csb-toolbar'},q,which),grid);refresh();
   }
   function editCharacter(id){
     const s=host.getSnapshot(),c=id?s.state.characters[id]:{id:uid('c'),name:'',aliases:[],present:true,values:{}},form=el('form',{class:'csb-form'}),error=el('p',{class:'csb-error',role:'alert'});
@@ -190,11 +190,13 @@ export function openManager(host,initialTab='characters'){
   function renderSettings(s){
     const form=el('form',{class:'csb-form'}),settings=clone(s.settings),items=[];
     for(const [key,label,hint]of [['enabled','啟用角色信息','關閉後停止注入提示與顯示狀態。'],['allowNew','允許模型建立新角色','關閉後只能更新已建立的角色。'],['inlineCards','在正文顯示劇情狀態','只控制正文快照顯示；關閉後角色信息仍持續保存與更新。'],['showAbsent','狀態欄同時顯示離場角色','角色庫始終保留所有角色。'],['mvuSync','完成更新後同步到 MVU','需要先安裝並啟動 MVU。']]){const c=checkbox(settings[key]);items.push([key,c]);form.append(control(label,c,hint));}
+    const auto=select([['off','關閉正文掃描'],['local','本機：只識別明確姓名／格式化欄位（免額度）'],['ai','AI：每輪完成後分析正文（額外使用模型額度）']],settings.autoScan??'local'),autoApply=checkbox(settings.autoAIApply===true);
+    form.append(control('自動掃描正文',auto,'只在完整回覆收到／編輯後執行，不會在輸入或串流每一個字時掃描。'),control('AI 結果自動新增／補空白',autoApply,'預設關閉，AI 結果等待確認。啟用後仍保留既有欄位、鎖定值與在場名單；需自行核對模型抽取正確性。'));
     const budget=input('number',settings.promptBudget,{min:6000,max:500000,step:1000});form.append(control('角色提示字元預算',budget,'不是 token 數。角色很多時優先載入在場、被提及、已釘選角色；完整資料仍保存。'),el('button',{type:'submit',class:'csb-btn csb-primary'},'儲存設定'));
-    form.addEventListener('submit',e=>{e.preventDefault();run(()=>{for(const[k,c]of items)settings[k]=c.checked;settings.promptBudget=Number(budget.value);return host.saveSettings(settings);});});
+    form.addEventListener('submit',e=>{e.preventDefault();run(()=>{for(const[k,c]of items)settings[k]=c.checked;settings.autoScan=auto.value;settings.autoAIApply=autoApply.checked;settings.promptBudget=Number(budget.value);return host.saveSettings(settings);});});
     const prompt=host.promptInfo();
     area.append(form,el('section',{class:'csb-data-section'},el('h4',{},'目前模型資料'),note(`載入 ${prompt.selected}／${prompt.total} 位角色詳細資料 · 約 ${prompt.characters} 字元${prompt.overBudget?' · 欄位設定已超過預算，請精簡說明':''}`),prompt.omitted?note(`${prompt.omitted} 位角色目前只提供姓名與 ID；可在角色編輯中開啟優先載入。`):null,btn('查看本輪提示',()=>{modal('注入內容',el('div',{class:'csb-form'},el('textarea',{readonly:true,rows:18,value:prompt.text})));})),
-      el('section',{class:'csb-data-section'},el('h4',{},'變化與診斷'),note(`版本 1.1.0 · ${s.result.inactiveEdits||0} 筆手動修改屬於其他回覆分支`),...(s.result.errors||[]).slice(-10).map(e=>el('p',{class:'csb-error'},`第 ${e.index+1} 則：${e.message}`)),...(s.result.warnings||[]).slice(-5).map(e=>note(`第 ${e.index+1} 則：${e.message}`)),el('div',{class:'csb-history'},...(s.result.changes||[]).slice(-30).reverse().map(c=>el('div',{},el('strong',{},`${c.name} · ${c.label}`),el('span',{},`${format(c.old,{})} → ${format(c.value,{})}`),el('small',{},c.reason)))),btn('重新讀取目前對話',()=>run(()=>host.rebuild(),'已依目前訊息重建狀態'))));
+      el('section',{class:'csb-data-section'},el('h4',{},'變化與診斷'),note(`版本 1.2.0 · ${s.result.inactiveEdits||0} 筆手動修改屬於其他回覆分支`),...(s.result.errors||[]).slice(-10).map(e=>el('p',{class:'csb-error'},`第 ${e.index+1} 則：${e.message}`)),...(s.result.warnings||[]).slice(-5).map(e=>note(`第 ${e.index+1} 則：${e.message}`)),el('div',{class:'csb-history'},...(s.result.changes||[]).slice(-30).reverse().map(c=>el('div',{},el('strong',{},`${c.name} · ${c.label}`),el('span',{},`${format(c.old,{})} → ${format(c.value,{})}`),el('small',{},c.reason)))),btn('重新讀取目前對話',()=>run(()=>host.rebuild(),'已依目前訊息重建狀態'))));
   }
   body.append(tabs,feedback,area);dialog=modal('角色信息',body);render();
   return {dialog,refresh(){const active=dialog.ownerDocument.activeElement;if(dialog.contains(active)&&active.matches?.('input,textarea,select,[contenteditable="true"]'))return;if(dialog.ownerDocument.querySelector('dialog.csb-dialog .csb-form'))return;render();},editCharacter};
@@ -207,7 +209,8 @@ export function mountInformation(container,api,{scope:expectedScope}={}){
   const root=e('section',{class:'csb csb-information-app','aria-label':'角色信息'}),message=e('p',{class:'csb-muted',role:'status'}),count=e('p',{class:'csb-muted'}),list=e('div',{class:'csb-information-roster'});
   const search=e('input',{type:'search',placeholder:'搜尋角色姓名、身分、別名','aria-label':'搜尋角色信息'}),filter=e('select',{'aria-label':'角色顯示範圍'},e('option',{value:'all'},'全部角色'),e('option',{value:'present'},'目前在場'),e('option',{value:'absent'},'目前離場'));
   const inline=e('input',{type:'checkbox','aria-label':'在正文顯示劇情狀態'}),manage=e('button',{type:'button',class:'csb-btn csb-primary'},'管理角色與欄位');
-  root.append(e('header',{},e('h2',{},'角色信息'),e('p',{class:'csb-muted'},'資料持續保存。未更新的條目沿用原值；正文狀態欄只顯示當回合快照。')),e('div',{class:'csb-toolbar'},manage,e('label',{class:'csb-information-toggle'},inline,'在正文顯示劇情狀態')),e('div',{class:'csb-toolbar'},search,filter),count,message,list);container.append(root);
+  const scan=e('button',{type:'button',class:'csb-btn'},'掃描正文'),ai=e('button',{type:'button',class:'csb-btn'},'AI 填表');
+  root.append(e('header',{},e('h2',{},'角色信息'),e('p',{class:'csb-muted'},'資料持續保存。未更新的條目沿用原值；正文狀態欄只顯示當回合快照。')),e('div',{class:'csb-toolbar'},manage,scan,ai,e('label',{class:'csb-information-toggle'},inline,'在正文顯示劇情狀態')),e('div',{class:'csb-toolbar'},search,filter),count,message,list);container.append(root);
   let alive=true,current=null,lastRevision='',schemaSignature='',cards=new Map(),refreshing=false;
   const showError=error=>{message.textContent=error?.message??String(error);message.classList.add('is-error');};
   function draw(){
@@ -231,9 +234,57 @@ export function mountInformation(container,api,{scope:expectedScope}={}){
       current=snapshot;lastRevision=revision??'';inline.disabled=false;manage.disabled=false;inline.checked=current.inlineCards!==false;message.textContent='';message.classList.remove('is-error');draw();
     }catch(error){showError(error);}finally{refreshing=false;}
   }
+  scan.addEventListener('click',()=>{try{if(!api.openScanner)throw Error('請更新 CSB 至 1.2.0');api.openScanner({scope:current?.scope,mode:'local'});}catch(error){showError(error);}});
+  ai.addEventListener('click',()=>{try{if(!api.openScanner)throw Error('請更新 CSB 至 1.2.0');api.openScanner({scope:current?.scope,mode:'ai'});}catch(error){showError(error);}});
   search.addEventListener('input',draw);filter.addEventListener('change',draw);
   manage.addEventListener('click',()=>{try{api.openManager({scope:current?.scope});}catch(error){showError(error);}});
   inline.addEventListener('change',async()=>{inline.disabled=true;try{await api.setInlineCards(inline.checked,{scope:current?.scope});lastRevision='';refresh();}catch(error){inline.checked=current?.inlineCards!==false;showError(error);}finally{if(alive)inline.disabled=!current;}});
   const unsubscribe=api.subscribe(refresh);refresh();
   return {refresh,dispose(){if(!alive)return;alive=false;unsubscribe();cards.clear();root.remove();}};
+}
+
+/** Review before commit. TextContent/DOM nodes only; no model HTML is executed. */
+export function openScanner(host,options={}){
+  const initial=host.getSnapshot(),body=el('div',{class:'csb-scan-body csb-form'}),feedback=el('p',{class:'csb-feedback',role:'status','aria-live':'polite'}),results=el('div',{class:'csb-scan-results'});
+  const mode=select([['local','本機掃描（免額度）'],['ai','AI 讀正文填表（使用目前模型額度）']],options.mode??'local');
+  const limit=select([['1','最新 1 則'],['5','最近 5 則'],['20','最近 20 則'],['all','本聊天（最多最近 60,000 字元）']],String(options.limit??20));
+  const merge=select([['fill','只新增角色、補空白欄位'],['changes','預覽明確變更，逐項勾選後更新']],options.merge??'fill');
+  const target=select([['','全部角色'],...Object.values(initial.state.characters).map(c=>[c.id,c.name])],options.targetId??'');
+  const includeUser=checkbox(false),start=btn('開始掃描',runScan,'csb-primary'),cancel=btn('取消本次掃描',()=>{abort?.abort();host.cancelScan();feedback.textContent='已要求取消；已送出的模型請求可能仍計費，返回結果不會寫入。';}),apply=btn('套用勾選結果',commit,'csb-primary');
+  apply.disabled=true;cancel.disabled=true;
+  let dialog,proposal=null,editors=[],abort=null,alive=true,running=false;
+  function message(text,error=false){feedback.textContent=text;feedback.classList.toggle('is-error',error);}
+  function renderProposal(p){
+    proposal=p;editors=[];results.replaceChildren();apply.disabled=!p?.rows.length;
+    if(!p)return;
+    results.append(note(`來源 ${p.sourceCount} 則／${p.sourceCharacters.toLocaleString()} 字元；${p.rows.length} 位可新增或補充。掃描尚未寫入。`));
+    if(!p.rows.length)results.append(empty('沒有可採用的新資料。本機掃描不會猜人名；普通敘事可切換 AI 填表。已有值也可能因「只補空白」而保留。'));
+    for(const row of p.rows){
+      const selected=checkbox(true),name=input('text',row.name,{maxlength:100,readonly:row.existing,'aria-label':`確認姓名 ${row.name}`}),changes=[];
+      const card=el('section',{class:'csb-scan-candidate'},control(`${row.existing?'補充':'新增'} ${row.name}`,selected),control('確認角色姓名',name),note(`姓名依據：第 ${(row.evidence?.index??0)+1} 則 · ${row.evidence?.quote??''}`));
+      for(const change of row.changes){
+        // Replacements require a deliberate check; blank fields are selected by default.
+        const on=checkbox(change.old===null||change.old===undefined||change.old===''),entry=el('label',{class:'csb-scan-change'},on,el('span',{},el('strong',{},change.label),el('span',{class:'csb-scan-values'},`${format(change.old,{})} → ${format(change.value,{})}`),el('small',{class:'csb-muted'},`第 ${change.evidence.index+1} 則：${change.evidence.quote}`)));
+        card.append(entry);changes.push({field:change.field,on});
+      }
+      results.append(card);editors.push({row,selected,name,changes});
+    }
+    if(p.diagnostics.length)results.append(el('details',{class:'csb-scan-diagnostics'},el('summary',{},`診斷與略過項目（${p.diagnostics.length}）`),...p.diagnostics.slice(0,100).map(d=>el('p',{class:'csb-muted'},d))));
+  }
+  async function runScan(){
+    if(running)return;running=true;start.disabled=true;cancel.disabled=false;apply.disabled=true;abort=new AbortController();results.replaceChildren();
+    message(mode.value==='ai'?'AI 分析中；只傳本次正文、相關角色與欄位定義，不傳整本世界書。':'正在讀取原始正文，不會掃描畫面上的其他狀態欄。');
+    try{const p=await host.scan({mode:mode.value,limit:limit.value==='all'?'all':Number(limit.value),merge:merge.value,targetId:target.value||null,includeUser:includeUser.checked,signal:abort.signal,onProgress:t=>{if(alive)message(t);}});if(alive){renderProposal(p);message('請核對姓名、原值、新值與原文依據，再套用。');}}
+    catch(e){if(alive)message(e.message,true);}
+    finally{running=false;if(alive){start.disabled=false;cancel.disabled=true;}}
+  }
+  async function commit(){
+    if(!proposal||running)return;apply.disabled=true;
+    try{const selected=editors.filter(e=>e.selected.checked).map(e=>({key:e.row.key,name:e.name.value,fields:e.changes.filter(c=>c.on.checked).map(c=>c.field)}));const r=await host.applyScan(proposal.token,selected);message(`已保存 ${r.applied} 位角色、${r.fields} 個欄位。未勾選、未知、鎖定與其他既有資料保持不變。`);proposal=null;results.replaceChildren();}
+    catch(e){message(e.message,true);apply.disabled=false;}
+  }
+  body.append(note('本機掃描讀取 CSB_UPDATE、CSB21 與「姓名：…」等明確資料。AI 可閱讀普通敘事並依目前自訂欄位填表，會額外呼叫酒館目前連線的模型。所有結果都需核對；沒寫到的資訊保持未知。'),el('div',{class:'csb-form-grid'},control('分析方式',mode),control('正文範圍',limit),control('寫入策略',merge),control('指定角色',target)),control('包含使用者已送出的訊息',includeUser,'預設只掃描 AI 正文；不讀輸入框草稿、推理區或整本世界書。'),el('div',{class:'csb-toolbar'},start,cancel,apply),feedback,results);
+  dialog=modal('掃描正文／AI 填表',body,()=>{alive=false;abort?.abort();if(running)host.cancelScan();});
+  const pending=host.scanPreview();if(pending){renderProposal(pending);message('有一份尚未採用的掃描結果；可直接核對，或重新掃描。');}
+  return {dialog};
 }

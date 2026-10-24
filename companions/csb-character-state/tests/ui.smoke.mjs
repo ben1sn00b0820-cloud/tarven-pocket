@@ -11,6 +11,13 @@ const base=process.env.CSB_TEST_URL||`http://127.0.0.1:${server.address().port}`
 const errors=[],checks=[];
 const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1});
 const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+// Optional in-process HTTPS fixture routing: no localhost navigation or network requests.
+if(process.env.CSB_ROUTE_FILES==='1')await context.route(base+'/**',async route=>{
+  try{const file=path.resolve(root,'.'+decodeURIComponent(new URL(route.request().url()).pathname));if(!file.startsWith(root+path.sep))throw Error('path');
+    await route.fulfill({status:200,contentType:({'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json'})[path.extname(file)]||'application/octet-stream',body:fs.readFileSync(file)});
+  }catch{await route.fulfill({status:404,body:'not found'});}
+});
+
 if(fs.existsSync(path.join(root,'tests/fonts/400.css')))await page.addInitScript(({base})=>document.addEventListener('DOMContentLoaded',()=>{const link=document.createElement('link');link.rel='stylesheet';link.href=base+'/tests/fonts/400.css';document.head.append(link);const style=document.createElement('style');style.textContent='.csb,body{font-family:"Noto Sans TC",sans-serif}';document.head.append(style);}),{base});
 const check=(name,fn)=>fn().then(()=>{checks.push(name);console.log('PASS',name);});
 try{

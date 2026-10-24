@@ -1,10 +1,11 @@
 import {StateController,KEY} from './src/controller.js';
 import {replay,makePrompt,stripUpdate} from './src/core.js';
-import {el,openManager,statusPanel,mountInformation} from './src/ui.js';
+import {el,openManager,statusPanel,mountInformation,openScanner} from './src/ui.js';
 import {createCharacterStateBridge,characterStateScope} from './src/bridge.js';
 
 let controller,manager,bridge,messageFormatter=null,scheduled=null,busy=false,dirty=false,lastSaved='',lastSynced='',started=false,epoch=0,slashRegistered=false;
 const listeners=[];
+let pendingScanIndex=-1;
 let formattedNodes=new WeakMap(),cardSnapshots=new WeakMap(),managerRevision='';
 const context=()=>globalThis.SillyTavern.getContext();
 const report=e=>{console.error('[CSB]',e);globalThis.toastr?.error(e.message??String(e),'角色信息');};
@@ -23,6 +24,7 @@ function showManager(){
   if(manager?.dialog?.isConnected){manager.dialog.focus();return manager;}
   const guarded=guardedController();guarded.getSnapshot();manager=openManager(guarded);return manager;
 }
+function showScanner(options={}){return openScanner(guardedController(),options);}
 function showEditor(id){showManager().editCharacter(id);}
 function launchManager(){try{showManager();}catch(e){report(e);}}
 function readPublicSnapshot(){
@@ -95,6 +97,7 @@ async function settle(session=epoch){
       if(signature!==lastSynced){try{await owner.pushMvu();if(!current())return;lastSynced=signature;}catch(e){if(!current())return;owner.mvuMessage=e.message;globalThis.toastr?.warning(e.message,'CSB · MVU 同步未完成',{preventDuplicates:true});}}
     }
     if(!current())return;dirty=false;bridge?.notify();
+    if(pendingScanIndex>=0&&!owner.scanner.job){const i=pendingScanIndex;pendingScanIndex=-1;await owner.scanner.automatic(i);if(current())bridge?.notify();}
   }catch(e){if(started&&session===epoch)report(e);}
 }
 function schedule(changed=false){if(!started)return;dirty||=changed;if(busy)return;if(scheduled!==null)clearTimeout(scheduled);const session=epoch;scheduled=setTimeout(()=>settle(session),80);}
@@ -121,17 +124,19 @@ export function initialize(){
   if(globalThis.CSBCharacterState||globalThis.csbCharacterStateIntercept&&globalThis.csbCharacterStateIntercept!==intercept)return null;
   const c=context(),events=c.eventTypes??c.event_types??{};
   if(!c.eventSource?.on)return null;
-  started=true;epoch++;controller=new StateController({context,getMvu:()=>globalThis.Mvu});
-  bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,mountView:mountInformation,setInlineCards:enabled=>guardedController().setInlineCards(enabled),onError:report});
+  started=true;epoch++;controller=new StateController({context,getMvu:()=>globalThis.Mvu,isBusy:()=>busy});
+  bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,openScanner:showScanner,mountView:mountInformation,setInlineCards:enabled=>guardedController().setInlineCards(enabled),onError:report});
   globalThis.CSBCharacterState=bridge.api;globalThis.csbCharacterStateIntercept=intercept;
+  controller.scanner.onStatus=message=>{if(started&&/等待確認|已新增/.test(message))globalThis.toastr?.info?.(message,'角色信息掃描',{preventDuplicates:true});};
   controller.onChange=()=>{if(!started)return;dirty=true;schedule(true);};
   const listen=(name,fn)=>{if(!events[name])return;c.eventSource.on(events[name],fn);listeners.push({source:c.eventSource,event:events[name],fn});};
   for(const name of ['CHAT_CHANGED','CHAT_CREATED'])listen(name,()=>{
-    closeDialogs();controller.invalidate();managerRevision='';lastSaved='';lastSynced='';dirty=false;busy=false;context().setExtensionPrompt(KEY,'',1,0,false,0);schedule();
+    closeDialogs();controller.cancelScan();controller.scanner.pending=null;pendingScanIndex=-1;controller.invalidate();managerRevision='';lastSaved='';lastSynced='';dirty=false;busy=false;context().setExtensionPrompt(KEY,'',1,0,false,0);schedule();
     // Clear consumers immediately, even when the new selection has no chat.
     try{bridge?.notify();}catch(e){report(e);}
   });
-  for(const name of ['MESSAGE_RECEIVED','MESSAGE_UPDATED','MESSAGE_EDITED','MESSAGE_DELETED','MESSAGE_SWIPED','CHARACTER_MESSAGE_RENDERED','USER_MESSAGE_RENDERED'])listen(name,()=>{
+  for(const name of ['MESSAGE_RECEIVED','MESSAGE_UPDATED','MESSAGE_EDITED','MESSAGE_DELETED','MESSAGE_SWIPED','CHARACTER_MESSAGE_RENDERED','USER_MESSAGE_RENDERED'])listen(name,(index)=>{
+    if(['MESSAGE_RECEIVED','MESSAGE_UPDATED','MESSAGE_EDITED','MESSAGE_SWIPED'].includes(name)){const i=Number.isInteger(Number(index))&&index!==undefined?Number(index):context().chat.length-1;if(!context().chat[i]?.is_user&&!context().chat[i]?.is_system)pendingScanIndex=i;}
     schedule(true);
   });
   listen('GENERATION_STARTED',()=>{busy=true;});
@@ -159,6 +164,6 @@ export function dispose(){
   }
   if(globalThis.CSBCharacterState===bridge?.api)delete globalThis.CSBCharacterState;
   if(globalThis.csbCharacterStateIntercept===intercept){delete globalThis.csbCharacterStateIntercept;c.setExtensionPrompt?.(KEY,'',1,0,false,0);}
-  bridge?.dispose();bridge=null;if(controller)controller.onChange=()=>{};controller=null;messageFormatter=null;busy=false;dirty=false;lastSaved='';lastSynced='';formattedNodes=new WeakMap();cardSnapshots=new WeakMap();managerRevision='';
+  controller?.scanner.dispose();pendingScanIndex=-1;bridge?.dispose();bridge=null;if(controller)controller.onChange=()=>{};controller=null;messageFormatter=null;busy=false;dirty=false;lastSaved='';lastSynced='';formattedNodes=new WeakMap();cardSnapshots=new WeakMap();managerRevision='';
 }
 initialize();

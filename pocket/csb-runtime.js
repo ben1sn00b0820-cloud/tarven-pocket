@@ -57,7 +57,7 @@ export function createCharacterStateRuntime({context, notice = () => {}, formatM
     if (!alive || sourceScope(context()) !== expected || context()?.chatMetadata !== metadata) throw Error('聊天已切換，請重新開啟角色信息。');
     const bridge = api();
     if (!bridge) {
-      if (!disabled() && (typeof globals.csbCharacterStateIntercept === 'function' || document?.getElementById?.('csb-launcher'))) throw Error('目前另行啟用的 CSB 版本較舊，請以 1.1.0 更新原來的 CSB 擴充，再重新整理。原有角色資料會保留。');
+      if (!disabled() && (typeof globals.csbCharacterStateIntercept === 'function' || document?.getElementById?.('csb-launcher'))) throw Error('目前另行啟用的 CSB 版本較舊，請以 1.2.0 更新原來的 CSB 擴充，再重新整理。原有角色資料會保留。');
       throw Error('角色信息尚未啟用，請啟用 CSB 後重新整理。');
     }
     return {bridge, scope: expected};
@@ -67,12 +67,12 @@ export function createCharacterStateRuntime({context, notice = () => {}, formatM
     async snapshot() { const {bridge} = await current(); return bridge.getSnapshot(); },
     async mount(container, options = {}) {
       const {bridge, scope} = await current(options.scope);
-      if (typeof bridge.mount !== 'function') throw Error('目前另行啟用的 CSB 版本較舊，請以 1.1.0 更新原來的 CSB 擴充，再重新整理。原有角色資料會保留。');
+      if (typeof bridge.mount !== 'function') throw Error('目前另行啟用的 CSB 版本較舊，請以 1.2.0 更新原來的 CSB 擴充，再重新整理。原有角色資料會保留。');
       return bridge.mount(container, {...options, scope});
     },
     async setInline(enabled, options = {}) {
       const {bridge, scope} = await current(options.scope);
-      if (typeof bridge.setInlineCards !== 'function') throw Error('請先更新 CSB 至 1.1.0，才能在此設定正文顯示。');
+      if (typeof bridge.setInlineCards !== 'function') throw Error('請先更新 CSB 至 1.2.0，才能在此設定正文顯示。');
       return bridge.setInlineCards(enabled, {scope});
     },
     owns: () => !!owned && api() === ownedApi,

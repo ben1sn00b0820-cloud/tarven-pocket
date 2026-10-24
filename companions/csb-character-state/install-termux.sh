@@ -17,5 +17,5 @@ fi
 mkdir -p "$destination"
 cp "$source_dir/manifest.json" "$source_dir/index.js" "$source_dir/style.css" "$source_dir/README.md" "$destination/"
 cp -R "$source_dir/src" "$destination/"
-echo "安裝完成。重新整理酒館，在擴充功能中開啟『角色狀態工坊』。"
+echo "安裝完成。重新整理酒館，在擴充功能中開啟『角色信息』。"
 echo "目前聊天資料未被改動；資料會在啟用插件後由酒館保存。"

@@ -38,3 +38,15 @@
   .csb .csb-bar-fill,.csb .csb-chevron{transition:none!important;}
   .csb-dialog::backdrop{backdrop-filter:none!important;}
 }
+
+/* Scan review is bounded, mobile-first and avoids costly blur effects. */
+.csb-scan-body {min-width:0;max-width:100%;}
+.csb-scan-results {display:grid;gap:12px;min-width:0;}
+.csb-scan-candidate {padding:14px;border:1px solid #67758a55;border-radius:12px;min-width:0;background:#182231;}
+.csb-scan-change {display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-top:1px solid #67758a33;cursor:pointer;min-width:0;}
+.csb-scan-change>input {flex:0 0 auto;margin-top:4px;}
+.csb-scan-change>span {display:grid;gap:6px;min-width:0;overflow-wrap:anywhere;}
+.csb-scan-values {white-space:pre-wrap;overflow-wrap:anywhere;}
+.csb-scan-diagnostics {overflow-wrap:anywhere;}
+.csb .csb-scan-body select {max-width:100%;width:100%;}
+.csb .csb-btn:disabled {opacity:.5;cursor:not-allowed;}

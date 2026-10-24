@@ -1,9 +1,10 @@
+import {ScanService} from './scan.js';
 import {clone,uid,newDatabase,defaultSettings} from './schema.js';
 import {validateSchema,validateState,applyUpdate,replay,anchorFor,makePrompt,makeBackup,validateBackup,parseCSB21} from './core.js';
 export const KEY='csb_character_state_v1';
 
 export class StateController {
-  constructor(adapter){this.adapter=adapter;this.onChange=()=>{};this.mvuMessage='尚未同步';this.pendingChats=new WeakSet();this.cache=null;this.revision=0;this.stats={replays:0,resumedMessages:0,cacheHits:0};}
+  constructor(adapter){this.adapter=adapter;this.scanner=new ScanService(this);this.onChange=()=>{};this.mvuMessage='尚未同步';this.pendingChats=new WeakSet();this.cache=null;this.revision=0;this.stats={replays:0,resumedMessages:0,cacheHits:0};}
   invalidate(){this.cache=null;this.revision++;}
   context(){const c=this.adapter.context();if(!c?.chatMetadata||!Array.isArray(c.chat))throw Error('請先開啟一個聊天');return c;}
   settings(){const c=this.context();if(!c.extensionSettings[KEY])c.extensionSettings[KEY]=defaultSettings();return c.extensionSettings[KEY];}
@@ -80,6 +81,10 @@ export class StateController {
   promptInfo(){const {db,state,settings}=this.getSnapshot();const copy=clone(state);for(const c of Object.values(copy.characters))c.locked=Object.keys(db.locks[c.id]??{});
     return makePrompt(copy,db.schema,settings,{recentText:this.context().chat.slice(-4).map(m=>m.mes).join('\n'),pinned:db.pinned});
   }
+  scan(options){return this.scanner.run(options);}
+  scanPreview(){return this.scanner.preview();}
+  applyScan(token,selections){return this.scanner.apply(token,selections);}
+  cancelScan(){this.scanner.cancel();}
   async rebuild(){this.invalidate();await this.persist();}
   async setInlineCards(enabled){if(typeof enabled!=='boolean')throw Error('正文顯示必須是布林值');await this.saveSettings({...this.settings(),inlineCards:enabled});return enabled;}
   mvu(){const m=this.adapter.getMvu?.();return m&&typeof m.getMvuData==='function'&&typeof m.replaceMvuData==='function'?m:null;}

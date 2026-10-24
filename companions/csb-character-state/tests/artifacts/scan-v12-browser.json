@@ -1,0 +1,23 @@
+{
+  "fixture": "inline actual modules, mocked SillyTavern host and AI; no external navigation",
+  "passed": 16,
+  "checks": [
+    "runtime initializes, exposes scan entry, and the raw original message is kept",
+    "selected local proposal persists and renders the expected fields",
+    "repeated local scan does not duplicate the same character",
+    "phone-style mounted information view has scan and AI buttons",
+    "AI extraction previews a valid role, quarantines a malformed name, and uses exact evidence",
+    "replacing an existing value is opt-in per field and not prechecked",
+    "a cancelled AI request cannot write a late result",
+    "new user messages preserve information while not being auto-scanned",
+    "finished assistant response triggers no-cost local detection once",
+    "settings expose automatic AI separately with auto-apply disabled by default",
+    "automatic AI call queues a review without unapproved writes or recursive calls",
+    "switching chats while AI is running closes the dialog and rejects its late result",
+    "scan dialog remains horizontally contained at 320px",
+    "scan dialog remains horizontally contained at 390px",
+    "scan dialog remains horizontally contained at 768px",
+    "scan dialog remains horizontally contained at 1280px"
+  ],
+  "pageErrors": []
+}
