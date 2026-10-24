@@ -101,7 +101,7 @@ function render(snapshot=null){
     const errors=s.result.errors.filter(e=>e.index===index),errorKey=errors.map(e=>e.message).join('|'),previous=old&&cardSnapshots.get(old);
     if(previous&&previous.frame===frame&&previous.schema===s.db.schema&&previous.showAbsent===s.settings.showAbsent&&previous.pinned===pinned&&previous.errorKey===errorKey){if(old.parentNode!==textNode)textNode.append(old);continue;}
     const holder=el('div',{class:'csb csb-message-card'});
-    errors.forEach(e=>holder.append(el('div',{class:'csb-message-error'},`狀態未更新：${e.message}。可編輯原始回覆修正，角色信息保持原值。`)));
+    errors.forEach(e=>holder.append(el('div',{class:'csb-message-error'},`部分更新未採用：${e.message}。請核對或編輯原始回覆；未採用項目保留原值，其他有效更新仍會套用。`)));
     holder.append(statusPanel(frame,s.db.schema,{title:'劇情狀態',showAbsent:s.settings.showAbsent,onManage:showManager,onEdit:showEditor,pinned:s.db.pinned}));
     restoreOpen(holder,open);old?.remove();textNode.append(holder);
     cardSnapshots.set(holder,{frame,schema:s.db.schema,showAbsent:s.settings.showAbsent,pinned,errorKey});
@@ -139,7 +139,7 @@ export async function intercept(chat,contextSize,abort,type){
     const messages=type==='swipe'?c.chat.slice(0,-1):c.chat;
     const current=replay(db,messages,{allowNew:settings.allowNew}).state;
     for(const ch of Object.values(current.characters))ch.locked=Object.keys(db.locks[ch.id]??{});
-    const info=makePrompt(current,db.schema,settings,{recentText:messages.slice(-4).map(m=>m.mes).join('\n'),pinned:db.pinned});
+    const info=makePrompt(current,db.schema,settings,{recentText:messages.slice(-4).map(m=>m.mes).join('\n'),pinned:db.pinned,presenceOverrides:db.presenceOverrides??{}});
     c.setExtensionPrompt(KEY,info.text,1,0,false,0);
   }catch(e){report(e);abort?.(true);}
 };
@@ -151,7 +151,7 @@ export function initialize(){
   const c=context(),events=c.eventTypes??c.event_types??{};
   if(!c.eventSource?.on)return null;
   started=true;epoch++;generation=createGenerationGuard({context,document,readHostState:readHostGeneration});loadHostGeneration();controller=new StateController({context,getMvu:()=>globalThis.Mvu,isBusy});
-  bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,openScanner:showScanner,mountView:mountInformation,setInlineCards:enabled=>guardedController().setInlineCards(enabled),onError:report});
+  bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,openScanner:showScanner,mountView:mountInformation,setInlineCards:enabled=>guardedController().setInlineCards(enabled),setPresence:(id,mode)=>guardedController().setPresence(id,mode),onError:report});
   globalThis.CSBCharacterState=bridge.api;globalThis.csbCharacterStateIntercept=intercept;
   controller.scanner.onStatus=message=>{if(started&&/等待確認|已新增/.test(message))globalThis.toastr?.info?.(message,'角色信息掃描',{preventDuplicates:true});};
   controller.onChange=()=>{if(!started)return;dirty=true;schedule(true);};

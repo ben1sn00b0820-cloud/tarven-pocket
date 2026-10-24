@@ -13,7 +13,7 @@ export class StateController {
     const c=this.context(),db=readOnly?(c.chatMetadata[KEY]??newDatabase(c.extensionSettings?.[KEY]?.template)):this.db(),settings=readOnly?(c.extensionSettings?.[KEY]??defaultSettings()):this.settings();
     if(!readOnly){if(this.ensureIds(c))this.pendingChats.add(c.chatMetadata);this.migrateInformation(c,db);}
     const entries=c.chat.map(m=>[m,m.mes,m.swipe_id??0,!!m.is_user,!!m.is_system,m.extra?.csb_uid,m.extra?.csb_order]);
-    const prior=this.cache,refs=[db,db.seed,db.schema,db.schema.fields.length,db.schema.groups.length,db.manual,db.manual.length,db.locks,db.pinned,db.ignoredIds,settings.allowNew,settings.enabled,settings.inlineCards];
+    const prior=this.cache,refs=[db,db.seed,db.schema,db.schema.fields.length,db.schema.groups.length,db.manual,db.manual.length,db.locks,db.presenceOverrides,JSON.stringify(db.presenceOverrides??{}),db.pinned,db.ignoredIds,settings.allowNew,settings.enabled,settings.inlineCards];
     const sameRefs=prior&&refs.every((v,i)=>v===prior.refs[i])&&(!readOnly?prior.capture:true);
     const prefix=sameRefs&&prior.entries.length<=entries.length&&prior.entries.every((row,i)=>row.every((v,j)=>v===entries[i][j]));
     if(prefix&&prior.entries.length===entries.length){this.stats.cacheHits++;return {...prior.snapshot,settings};}
@@ -28,7 +28,7 @@ export class StateController {
       db.legacyManualBackup??=clone(db.manual);
       const orders=new Map(c.chat.map(m=>[m.extra.csb_uid,m.extra.csb_order]));
       for(const event of db.manual){
-        if(event.kind==='information')continue;
+        if(event.kind==='information'||event.kind==='presence')continue;
         const id=event.anchor?.split(':')[0];
         event.kind='information';event.afterOrder=event.anchor==='start'?0:(orders.get(id)??Math.max(0,...orders.values()));
       }
@@ -36,21 +36,53 @@ export class StateController {
     db.informationVersion=1;this.invalidate();
   }
   assertContext(c){if(this.context().chatMetadata!==c.chatMetadata)throw Error('聊天已切換，取消對原聊天的操作');}
-  async flush(c=this.context(),messagesChanged=false){this.assertContext(c);if(messagesChanged||this.pendingChats.has(c.chatMetadata)){await c.saveChat();this.pendingChats.delete(c.chatMetadata);}this.assertContext(c);await c.saveMetadata();this.assertContext(c);}
+  contextGuard(c=this.context()){
+    const metadata=c.chatMetadata,chat=c.chat,scope=JSON.stringify([c.groupId??null,c.characters?.[c.characterId]?.avatar??c.characterId??null,c.getCurrentChatId?.()??c.chatId]);
+    return ()=>{const now=this.context();if(now.chatMetadata!==metadata||now.chat!==chat||JSON.stringify([now.groupId??null,now.characters?.[now.characterId]?.avatar??now.characterId??null,now.getCurrentChatId?.()??now.chatId])!==scope)throw Error('聊天已切換，取消對原聊天的操作');};
+  }
+  async flush(c=this.context(),messagesChanged=false){const guard=this.contextGuard(c);guard();const metadata=c.chatMetadata;if(messagesChanged||this.pendingChats.has(metadata)){await c.saveChat();guard();this.pendingChats.delete(metadata);}guard();await c.saveMetadata();guard();}
   async persist(c=this.context(),messagesChanged=false){this.invalidate();await this.flush(c,messagesChanged);this.onChange();}
   ensureIds(c){let changed=false;const db=this.db();let order=Math.max(db.nextOrder??1,1,...c.chat.map(m=>Number.isSafeInteger(m.extra?.csb_order)?m.extra.csb_order+1:1));for(const m of c.chat){m.extra??={};if(!m.extra.csb_uid){m.extra.csb_uid=uid('m');changed=true;}if(!Number.isSafeInteger(m.extra.csb_order)||m.extra.csb_order<1){m.extra.csb_order=order++;changed=true;}}db.nextOrder=order;return changed;}
   addManual(payload){const c=this.context(),db=this.db();const changed=this.ensureIds(c);const anchor=c.chat.length?anchorFor(c.chat.at(-1)):'start';const afterOrder=Math.max(0,...c.chat.map(m=>m.extra.csb_order));db.manual.push({id:uid('e'),kind:'information',anchor,afterOrder,payload:clone(payload),createdAt:Date.now()});this.invalidate();return changed;}
-  async saveCharacter(update,locks,pinned,isNew){
-    const c=this.context(),{db,state}=this.getSnapshot();
-    // Validate the entire transaction before touching persisted data.
-    const verified=applyUpdate(state,db.schema,{version:1,characters:[update]},{manual:true});
-    if(isNew&&Object.hasOwn(state.characters,update.id))throw Error('角色 ID 已存在');
-    for(const [key,val]of Object.entries(locks))if(!db.schema.fields.some(f=>f.id===key))throw Error('鎖定欄位不存在');
-    if(isNew){db.seed.characters[update.id]=clone(verified.state.characters[update.id]);db.seed.characters[update.id].present=false;}
-    const durableUpdate={...update,name:update.name??verified.state.characters[update.id].name};
-    const changed=this.addManual({version:1,characters:[durableUpdate]});db.locks[update.id]=clone(locks);
-    db.pinned=db.pinned.filter(id=>id!==update.id);if(pinned)db.pinned.push(update.id);
-    await this.persist(c,changed);
+  addPresence(payload){
+    const c=this.context(),db=this.db(),changed=this.ensureIds(c),anchor=c.chat.length?anchorFor(c.chat.at(-1)):'start';
+    db.manual.push({id:uid('e'),kind:'presence',anchor,payload:clone(payload),createdAt:Date.now()});this.invalidate();return changed;
+  }
+  presenceMode(mode){if(!['auto','present','absent'].includes(mode))throw Error('在場設定必須是跟隨劇情、固定在場或固定離場');return mode;}
+  async setPresence(id,mode){
+    this.presenceMode(mode);if(this.presenceSaving)throw Error('正在保存角色在場設定，請稍後');
+    const c=this.context(),guard=this.contextGuard(c),{db,state}=this.getSnapshot();
+    if(!Object.hasOwn(state.characters,id))throw Error('找不到這個角色，請重新開啟角色資料');
+    const before=db.presenceOverrides,next={...(before??{})};
+    if(mode==='auto')delete next[id];else next[id]=mode==='present';
+    if(JSON.stringify(before??{})===JSON.stringify(next))return state.characters[id].present;
+    this.presenceSaving=true;db.presenceOverrides=next;this.invalidate();
+    try{await this.flush(c);guard();this.onChange();return this.getSnapshot().state.characters[id]?.present??false;}
+    catch(error){if(db.presenceOverrides===next){if(before===undefined)delete db.presenceOverrides;else db.presenceOverrides=before;}this.invalidate();this.onChange();throw error;}
+    finally{this.presenceSaving=false;}
+  }
+  async saveCharacter(update,locks,pinned,isNew,presenceMode){
+    if(this.presenceSaving)throw Error('正在保存角色資料，請稍後');
+    if(presenceMode!==undefined)this.presenceMode(presenceMode);
+    const c=this.context(),guard=this.contextGuard(c),{db,state}=this.getSnapshot();
+    // Editing an unrelated field must not convert the displayed scene state
+    // into a durable presence event. New UI supplies a separate explicit mode.
+    const edit={...update};if(presenceMode!==undefined)delete edit.present;
+    const verified=applyUpdate(state,db.schema,{version:1,characters:[edit]},{manual:true});
+    if(isNew&&Object.hasOwn(state.characters,edit.id))throw Error('角色 ID 已存在');
+    for(const key of Object.keys(locks))if(!db.schema.fields.some(f=>f.id===key))throw Error('鎖定欄位不存在');
+    const before={seed:db.seed,manual:db.manual,locks:db.locks,pinned:db.pinned,presenceOverrides:db.presenceOverrides};
+    db.seed={...db.seed,characters:{...db.seed.characters}};db.manual=[...db.manual];db.locks={...db.locks};
+    if(isNew){db.seed.characters[edit.id]=clone(verified.state.characters[edit.id]);db.seed.characters[edit.id].present=false;}
+    const durableUpdate={...edit,name:edit.name??verified.state.characters[edit.id].name};
+    const changed=this.addManual({version:1,characters:[durableUpdate]});db.locks[edit.id]=clone(locks);
+    db.pinned=db.pinned.filter(id=>id!==edit.id);if(pinned)db.pinned.push(edit.id);
+    if(presenceMode!==undefined){db.presenceOverrides={...(db.presenceOverrides??{})};if(presenceMode==='auto')delete db.presenceOverrides[edit.id];else db.presenceOverrides[edit.id]=presenceMode==='present';}
+    const staged=Object.fromEntries(Object.keys(before).map(key=>[key,db[key]]));
+    this.presenceSaving=true;
+    try{await this.persist(c,changed);guard();}
+    catch(error){for(const key of Object.keys(before))if(db[key]===staged[key]){if(before[key]===undefined)delete db[key];else db[key]=before[key];}this.invalidate();this.onChange();throw error;}
+    finally{this.presenceSaving=false;}
   }
   async saveSchema(schema){const c=this.context(),next=validateSchema(schema),db=this.db();
     // Configuration edits do not rewrite stored snapshots. Validate conversions against live data.
@@ -66,10 +98,10 @@ export class StateController {
     for(const f of next.fields){const i=merged.fields.findIndex(x=>x.id===f.id);if(i<0)merged.fields.push(f);else merged.fields[i]=f;}
     await this.saveSchema(merged);
   }
-  exportBackup(){const {db,state}=this.getSnapshot();return makeBackup(db,state);}
+  exportBackup(){const {db,state,result}=this.getSnapshot();return makeBackup(db,state,result.unlockedState);}
   validateImport(data){return validateBackup(data);}
   async importBackup(data){const valid=validateBackup(data),c=this.context();const changed=this.ensureIds(c),db=newDatabase(valid.schema);
-    db.seed=valid.state;db.locks=valid.locks;db.pinned=valid.pinned;db.ignoredIds=c.chat.map(m=>m.extra.csb_uid);
+    db.seed=valid.state;db.locks=valid.locks;db.pinned=valid.pinned;db.presenceOverrides=valid.presenceOverrides;db.ignoredIds=c.chat.map(m=>m.extra.csb_uid);
     c.chatMetadata[KEY]=db;await this.persist(c,changed);
   }
   async importLegacy(source){const c=this.context(),s=this.getSnapshot(),converted=parseCSB21(source,s.db.schema,s.state);
@@ -79,7 +111,7 @@ export class StateController {
   }
   legacyFromChat(){return this.context().chat.filter(m=>!m.is_user).map(m=>m.mes).join('\n');}
   promptInfo(){const {db,state,settings}=this.getSnapshot();const copy=clone(state);for(const c of Object.values(copy.characters))c.locked=Object.keys(db.locks[c.id]??{});
-    return makePrompt(copy,db.schema,settings,{recentText:this.context().chat.slice(-4).map(m=>m.mes).join('\n'),pinned:db.pinned});
+    return makePrompt(copy,db.schema,settings,{recentText:this.context().chat.slice(-4).map(m=>m.mes).join('\n'),pinned:db.pinned,presenceOverrides:db.presenceOverrides??{}});
   }
   scan(options){return this.scanner.run(options);}
   scanPreview(){return this.scanner.preview();}
@@ -107,6 +139,6 @@ export class StateController {
     for(const g of valid.schema.groups)if(!merged.groups.some(x=>x.id===g.id))merged.groups.push(g);
     for(const f of valid.schema.fields){const old=merged.fields.find(x=>x.id===f.id);if(old&&old.type!==f.type)throw Error('MVU 模板與本地欄位類型衝突');if(!old)merged.fields.push(f);}
     const payload={version:1,scene:valid.state.scene,present:Object.values(valid.state.characters).filter(c=>c.present).map(c=>c.id),characters:Object.values(valid.state.characters).map(c=>({id:c.id,name:c.name,aliases:c.aliases,set:Object.fromEntries(Object.entries(c.values).filter(([key])=>!merged.fields.find(f=>f.id===key)?.hidden)),reason:'從 MVU 讀回'}))};
-    applyUpdate(this.getSnapshot().state,merged,payload,{manual:true});this.db().schema=validateSchema(merged);const changed=this.addManual(payload);await this.persist(c,changed);this.mvuMessage='已讀回角色資料（本地鎖定優先）';
+    applyUpdate(this.getSnapshot().state,merged,payload,{manual:true});this.db().schema=validateSchema(merged);this.db().presenceOverrides={...valid.presenceOverrides,...(this.db().presenceOverrides??{})};const changed=this.addManual(payload);await this.persist(c,changed);this.mvuMessage='已讀回角色資料（本地鎖定優先）';
   }
 }

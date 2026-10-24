@@ -9,7 +9,7 @@ const user = {userName: '小雨', characterName: '阿澤', isUser: true, message
 const role = {...user, isUser: false};
 
 test('spirit protocol version and structured money limits retain exact historical tails', () => {
-  assert.equal(PHONE_VERSION, '0.13.0');
+  assert.equal(PHONE_VERSION, '0.13.1');
   assert.equal(PHONE_LIMITS.amount, SPIRIT_MAX);
   const event = {id: 'old-payment', app: 'wechat', action: 'transfer', from: '阿澤', to: '小雨'};
   for (const amount of [0.01, 12.34, 88.5, 200000.01, SPIRIT_MAX - 0.01, SPIRIT_MAX]) {

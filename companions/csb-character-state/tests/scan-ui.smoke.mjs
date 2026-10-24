@@ -9,7 +9,7 @@ const modules=['src/schema.js','src/identity.js','src/core.js','src/scan.js','sr
 const js=modules.map(p=>fs.readFileSync(path.join(root,p),'utf8').replace(/^import .*?;\n/gm,'').replace(/^export /gm,'')).join('\n');
 const html=fs.readFileSync(path.join(root,'tests/host.html'),'utf8')
   .replace('<link rel="stylesheet" href="../style.css">','<style>'+fs.readFileSync(path.join(root,'style.css'),'utf8')+'</style>')
-  .replace('<script type="module" src="../index.js"></script>','<script type="module">'+js.replaceAll('</script','<\\/script')+'</script>');
+  .replace('<script type="module" src="../index.js"></script>',()=>'<script type="module">'+js.replaceAll('</script','<\\/script')+'</script>');
 const browser=await chromium.launch({headless:true,...(process.env.CSB_CHROMIUM?{executablePath:process.env.CSB_CHROMIUM}:{}),args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
 const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});page.setDefaultTimeout(8000);
 const errors=[],checks=[];page.on('pageerror',e=>errors.push(e.message));
@@ -79,7 +79,7 @@ try{
  });
  await check('replacing an existing value is opt-in per field and not prechecked',async()=>{
   await raw('姓名：雲璃\n身分：外院管事');await page.evaluate(()=>CSBCharacterState.openScanner({mode:'local',limit:1,merge:'changes'}));await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText('補充 雲璃',{exact:true}).waitFor();
-  const box=scanner().locator('.csb-scan-change input');assert.equal(await box.isChecked(),false);assert.ok((await scanner().innerText()).includes('隨行侍女 → 外院管事'));await box.check();
+  const box=scanner().locator('.csb-scan-change:not(.csb-scan-presence) input');assert.equal(await box.isChecked(),false);assert.ok((await scanner().innerText()).includes('隨行侍女 → 外院管事'));await box.check();
   await scanner().getByRole('button',{name:'套用勾選結果',exact:true}).click();await scanner().getByText(/已保存 1 位角色、1 個欄位/).waitFor();assert.equal(await page.evaluate(()=>Object.values(CB().state.characters).find(c=>c.name==='雲璃').values.identity),'外院管事');await closeScan();
  });
  await check('a cancelled AI request cannot write a late result',async()=>{

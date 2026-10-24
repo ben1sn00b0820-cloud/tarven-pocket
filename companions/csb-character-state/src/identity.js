@@ -12,10 +12,19 @@ export function characterName(value, label='姓名', {strict=false}={}) {
 export const nameKey=value=>String(value??'').normalize('NFKC').trim().toLocaleLowerCase();
 const goodId=id=>typeof id==='string'&&/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(id)&&!['__proto__','prototype','constructor'].includes(id);
 function nameHash(s){let h=2166136261;for(const c of s){h^=c.codePointAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}
+/** Recover only exact, unambiguous references. Never infer a person from an invented ID. */
+export function resolveKnownReference(reference,state){
+  if(typeof reference!=='string'||!reference.trim())return null;
+  const characters=state?.characters??{};
+  if(goodId(reference)&&Object.hasOwn(characters,reference))return characters[reference];
+  const key=nameKey(reference),matches=Object.values(characters).filter(c=>[c.name,...(c.aliases??[])].some(name=>nameKey(name)===key));
+  if(matches.length>1)throw Error(`「${reference}」對應多位角色，請指定正確的既有 ID`);
+  return matches[0]??null;
+}
 export function resolveIdentity(row,state,{strict=true}={}){
   if(!row||typeof row!=='object'||Array.isArray(row))throw Error('角色條目必須是物件，不能把整段正文當成角色');
   const rawName=row.name??row.姓名??row.set?.name??row.set?.姓名;
-  const byId=goodId(row.id)?state.characters[row.id]:null;
+  const byId=goodId(row.id)&&Object.hasOwn(state.characters,row.id)?state.characters[row.id]:(rawName===undefined?resolveKnownReference(row.id,state):null);
   const name=rawName===undefined&&byId?byId.name:characterName(rawName,'角色姓名',{strict});
   const matches=Object.values(state.characters).filter(c=>[c.name,...(c.aliases??[])].some(n=>nameKey(n)===nameKey(name)));
   if(byId){
@@ -48,11 +57,28 @@ export function normalizeIncomingIdentities(payload,state){
     }catch(error){diagnostics.push({kind:'error',row:i+1,message:`第 ${i+1} 個角色：${error.message}`});}
   }
   const result={...payload,characters};
-  // Do not let one rejected newcomer erase everyone else's presence.
+  // A valid complete roster can also use exact known names/aliases. An invalid
+  // roster is not complete: retain others' status and only affirm identifiable
+  // listed people, rather than dropping every useful presence update.
   if(Array.isArray(payload.present)){
-    const fixed=[...new Set(payload.present.map(id=>mapping.get(id)??id))];
-    if(fixed.every(id=>working.characters[id]))result.present=fixed;
-    else{delete result.present;diagnostics.push({kind:'warning',message:'在場名單包含未能識別的角色，保留原在場狀態'});}
+    const fixed=[],unresolved=[];
+    for(const reference of payload.present){
+      try{
+        const mapped=mapping.get(reference)??reference,character=resolveKnownReference(mapped,working);
+        if(character){if(!fixed.includes(character.id))fixed.push(character.id);}
+        else unresolved.push(reference);
+      }catch{unresolved.push(reference);}
+    }
+    if(!unresolved.length)result.present=fixed;
+    else{
+      delete result.present;
+      for(const id of fixed){
+        const row=characters.find(c=>c.id===id);
+        if(row){if(row.present===undefined){row.present=true;if(!String(row.reason??'').trim())row.reason='本輪在場名單明確列出此角色';}}
+        else characters.push({id,present:true,reason:'本輪在場名單明確列出此角色'});
+      }
+      diagnostics.push({kind:'warning',message:'在場名單包含未能識別的角色；只更新可確認列出的人物，其餘在場狀態保持原值'});
+    }
   }
   return {payload:result,diagnostics};
 }

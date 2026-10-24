@@ -12,7 +12,7 @@ export function characterStateScope(c) {
 }
 
 /** Read-only public contract. Mutations stay in the existing guarded editor. */
-export function createCharacterStateBridge({context, snapshot, openEditor, openManager, openScanner, mountView, setInlineCards, target = globalThis, onError = () => {}}) {
+export function createCharacterStateBridge({context, snapshot, openEditor, openManager, openScanner, mountView, setInlineCards, setPresence, target = globalThis, onError = () => {}}) {
   let alive = true, signature;
   const listeners = new Set(), mounts = new Set();
   const stale = () => Object.assign(Error('角色狀態或對話已變動，請重新開啟角色資料。'), {code:'STALE'});
@@ -24,7 +24,7 @@ export function createCharacterStateBridge({context, snapshot, openEditor, openM
     const now = context();
     if (!alive || characterStateScope(now) !== scope || now.chatMetadata !== c.chatMetadata || now.chat !== c.chat) throw stale();
     return clone({scope, revision:current.revision??0, enabled:current.settings?.enabled !== false, inlineCards:current.settings?.inlineCards !== false,
-      schema:current.db.schema, state:current.state, locks:current.db.locks ?? {}, pinned:current.db.pinned ?? []});
+      schema:current.db.schema, state:current.state, locks:current.db.locks ?? {}, pinned:current.db.pinned ?? [], presenceOverrides:current.db.presenceOverrides ?? {}});
   }
   function edit(id, {scope:expectedScope} = {}) {
     const c = context(), current = getSnapshot();
@@ -69,7 +69,18 @@ export function createCharacterStateBridge({context, snapshot, openEditor, openM
     return true;
   }
   async function setInline(enabled,{scope:expectedScope}={}){const current=getSnapshot();if(!current||(expectedScope!==undefined&&current.scope!==expectedScope))throw stale();if(typeof setInlineCards!=='function')throw Error('目前環境未提供正文顯示設定');if(typeof enabled!=='boolean')throw TypeError('正文顯示必須是布林值');return setInlineCards(enabled,{scope:current.scope});}
+  async function setCurrentPresence(id,mode,{scope:expectedScope,revision:expectedRevision}={}){
+    const c=context(),metadata=c?.chatMetadata,chat=c?.chat,current=getSnapshot();
+    if(!current||(expectedScope!==undefined&&current.scope!==expectedScope)||(expectedRevision!==undefined&&current.revision!==expectedRevision))throw stale();
+    if(!current.enabled)throw Error('角色信息已停用，請先啟用');
+    if(typeof id!=='string'||!Object.hasOwn(current.state.characters,id))throw Error('找不到這個角色，請重新讀取角色資料');
+    if(!['auto','present','absent'].includes(mode))throw TypeError('在場設定格式錯誤');
+    if(typeof setPresence!=='function')throw Error('目前版本未提供在場設定，請更新角色信息');
+    const value=await setPresence(id,mode,{scope:current.scope,revision:current.revision});
+    if(!alive||context()?.chatMetadata!==metadata||context()?.chat!==chat||characterStateScope(context())!==current.scope)throw stale();
+    notify();return value;
+  }
   function mount(container,options={}){const current=getSnapshot();if(!current||(options.scope!==undefined&&current.scope!==options.scope))throw stale();if(typeof mountView!=='function')throw Error('目前環境未提供內嵌角色信息');const view=mountView(container,api,options);const wrapped={refresh:()=>view.refresh(),dispose(){view.dispose();mounts.delete(wrapped);}};mounts.add(wrapped);return wrapped;}
-  const api = Object.freeze({apiVersion:BRIDGE_VERSION, getSnapshot, getRevision, openEditor:edit, openManager:manage, openScanner:scan, subscribe, mount, setInlineCards:setInline});
+  const api = Object.freeze({apiVersion:BRIDGE_VERSION, getSnapshot, getRevision, openEditor:edit, openManager:manage, openScanner:scan, subscribe, mount, setInlineCards:setInline,setPresence:setCurrentPresence});
   return {api, notify, dispose() {alive=false;for(const view of [...mounts])view.dispose();mounts.clear();listeners.clear();signature=undefined;}};
 }

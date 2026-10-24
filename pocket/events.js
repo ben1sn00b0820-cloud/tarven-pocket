@@ -2,7 +2,7 @@ import {safePhotoUrl} from '../core/photo-url.js';
 import {legacyWalletAmount, parseSpiritText, SPIRIT_MAX} from '../core/currency.js';
 
 /** Strict, side-effect-free narrative → phone protocol. Never guesses events from prose. */
-export const PHONE_VERSION = '0.13.0';
+export const PHONE_VERSION = '0.13.1';
 export const PHONE_LIMITS = Object.freeze({message: 2_000_000, block: 100_000, events: 256, name: 40, text: 4000, longText: 20_000, members: 20, amount: SPIRIT_MAX});
 const WX = new Set(['contact', 'message', 'group_message', 'group_create', 'photo', 'voice', 'location', 'pat', 'dice', 'transfer', 'redpacket', 'gift', 'recall']);
 const IG = new Set(['post', 'story', 'dm', 'comment', 'like']);

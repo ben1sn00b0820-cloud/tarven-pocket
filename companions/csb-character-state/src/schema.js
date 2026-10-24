@@ -43,5 +43,5 @@ export function defaultSchema() {
 }
 export function defaultSettings() {return {enabled:true,autoUpdate:true,autoScan:'local',autoAIApply:false,allowNew:true,showAbsent:false,inlineCards:true,mvuSync:false,promptBudget:42000,template:defaultSchema()};}
 export function emptyState() {return {characters:{},scene:{time:'',location:''}};}
-export function newDatabase(template=defaultSchema()) {return {version:VERSION,informationVersion:1,nextOrder:1,schema:clone(template),seed:emptyState(),manual:[],processed:{},locks:{},pinned:[],enabled:true};}
+export function newDatabase(template=defaultSchema()) {return {version:VERSION,informationVersion:1,nextOrder:1,schema:clone(template),seed:emptyState(),manual:[],processed:{},locks:{},presenceOverrides:{},pinned:[],enabled:true};}
 export function valueOf(character,field) {return Object.hasOwn(character.values,field.id) ? character.values[field.id] : field.default;}

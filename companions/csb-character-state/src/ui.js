@@ -19,6 +19,9 @@ export function elementIn(doc,tag,attrs={},...children){
 const btn=(label,fn,cls='')=>el('button',{type:'button',class:`csb-btn ${cls}`,onclick:fn},label);
 const note=t=>el('p',{class:'csb-muted'},t);
 const empty=t=>el('div',{class:'csb-empty'},t);
+const PRESENCE_OPTIONS=[['auto','跟隨劇情'],['present','固定在場'],['absent','固定離場']];
+const presenceModeFor=(overrides,id)=>Object.hasOwn(overrides??{},id)?(overrides[id]===true?'present':'absent'):'auto';
+const presenceLabel=value=>value===true?'在場':value===false?'離場':'無法判定';
 const format=(v,f)=>v===null||v===undefined||v===''?'未設定':Array.isArray(v)?v.join('、'):typeof v==='boolean'?(v?'是':'否'):`${v}${f.unit?' '+f.unit:''}`;
 export function barView(f,v,doc=document){
   const el=(tag,attrs,...children)=>elementIn(doc,tag,attrs,...children);
@@ -29,14 +32,21 @@ export function barView(f,v,doc=document){
   const bar=el('div',{class:`csb-bar-track ${known?'':'csb-bar-unknown'}`,role:'progressbar','aria-label':f.label,'aria-valuemin':f.min,'aria-valuemax':f.max,...(known?{'aria-valuenow':v}:{'aria-valuetext':'未知'})},fill);
   return el('div',{class:'csb-gauge'},el('div',{class:'csb-gauge-top'},el('span',{},f.icon?`${f.icon} `:'',f.label),el('strong',{},label)),bar,stage?el('small',{class:'csb-stage'},stage):null);
 }
-export function characterCard(c,schema,{expanded=false,onEdit=null,pinned=false,document:doc=document}={}){
+export function characterCard(c,schema,{expanded=false,onEdit=null,onPresence=null,presenceMode='auto',pinned=false,document:doc=document}={}){
   const el=(tag,attrs,...children)=>elementIn(doc,tag,attrs,...children);
   const btn=(label,fn,cls='')=>el('button',{type:'button',class:`csb-btn ${cls}`,onclick:fn},label);
   const overview=[c.values.age?`${c.values.age} 歲`:null,c.values.identity,c.values.relation].filter(Boolean).join(' · ');
   const card=el('details',{class:'csb-character',open:expanded,'data-char':c.id});
+  const presenceHead=el('span',{class:'csb-presence-head'},el('span',{class:`csb-presence ${c.present===true?'is-present':''}`},presenceLabel(c.present)));
+  if(onPresence){
+    const picker=el('select',{'aria-label':`${c.name} 在場設定`,'data-presence-control':c.id},...PRESENCE_OPTIONS.map(([value,label])=>el('option',{value},label))),error=el('span',{class:'csb-presence-error',role:'status','aria-live':'polite'});
+    picker.value=presenceMode;
+    for(const event of ['click','keydown','pointerdown'])picker.addEventListener(event,e=>e.stopPropagation());
+    picker.addEventListener('change',async()=>{const next=picker.value;picker.disabled=true;error.textContent='';try{await onPresence(c.id,next);presenceMode=next;}catch(e){picker.value=presenceMode;error.textContent=e.message??String(e);}finally{picker.disabled=false;}});
+    presenceHead.append(picker,error);
+  }
   const summary=el('summary',{class:'csb-character-head'},el('span',{class:'csb-avatar'},Array.from(c.name)[0]||'◇'),
-    el('span',{class:'csb-person'},el('strong',{},c.name),el('small',{},overview||'人物資料待補充')),
-    el('span',{class:`csb-presence ${c.present?'is-present':''}`},c.present?'在場':'離場'),el('span',{class:'csb-chevron'},'⌄'));
+    el('span',{class:'csb-person'},el('strong',{},c.name),el('small',{},overview||'人物資料待補充')),presenceHead,el('span',{class:'csb-chevron'},'⌄'));
   card.append(summary);
   let body;const build=()=>{if(body)return;body=el('div',{class:'csb-character-body'});
   if(onEdit)body.append(el('div',{class:'csb-card-actions'},pinned?el('span',{class:'csb-chip'},'已優先載入'):null,btn('編輯角色',()=>onEdit(c.id),'csb-small')));
@@ -102,16 +112,16 @@ export function openManager(host,initialTab='characters'){
   function renderCharacters(s){
     const chars=Object.values(s.state.characters),q=input('search',search,{placeholder:'搜尋姓名、身分、別名','aria-label':'搜尋角色'}),which=select([['all','全部角色'],['present','只看在場'],['absent','只看離場']],filter),grid=el('div',{class:'csb-roster'});
     const refresh=()=>{const found=chars.filter(c=>(filter==='all'||(filter==='present')===c.present)&&[c.name,...c.aliases,String(c.values.identity??'')].some(x=>x.toLowerCase().includes(search.toLowerCase())));
-      grid.replaceChildren(...found.map(c=>characterCard(c,s.db.schema,{onEdit:id=>editCharacter(id),pinned:s.db.pinned.includes(c.id)})));if(!found.length)grid.append(empty('沒有符合條件的角色。'));
+      grid.replaceChildren(...found.map(c=>characterCard(c,s.db.schema,{onEdit:id=>editCharacter(id),pinned:s.db.pinned.includes(c.id),presenceMode:presenceModeFor(s.db.presenceOverrides,c.id),onPresence:async(id,mode)=>{await host.setPresence(id,mode);status(mode==='auto'?'已恢復跟隨劇情':'已固定角色在場狀態');render();}})));if(!found.length)grid.append(empty('沒有符合條件的角色。'));
     };
     q.addEventListener('input',()=>{search=q.value;refresh();});which.addEventListener('change',()=>{filter=which.value;refresh();});
     area.append(el('div',{class:'csb-section-heading'},el('div',{},el('h3',{},'每個角色，都有自己的故事。'),note(`${chars.filter(c=>c.present).length} 人在場 · ${chars.length} 份角色檔案`)),btn('＋ 新增角色',()=>editCharacter(null),'csb-primary')),
       el('div',{class:'csb-toolbar'},btn('掃描正文',()=>openScanner(host,{mode:'local'})),btn('AI 填表',()=>openScanner(host,{mode:'ai'}),'csb-primary')),el('div',{class:'csb-toolbar'},q,which),grid);refresh();
   }
   function editCharacter(id){
-    const s=host.getSnapshot(),c=id?s.state.characters[id]:{id:uid('c'),name:'',aliases:[],present:true,values:{}},form=el('form',{class:'csb-form'}),error=el('p',{class:'csb-error',role:'alert'});
-    const name=input('text',c.name,{required:true,maxlength:100}),aliases=input('text',c.aliases.join('、')),present=checkbox(c.present),pin=checkbox(s.db.pinned.includes(c.id));
-    form.append(note('角色信息會持續保存；新訊息、切換回覆、離場與省略欄位不會清空設定。只有後續正文的明確條目更新才會改變；勾選「鎖定」可禁止模型修改該欄位。'),el('div',{class:'csb-form-grid'},control('姓名',name),control('別名（以頓號分隔）',aliases),control('目前在場',present),control('優先載入模型',pin,'角色未出場時，也優先提供詳細資料。')));
+    const s=host.getSnapshot(),c=id?s.state.characters[id]:{id:uid('c'),name:'',aliases:[],present:false,values:{}},form=el('form',{class:'csb-form'}),error=el('p',{class:'csb-error',role:'alert'});
+    const initialPresenceMode=presenceModeFor(s.db.presenceOverrides,c.id),name=input('text',c.name,{required:true,maxlength:100}),aliases=input('text',c.aliases.join('、')),presence=select(PRESENCE_OPTIONS,initialPresenceMode),pin=checkbox(s.db.pinned.includes(c.id));
+    form.append(note('角色信息會持續保存；新訊息、切換回覆、離場與省略欄位不會清空設定。只有後續正文的明確條目更新才會改變；勾選「鎖定」可禁止模型修改該欄位。'),el('div',{class:'csb-form-grid'},control('姓名',name),control('別名（以頓號分隔）',aliases),control('在場設定',presence,'跟隨劇情會依當前場景更新；固定在場／離場優先於正文與掃描，直到改回跟隨劇情。'),control('優先載入模型',pin,'角色未出場時，也優先提供詳細資料。')));
     const editors=[];
     for(const g of s.db.schema.groups){
       const fields=s.db.schema.fields.filter(f=>f.group===g.id&&!f.hidden);if(!fields.length)continue;
@@ -140,7 +150,7 @@ export function openManager(host,initialTab='characters'){
         value=normalizeValue(f,value,false);if(!id||JSON.stringify(value)!==JSON.stringify(old))set[f.id]=value;
         if(lock.checked)locks[f.id]=value;
       }
-      await host.saveCharacter({id:c.id,name:name.value.trim(),aliases:aliases.value.split(/[、,，]/).map(s=>s.trim()).filter(Boolean),set,present:present.checked,reason:'使用者手動設定'},locks,pin.checked,!id);
+      await host.saveCharacter({id:c.id,name:name.value.trim(),aliases:aliases.value.split(/[、,，]/).map(s=>s.trim()).filter(Boolean),set,reason:'使用者手動設定'},locks,pin.checked,!id,!id||presence.value!==initialPresenceMode?presence.value:undefined);
       d.close();status('角色資料已儲存');render();
     }catch(e){error.textContent=e.message;}finally{submit.disabled=false;}});
   }
@@ -218,8 +228,9 @@ export function mountInformation(container,api,{scope:expectedScope}={}){
     const shown=characters.filter(c=>(filter.value==='all'||(filter.value==='present')===c.present)&&[c.name,...(c.aliases??[]),String(c.values.identity??'')].some(s=>s.toLocaleLowerCase().includes(query)));
     const nextSchema=JSON.stringify(current.schema),schemaChanged=nextSchema!==schemaSignature;schemaSignature=nextSchema;
     const keep=new Set(characters.map(c=>c.id));for(const id of cards.keys())if(!keep.has(id))cards.delete(id);
-    const nodes=shown.map(c=>{const signature=JSON.stringify([c,pinned.includes(c.id)]),old=cards.get(c.id);if(old&&!schemaChanged&&old.signature===signature)return old.node;
-      const node=characterCard(c,current.schema,{expanded:!!old?.node.open,pinned:pinned.includes(c.id),document:doc,onEdit:id=>{try{api.openEditor(id,{scope:current.scope});}catch(error){showError(error);}}});
+    const nodes=shown.map(c=>{const mode=presenceModeFor(current.presenceOverrides,c.id),scope=current.scope,signature=JSON.stringify([scope,c,pinned.includes(c.id),mode]),old=cards.get(c.id);if(old&&!schemaChanged&&old.signature===signature)return old.node;
+      const node=characterCard(c,current.schema,{expanded:!!old?.node.open,pinned:pinned.includes(c.id),presenceMode:mode,document:doc,onEdit:id=>{try{api.openEditor(id,{scope});}catch(error){showError(error);}},
+        onPresence:typeof api.setPresence==='function'?async(id,next)=>{const latest=api.getSnapshot();if(!alive||latest?.scope!==scope)throw Error('聊天已切換，請重新開啟角色信息。');try{await api.setPresence(id,next,{scope,revision:latest.revision});lastRevision='';refresh();}catch(error){showError(error);throw error;}}:null});
       if(old){const groups=[...old.node.querySelectorAll('.csb-group')].map(g=>g.open);node.querySelectorAll('.csb-group').forEach((g,i)=>{if(groups[i]!==undefined)g.open=groups[i];});}
       cards.set(c.id,{node,signature});return node;});
     list.replaceChildren(...nodes);if(!nodes.length)list.append(e('div',{class:'csb-empty'},characters.length?'沒有符合條件的角色。':'尚未建立角色信息；可從管理介面新增或匯入。'));
@@ -250,14 +261,14 @@ export function openScanner(host,options={}){
   const limit=select([['1','最新 1 則'],['5','最近 5 則'],['20','最近 20 則'],['all','本聊天（最多最近 60,000 字元）']],String(options.limit??20));
   const merge=select([['fill','只新增角色、補空白欄位'],['changes','預覽明確變更，逐項勾選後更新']],options.merge??'fill');
   const target=select([['','全部角色'],...Object.values(initial.state.characters).map(c=>[c.id,c.name])],options.targetId??'');
-  const includeUser=checkbox(false),start=btn('開始掃描',runScan,'csb-primary'),cancel=btn('取消本次掃描',()=>{abort?.abort();host.cancelScan();feedback.textContent='已要求取消；已送出的模型請求可能仍計費，返回結果不會寫入。';}),apply=btn('套用勾選結果',commit,'csb-primary');
+  const includeUser=checkbox(false),assessPresence=checkbox(options.assessPresence!==false),start=btn('開始掃描',runScan,'csb-primary'),cancel=btn('取消本次掃描',()=>{abort?.abort();host.cancelScan();feedback.textContent='已要求取消；已送出的模型請求可能仍計費，返回結果不會寫入。';}),apply=btn('套用勾選結果',commit,'csb-primary');
   apply.disabled=true;cancel.disabled=true;
   let dialog,proposal=null,editors=[],abort=null,alive=true,running=false;
   function message(text,error=false){feedback.textContent=text;feedback.classList.toggle('is-error',error);}
   function renderProposal(p){
     proposal=p;editors=[];results.replaceChildren();apply.disabled=!p?.rows.length;
     if(!p)return;
-    results.append(note(`來源 ${p.sourceCount} 則／${p.sourceCharacters.toLocaleString()} 字元；${p.rows.length} 位可新增或補充。掃描尚未寫入。`));
+    results.append(note(`來源 ${p.sourceCount} 則／${p.sourceCharacters.toLocaleString()} 字元；${p.rows.length} 位可新增、補充或核對在場狀態。掃描尚未寫入。`));
     if(!p.rows.length)results.append(empty('沒有可採用的新資料。本機掃描不會猜人名；普通敘事可切換 AI 填表。已有值也可能因「只補空白」而保留。'));
     for(const row of p.rows){
       const selected=checkbox(true),name=input('text',row.name,{maxlength:100,readonly:row.existing,'aria-label':`確認姓名 ${row.name}`}),changes=[];
@@ -267,23 +278,31 @@ export function openScanner(host,options={}){
         const on=checkbox(change.old===null||change.old===undefined||change.old===''),entry=el('label',{class:'csb-scan-change'},on,el('span',{},el('strong',{},change.label),el('span',{class:'csb-scan-values'},`${format(change.old,{})} → ${format(change.value,{})}`),el('small',{class:'csb-muted'},`第 ${change.evidence.index+1} 則：${change.evidence.quote}`)));
         card.append(entry);changes.push({field:change.field,on});
       }
-      results.append(card);editors.push({row,selected,name,changes});
+      let presence=null;
+      if(row.presence){
+        const assessment=row.presence,known=typeof assessment.value==='boolean',changed=known&&assessment.old!==assessment.value;
+        presence=checkbox(known&&!assessment.locked&&changed);presence.disabled=!known||assessment.locked||!changed;
+        presence.setAttribute('data-scan-presence',row.id);presence.setAttribute('aria-label',`採用 ${row.name} 的在場判定`);
+        const evidence=assessment.evidence,details=assessment.locked?'已固定手動在場設定；掃描不會覆蓋。':!known?'目前正文不足以判定，維持原狀。':changed?'勾選後套用本次在場判定；不受補空白欄位策略限制。':'與目前狀態一致，無需變更。';
+        card.append(el('label',{class:`csb-scan-change csb-scan-presence ${presence.disabled?'is-disabled':''}`},presence,el('span',{},el('strong',{},'目前在場狀態'),el('span',{class:'csb-scan-values'},`${presenceLabel(assessment.old)} → ${presenceLabel(assessment.value)}`),note(details),assessment.reason?note(assessment.reason):null,evidence?el('small',{class:'csb-muted'},`第 ${evidence.index+1} 則：${evidence.quote}`):null)));
+      }
+      results.append(card);editors.push({row,selected,name,changes,presence});
     }
     if(p.diagnostics.length)results.append(el('details',{class:'csb-scan-diagnostics'},el('summary',{},`診斷與略過項目（${p.diagnostics.length}）`),...p.diagnostics.slice(0,100).map(d=>el('p',{class:'csb-muted'},d))));
   }
   async function runScan(){
     if(running)return;running=true;start.disabled=true;cancel.disabled=false;apply.disabled=true;abort=new AbortController();results.replaceChildren();
     message(mode.value==='ai'?'AI 分析中；只傳本次正文、相關角色與欄位定義，不傳整本世界書。':'正在讀取原始正文，不會掃描畫面上的其他狀態欄。');
-    try{const p=await host.scan({mode:mode.value,limit:limit.value==='all'?'all':Number(limit.value),merge:merge.value,targetId:target.value||null,includeUser:includeUser.checked,signal:abort.signal,onProgress:t=>{if(alive)message(t);}});if(alive){renderProposal(p);message('請核對姓名、原值、新值與原文依據，再套用。');}}
+    try{const p=await host.scan({mode:mode.value,limit:limit.value==='all'?'all':Number(limit.value),merge:merge.value,targetId:target.value||null,includeUser:includeUser.checked,assessPresence:assessPresence.checked,signal:abort.signal,onProgress:t=>{if(alive)message(t);}});if(alive){renderProposal(p);message('請核對姓名、原值、新值與原文依據，再套用。');}}
     catch(e){if(alive)message(e.message,true);}
     finally{running=false;if(alive){start.disabled=false;cancel.disabled=true;}}
   }
   async function commit(){
     if(!proposal||running)return;apply.disabled=true;
-    try{const selected=editors.filter(e=>e.selected.checked).map(e=>({key:e.row.key,name:e.name.value,fields:e.changes.filter(c=>c.on.checked).map(c=>c.field)}));const r=await host.applyScan(proposal.token,selected);message(`已保存 ${r.applied} 位角色、${r.fields} 個欄位。未勾選、未知、鎖定與其他既有資料保持不變。`);proposal=null;results.replaceChildren();}
+    try{const selected=editors.filter(e=>e.selected.checked).map(e=>({key:e.row.key,name:e.name.value,fields:e.changes.filter(c=>c.on.checked).map(c=>c.field),presence:!!e.presence?.checked&&!e.presence?.disabled}));const r=await host.applyScan(proposal.token,selected);message(`已保存 ${r.applied} 位角色、${r.fields} 個欄位${r.presences?`、${r.presences} 個在場狀態`:''}。未勾選、未知、鎖定與其他既有資料保持不變。`);proposal=null;results.replaceChildren();}
     catch(e){message(e.message,true);apply.disabled=false;}
   }
-  body.append(note('本機掃描讀取 CSB_UPDATE、CSB21 與「姓名：…」等明確資料。AI 可閱讀普通敘事並依目前自訂欄位填表，會額外呼叫酒館目前連線的模型。所有結果都需核對；沒寫到的資訊保持未知。'),el('div',{class:'csb-form-grid'},control('分析方式',mode),control('正文範圍',limit),control('寫入策略',merge),control('指定角色',target)),control('包含使用者已送出的訊息',includeUser,'預設只掃描 AI 正文；不讀輸入框草稿、推理區或整本世界書。'),el('div',{class:'csb-toolbar'},start,cancel,apply),feedback,results);
+  body.append(note('本機掃描讀取 CSB_UPDATE、CSB21 與「姓名：…」等明確資料。AI 可閱讀普通敘事並依目前自訂欄位填表，會額外呼叫酒館目前連線的模型。所有結果都需核對；沒寫到的資訊保持未知。'),el('div',{class:'csb-form-grid'},control('分析方式',mode),control('正文範圍',limit),control('寫入策略',merge),control('指定角色',target)),control('判定目前在場／離場',assessPresence,'以最新場景為準；提及、回憶與遠端通訊不等於在場。無法判定時保留原狀，手動固定優先。'),control('包含使用者已送出的訊息',includeUser,'預設只掃描 AI 正文；不讀輸入框草稿、推理區或整本世界書。'),el('div',{class:'csb-toolbar'},start,cancel,apply),feedback,results);
   dialog=modal('掃描正文／AI 填表',body,()=>{alive=false;abort?.abort();if(running)host.cancelScan();});
   const pending=host.scanPreview();if(pending){renderProposal(pending);message('有一份尚未採用的掃描結果；可直接核對，或重新掃描。');}
   return {dialog};
