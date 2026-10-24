@@ -11,7 +11,7 @@ const csbValue = (state, field) => Object.hasOwn(state.values || {}, field.id) ?
 const csbLabel = field => [field.icon, field.label || field.id].filter(Boolean).join(' ');
 const deleting = new WeakSet();
 
-/** One confirmation, shared by manual contacts and discovered voice roles. */
+/** One confirmation, shared by manual contacts and discovered characters. */
 export async function deleteContactWithConfirmation(ctx, contact) {
   if (deleting.has(ctx)) return false;
   const name = typeof contact === 'string' ? contact : contact?.name;
@@ -20,7 +20,7 @@ export async function deleteContactWithConfirmation(ctx, contact) {
   deleting.add(ctx);
   try {
     const account = ctx.api.getState?.()?.scope;
-    if (!await ctx.confirm(`刪除「${name}」？`, '會從千里傳音聯絡簿與私聊列表移除，正文同步也不會自動加回。原聊天記錄、角色信息、世界書與配音設定會保留；可在「已刪除聯絡人」恢復。')) return false;
+    if (!await ctx.confirm(`刪除「${name}」？`, '會從千里傳音聯絡簿與私聊列表移除，正文同步也不會自動加回。原聊天記錄、角色信息與世界書會保留；可在「已刪除聯絡人」恢復。')) return false;
     if (ctx.api.getState?.()?.scope !== account) throw Error('帳戶已切換，請重新開啟聯絡簿。');
     await ctx.api.deleteContact(target);
     ctx.notify?.(`已刪除「${name}」，可在已刪除聯絡人中恢復。`);

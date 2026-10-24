@@ -1,4 +1,4 @@
-import {createView, esc, btn, field, input, select, toggle, heading, size, languageField, typedLanguages, groupTitle, help, copyText} from './common.js';
+import {createView, esc, btn, field, input, select, toggle, heading, size, groupTitle, help, copyText} from './common.js';
 import {buildReport} from '../core/diagnostics.js';
 import {saveFile} from '../download.js';
 import {icon, GLYPH_NAMES} from './icons.js';
@@ -12,6 +12,8 @@ export function settingsApp(ctx) {
   const {api} = ctx, v = createView(ctx, 'settings');
   let appearance = null, check = null, backup = null, restore = null, epoch = 0;
   const glyphName = key => APPS[key]?.name || GLYPH_NAMES[key] || key;
+
+  const backupParts = () => Object.fromEntries(Object.entries(api.backupParts()).filter(([key]) => key !== 'favorites'));
 
   // The self-check page: what core/diagnostics.js found, grouped, with the plain report to copy, save or send.
   function renderCheck() {
@@ -30,13 +32,13 @@ export function settingsApp(ctx) {
     const [library, threads, moments] = await Promise.all([api.libraryStats().catch(() => null), api.listThreads().catch(() => null), api.listMoments().catch(() => null)]);
     if (v.disposed || ticket !== epoch) return;
     const s = api.getState(), n = (value, unit) => value === null || value === undefined ? '讀不到' : `${value} ${unit}`;
-    const counts = {settings: `${s.routes.length} 個角色 · ${s.presets.length} 個配音預設`, chats: n(threads?.length, '段'), moments: n(moments?.length, '條'), notes: n(library?.notes, '條'), photos: n(library?.photos, '張'), favorites: n(library?.favorites, '段'), vibes: library ? `${library.vibes} 個 · ${s.draw.vibe.groups.length} 組` : '讀不到', keys: savedKeys() ? `這臺瀏覽器裡的 ${savedKeys()} 個金鑰` : '這臺瀏覽器裡還沒有金鑰'};
-    v.draw(heading('備份', help('備份是一個 .json 檔案，可以存在電腦、手機或網盤裡。\n金鑰預設不放進去；開啟「金鑰」後會用你設的密碼加密，恢復時輸入同一個密碼才能取出來，沒有密碼的人拿到檔案也看不到金鑰。\n語音快取不備份，需要時會重新生成。相簿、收藏和 Vibe 多的話，檔案會比較大。'), 'Backup')
-      + `<div class="group">${Object.entries(api.backupParts()).map(([key, label]) => key === 'keys' && !savedKeys() ? `<div class="setting-row"><span class="row-text"><strong>${esc(label)}</strong><small>這臺瀏覽器裡還沒有金鑰</small></span></div>` : partRow(key, label, counts[key], backup.parts.has(key))).join('')}</div>`
+    const counts = {settings: `${s.routes.length} 個角色`, chats: n(threads?.length, '段'), moments: n(moments?.length, '條'), notes: n(library?.notes, '條'), photos: n(library?.photos, '張'), favorites: n(library?.favorites, '段'), vibes: library ? `${library.vibes} 個 · ${s.draw.vibe.groups.length} 組` : '讀不到', keys: savedKeys() ? `這臺瀏覽器裡的 ${savedKeys()} 個金鑰` : '這臺瀏覽器裡還沒有金鑰'};
+    v.draw(heading('備份', help('備份是一個 .json 檔案，可以存在電腦、手機或網盤裡。\n金鑰預設不放進去；開啟「金鑰」後會用你設的密碼加密，恢復時輸入同一個密碼才能取出來，沒有密碼的人拿到檔案也看不到金鑰。\n相簿和 Vibe 多的話，檔案會比較大。'), 'Backup')
+      + `<div class="group">${Object.entries(backupParts()).map(([key, label]) => key === 'keys' && !savedKeys() ? `<div class="setting-row"><span class="row-text"><strong>${esc(label)}</strong><small>這臺瀏覽器裡還沒有金鑰</small></span></div>` : partRow(key, label, counts[key], backup.parts.has(key))).join('')}</div>`
       + (backup.parts.has('keys') ? keyPasswordFields() : '')
       + `<div class="actions">${btn('make-backup', icon('download') + '生成備份檔案', 'primary', canBackup() ? '' : 'disabled')}</div>`);
   }
-  const savedKeys = () => ['fish', 'mini', 'eleven', 'mimo', 'nai', 'llm'].filter(engine => { try { return api.keyStatus(engine); } catch { return false; } }).length;
+  const savedKeys = () => ['nai', 'gpt', 'llm'].filter(engine => { try { return api.keyStatus(engine); } catch { return false; } }).length;
   const passwordOk = () => !backup.parts.has('keys') || backup.password.length >= 6 && backup.password === backup.again;
   const canBackup = () => backup.parts.size > 0 && passwordOk();
   function keyPasswordFields() {
@@ -46,8 +48,8 @@ export function settingsApp(ctx) {
   const passwordNote = () => !backup.password ? '' : backup.password.length < 6 ? '密碼至少 6 位' : backup.again && backup.again !== backup.password ? '兩次輸入的不一樣' : backup.again ? '可以了' : '';
   // Restore: what the chosen file holds, which parts to take, and whether to merge or replace.
   function renderRestore() {
-    const {info, parts, replace} = restore, sum = info.summary, labels = api.backupParts();
-    const counts = {settings: sum.settings && `${sum.settings.roles} 個角色 · ${sum.settings.presets} 個配音預設`, chats: sum.chats !== null && `${sum.chats} 段`, moments: sum.moments != null && `${sum.moments} 條`, notes: sum.notes !== null && `${sum.notes} 條`, photos: sum.photos !== null && `${sum.photos} 張`, favorites: sum.favorites !== null && `${sum.favorites} 段`, vibes: sum.vibes != null && `${sum.vibes.vibes} 個 · ${sum.vibes.groups} 組`, keys: sum.keys != null && `${sum.keys} 個金鑰（要輸入備份時的密碼）`};
+    const {info, parts, replace} = restore, sum = info.summary, labels = backupParts();
+    const counts = {settings: sum.settings && `${sum.settings.roles} 個角色`, chats: sum.chats !== null && `${sum.chats} 段`, moments: sum.moments != null && `${sum.moments} 條`, notes: sum.notes !== null && `${sum.notes} 條`, photos: sum.photos !== null && `${sum.photos} 張`, favorites: sum.favorites !== null && `${sum.favorites} 段`, vibes: sum.vibes != null && `${sum.vibes.vibes} 個 · ${sum.vibes.groups} 組`, keys: sum.keys != null && `${sum.keys} 個金鑰（要輸入備份時的密碼）`};
     const when = info.createdAt ? new Date(info.createdAt).toLocaleString('zh-TW', {hour12: false}) : '未知';
     v.draw(heading('恢復', '', 'Restore')
       + `<div class="group pad"><p class="help-copy">備份時間：${esc(when)}${info.version ? ` · 外掛 ${esc(info.version)}` : ''}</p></div>`
@@ -73,7 +75,7 @@ export function settingsApp(ctx) {
       : st.lastAt ? '上次同步 ' + time(st.lastAt) : st.pending ? '有改動，馬上同步' : '還沒同步過';
     const remote = st.remote?.savedAt ? `酒館裡的是${st.remote.deviceName ? ' ' + st.remote.deviceName + ' ' : ''}在 ${time(st.remote.savedAt)} 存的` : '';
     return groupTitle('儲存到酒館')
-      + `<div class="group">${toggle('syncEnabled', '儲存到酒館', st.enabled, '聊天記錄、朋友圈、備忘錄和相簿存進酒館裡你賬號的資料夾（data/你的使用者名稱/user/files）。換一臺裝置、換個瀏覽器開啟酒館，傳音玉符裡的東西都還在；清了瀏覽器資料也不會丟。有改動幾秒後自動儲存，開啟傳音玉符時自動讀取別的裝置的新內容。兩臺裝置都改了同一段聊天或同一條朋友圈時，會合併成一份（訊息和評論都保留）；只有一邊改過就直接用那一邊的。金鑰不會存進去；語音快取和收藏的語音也不存，需要時重新生成。')}
+      + `<div class="group">${toggle('syncEnabled', '儲存到酒館', st.enabled, '聊天記錄、朋友圈、備忘錄和相簿存進酒館裡你賬號的資料夾（data/你的使用者名稱/user/files）。換一臺裝置、換個瀏覽器開啟酒館，傳音玉符裡的東西都還在；清了瀏覽器資料也不會丟。有改動幾秒後自動儲存，開啟傳音玉符時自動讀取別的裝置的新內容。兩臺裝置都改了同一段聊天或同一條朋友圈時，會合併成一份（訊息和評論都保留）；只有一邊改過就直接用那一邊的。金鑰不會存進去。')}
         ${st.enabled ? `<div class="setting-row"><span class="row-text"><strong data-sync-state>${esc(state)}</strong>${remote ? `<small>${esc(remote)}</small>` : ''}</span>${btn('sync-now', icon('refresh') + '立即同步', 'chip-button', st.busy || !st.available ? 'disabled' : '')}</div>` : ''}</div>`
       ;
   }
@@ -106,7 +108,7 @@ export function settingsApp(ctx) {
     if (check) { renderCheck(); return; }
     if (backup) { await renderBackup(ticket); return; }
     if (restore) { renderRestore(); return; }
-    const [phone, cache, library, drawn] = await Promise.all([api.getPhone(), api.cacheStats(), api.libraryStats().catch(() => null), api.generatedPhotos().catch(() => null)]);
+    const [phone, library, drawn] = await Promise.all([api.getPhone(), api.libraryStats().catch(() => null), api.generatedPhotos().catch(() => null)]);
     const chatPictures = api.chatPictureStats?.() || null;
     if (v.disposed || ticket !== epoch) return;
     const s = api.getState();
@@ -120,14 +122,9 @@ export function settingsApp(ctx) {
           <button class="list-row" data-action="appearance"><span><strong>桌布與圖示</strong><small>${wallName} · ${({color: '彩色', glass: '玻璃', mono: '單色'})[phone.iconStyle]}圖示</small></span>${icon('next')}</button>
           ${phone.wallpaper.kind === 'photo' ? `<div class="setting-row"><span>現在用的是自己的照片當桌布</span>${btn('builtin-wallpaper', '換回主題桌布', 'chip-button')}</div>` : ''}
         </div>`
-      + groupTitle('配音')
-      + `<div class="group pad">${languageField('defaultLanguage', s.general.defaultLanguage, false, typedLanguages(api.getState()))}
-          ${toggle('voiceEnabled', '正文語音', s.general.voiceEnabled !== false, '關掉後，聊天請求裡不再加入語音規則，模型只寫普通對白；正文裡已有的語音標籤只顯示中文譯文，不顯示聲波；手機聊天裡的聯絡人也只發文字。開啟後恢復。')}
-          ${toggle('stripVoice', '發給模型時去掉舊配音標籤', s.general.stripVoice !== false, '酒館裡的正文不變，聲波照常顯示；只是之後每次請求模型時，舊回覆裡的每句臺詞只留中文譯文，標籤和原文不發，省上下文，也不用自己寫正則。最新一條帶臺詞的回覆保留原樣，給模型做格式示範（正文語音關掉時也一起去掉）。出圖塊在「繪圖」裡另有同樣的開關。')}
-          ${toggle('floatingEnabled', '懸浮入口', s.general.floatingEnabled, '在酒館裡顯示可以拖動的小球，點開再點一次進入手機。')}
-          ${toggle('fastMode', '流暢模式', s.general.fastMode !== false, '合併畫面更新，關閉背景模糊與裝飾動效。資料保存、聊天、語音、生圖及所有應用功能照常運作。')}
-          ${toggle('waveformEnabled', '聲波動效', s.general.waveformEnabled, '臺詞旁和手機裡的聲波隨真實音訊跳動。系統開啟減少動態效果時保持靜止。\n\n正文聲波的顏色跟隨酒館主題：\n· 虛線小點：這個角色還沒配音（斜體色）\n· 淡色：還沒生成（正文色）\n· 引號色：已生成，可以播放\n· 引號色加底色：正在播放\n· 下劃線色：已經播放過')}
-          <div class="field"><div class="meter-label"><span>播放音量</span><output>${Math.round(phone.volume * 100)}%</output></div><input class="slider" type="range" data-field="volume" min="0" max="100" value="${Math.round(phone.volume * 100)}" aria-label="播放音量"></div>
+      + groupTitle('操作')
+      + `<div class="group">${toggle('floatingEnabled', '懸浮入口', s.general.floatingEnabled, '在酒館裡顯示可以拖動的小球，點開再點一次進入手機。')}
+          ${toggle('fastMode', '流暢模式', s.general.fastMode !== false, '合併畫面更新，關閉背景模糊與裝飾動效。資料保存、聊天、生圖及應用功能照常運作。')}
         </div>`
       + groupTitle('繪圖')
       + `<div class="group">${toggle('drawEnabled', '正文出圖', s.draw.enabled, '開啟後，繪圖預設會加進聊天請求，讓模型在正文裡寫出圖示籤。')}${toggle('drawAuto', '新回覆自動出圖', s.draw.auto, '只自動畫不花錢的：NovelAI 免費檔內的圖、ComfyUI 的圖；GPT 生圖在「每張先問」關掉後也會自動畫。其餘的正文裡顯示“點選生成”。用哪個引擎畫在繪圖 App 頂上選。')}${toggle('drawFold', '正文圖片預設收起', s.draw.fold, '正文裡只留一個小縮圖，點開再看。每張圖也能單獨收起或展開。')}${toggle('drawGuard', '免費檔守衛', s.draw.guard, '步數不超過 28、尺寸不超過 1024×1024，不會發出扣 Anlas 的請求。')}</div>`
@@ -137,22 +134,20 @@ export function settingsApp(ctx) {
       + groupTitle('手機')
       + `<div class="group">${toggle('lockOnOpen', '開啟時顯示鎖屏', phone.lockOnOpen, '鎖屏可隨時跳過，是外掛內的外觀，不是手機安全鎖。')}<button class="list-row" data-action="lock"><span><strong>看一眼鎖屏</strong></span>${icon('lock')}</button></div>`
       + groupTitle('儲存')
-      + `<div class="group">${toggle('cacheEnabled', '儲存語音快取', s.general.cacheEnabled, '已生成的音訊用於重播。清快取不會刪除收藏、相簿、備忘錄或參考音訊。')}
-          <div class="setting-row"><span>語音快取</span><small>${cache.available ? cache.count + ' 段 · ' + size(cache.bytes) : '本地快取不可用'}</small></div>
+      + `<div class="group">
           <div class="setting-row"><span>本地資料</span><small>${library ? size(library.bytes) + ' / ' + size(library.limit) : '無法讀取'}</small></div>
           <div class="setting-row"><span>相簿裡的繪圖</span><small>${drawn ? drawn.count + ' 張 · ' + size(drawn.bytes) : '無法讀取'}</small></div>
           ${chatPictures ? `<div class="setting-row"><span>當前聊天的正文圖片</span><small>${chatPictures.count} 張 · 存在酒館</small></div>` : ''}</div>
-        <details class="tool-fold" data-group="storage-clear"><summary>${icon('trash')}清理<small>語音快取 · 相簿裡的繪圖 · 正文圖片</small></summary><div>
-          <div class="actions" style="margin-top:0">${btn('clear-cache', icon('trash') + '清理語音快取', 'danger')}${btn('clear-drawn', icon('trash') + '清除相簿裡的繪圖', 'danger', drawn?.count ? '' : 'disabled')}${chatPictures ? btn('clear-chat-pictures', icon('trash') + '清除正文圖片', 'danger', chatPictures.count ? '' : 'disabled') : ''}</div></div></details>
+        <details class="tool-fold" data-group="storage-clear"><summary>${icon('trash')}清理<small>相簿裡的繪圖 · 正文圖片</small></summary><div>
+          <div class="actions" style="margin-top:0">${btn('clear-drawn', icon('trash') + '清除相簿裡的繪圖', 'danger', drawn?.count ? '' : 'disabled')}${chatPictures ? btn('clear-chat-pictures', icon('trash') + '清除正文圖片', 'danger', chatPictures.count ? '' : 'disabled') : ''}</div></div></details>
         ${syncGroup()}
-        ${groupTitle('備份與恢復')}<div class="group"><button class="list-row" data-action="backup"><span><strong>備份到檔案</strong><small>設定、角色音色、聊天記錄、相簿和收藏存成一個檔案，換裝置或誤刪時能找回</small></span>${icon('next')}</button><label class="list-row file-button"><span><strong>從檔案恢復</strong><small>選一個 傳音玉符 備份檔案</small></span>${icon('next')}<input type="file" data-backup-file accept=".json,application/json" aria-label="選擇備份檔案"></label></div>
+        ${groupTitle('備份與恢復')}<div class="group"><button class="list-row" data-action="backup"><span><strong>備份到檔案</strong><small>設定、角色資料、聊天記錄和相簿存成一個檔案，換裝置或誤刪時能找回</small></span>${icon('next')}</button><label class="list-row file-button"><span><strong>從檔案恢復</strong><small>選一個 傳音玉符 備份檔案</small></span>${icon('next')}<input type="file" data-backup-file accept=".json,application/json" aria-label="選擇備份檔案"></label></div>
         ${groupTitle('幫助')}<div class="group"><button class="list-row" data-action="self-check"><span><strong>自檢</strong><small>出問題時看看是哪裡不對，可以把報告發給幫你的人</small></span>${icon('next')}</button></div>
         <div class="actions">${btn('about', '關於 傳音玉符', 'text-button')}</div>`);
   }
 
   v.back = () => { if (!appearance && !check && !backup && !restore) return false; appearance = check = backup = restore = null; render().catch(e => ctx.notify(e.message)); return true; };
   v.refresh = () => { if (!appearance) return render(); };
-  v.on('input', '[data-field=volume]', el => { el.previousElementSibling.querySelector('output').textContent = el.value + '%'; });
   v.on('change', '[data-field]', async el => {
     const key = el.dataset.field;
     if (appearance) {
@@ -161,13 +156,11 @@ export function settingsApp(ctx) {
       return;
     }
     if (key === 'syncEnabled') { api.saveSync({enabled: el.checked}); await render(); return; }
-    if (['voiceEnabled', 'floatingEnabled', 'waveformEnabled', 'cacheEnabled', 'wallpaperMotion', 'stripVoice', 'fastMode'].includes(key)) api.updateGeneral({[key]: el.checked});
+    if (['floatingEnabled', 'wallpaperMotion', 'fastMode'].includes(key)) api.updateGeneral({[key]: el.checked});
     else if (key === 'drawEnabled') api.saveDraw({enabled: el.checked});
     else if (key === 'drawAuto') api.saveDraw({auto: el.checked});
     else if (key === 'drawGuard') api.saveDraw({guard: el.checked});
     else if (key === 'drawFold') api.saveDraw({fold: el.checked});
-    else if (key === 'defaultLanguage') api.updateGeneral({defaultLanguage: el.value});
-    else if (key === 'volume') await api.setVolume(Number(el.value) / 100);
     else if (key === 'lockOnOpen') await api.savePhone({lockOnOpen: el.checked});
     else if (key === 'partition') { api.saveChatOptions({partition: el.checked ? 'card' : 'none'}); ctx.notify(el.checked ? '已按角色卡分開' : '已關閉分割槽，所有內容一起顯示'); }
   });
@@ -195,7 +188,7 @@ export function settingsApp(ctx) {
     el.disabled = true;
     try {
       const info = await api.inspectBackup(file), sum = info.summary;
-      const parts = new Set(Object.keys(api.backupParts()).filter(key => key === 'settings' ? sum.settings : sum[key] != null));
+      const parts = new Set(Object.keys(backupParts()).filter(key => key === 'settings' ? sum.settings : sum[key] != null));
       restore = {file, info, parts, replace: false};
       await render();
     } finally { if (el.isConnected) { el.value = ''; el.disabled = false; } }
@@ -237,7 +230,7 @@ export function settingsApp(ctx) {
       case 'save-appearance': await v.busy(el, async () => { await api.savePhone(appearance); appearance = null; await render(); ctx.notify('外觀已應用'); }); break;
       case 'lock': ctx.lock(); break;
       case 'self-check': case 'run-check': await runCheck(); break;
-      case 'backup': backup = {parts: new Set(Object.keys(api.backupParts()).filter(part => part !== 'keys')), password: '', again: ''}; await render(); break;
+      case 'backup': backup = {parts: new Set(Object.keys(backupParts()).filter(part => part !== 'keys')), password: '', again: ''}; await render(); break;
       case 'sync-now': { const st = await api.syncNow(); const r = st.lastResult || {}; ctx.notify(r.pulled?.length || r.merged?.length ? '已讀取別的裝置的新內容' + (r.pushed?.length ? '，也儲存了這裡的改動' : '') : r.pushed?.length ? '已儲存到酒館' : '已經是最新的了'); await render(); break; }
       case 'make-backup':
         await v.busy(el, async () => {
@@ -275,10 +268,7 @@ export function settingsApp(ctx) {
       case 'clear-chat-pictures':
         if (await ctx.confirm('清除當前聊天的正文圖片？', '圖片檔案會從酒館刪除，出圖示籤還在，之後可以點“點選生成”重新畫。相簿裡的副本不受影響。')) { const r = await v.busy(el, () => api.clearChatPictures()); await render(); ctx.notify(`已清除 ${r.count} 張` + (r.failed ? `，${r.failed} 張沒刪掉` : '')); }
         break;
-      case 'clear-cache':
-        if (await ctx.confirm('清理語音快取？', '正在播放的音訊會停止，收藏和其他資料會保留。')) { await v.busy(el, () => api.clearCache()); await render(); ctx.notify('語音快取已清理'); }
-        break;
-      case 'about': ctx.help('傳音玉符\n酒館裡的傳音玉符：聊天、角色配音、聽取、繪圖（NovelAI、GPT 生圖、ComfyUI）、收藏、相簿和備忘錄。\n\n金鑰和本地資料儲存在當前瀏覽器與酒館地址。狀態列的訊號和電量是裝飾。語音只在你點選播放或試聽後生成。'); break;
+      case 'about': ctx.help('傳音玉符\n酒館裡的傳音玉符：角色庫、劇情時間、聊天、繪圖（NovelAI、GPT 生圖、ComfyUI）、相簿和備忘錄。\n\n金鑰和本地資料儲存在當前瀏覽器與酒館地址。首頁日期與時間跟隨劇情；訊號與電量依瀏覽器提供的裝置狀態顯示。'); break;
     }
   });
   render().catch(e => ctx.notify(e.message));

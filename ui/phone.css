@@ -1309,3 +1309,14 @@ button.gift-item[data-short]{opacity:.55}
 .gift-open .go-emoji{font-size:64px;line-height:1.1;filter:drop-shadow(0 6px 10px #ff5e8e44)}
 .gift-open .go-name{margin:0;font-size:20px;font-weight:800}
 .deco[data-background=meteor] .deco-sample{background-size:30px 30px,20px 20px,24px 24px,14px 14px,20px 20px,100% 100%,100% 100%}
+
+/* Story time is text from this chat, so fantasy dates and named hours stay legible. */
+.story-clock-button{display:flex;flex-direction:column;align-items:center;width:100%;color:inherit}
+.story-clock-caption{display:block;font-size:11px;font-weight:800;letter-spacing:.16em;opacity:.8;margin-bottom:4px}
+.home-clock.story-clock-text{font-size:clamp(30px,8vw,48px);overflow-wrap:anywhere;padding:6px 12px;line-height:1.2}
+.story-clock-button .home-date{max-width:100%;padding:0 18px;overflow-wrap:anywhere}
+.cast-widget{grid-column:1/-1;min-height:110px}
+.cast-widget .widget-head{align-items:center}
+.cast-widget .cast{gap:14px}
+.cast-widget .cast button{font-size:13px}
+.role-body small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}

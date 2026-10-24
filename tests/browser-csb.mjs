@@ -25,7 +25,7 @@ const server=createServer(async(req,res)=>{try{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser,page;const checks=[],errors=[];
 try{
- browser=await playwright.chromium.launch({headless:true,executablePath:process.env.TP_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--no-zygote','--single-process']});
+ browser=await playwright.chromium.launch({headless:true,executablePath:process.env.TP_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--use-gl=angle','--use-angle=swiftshader']});
  page=await browser.newPage({viewport:{width:1280,height:1000},deviceScaleFactor:1,hasTouch:true});page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);
  await page.locator('#sttts-floating .orb').waitFor();
@@ -71,8 +71,8 @@ try{
  const snapshotIsolation=await page.evaluate(()=>{const a=CSBCharacterState.getSnapshot();a.state.characters.c_xia.values.spirit=999;return CSBCharacterState.getSnapshot().state.characters.c_xia.values.spirit;});
  assert.equal(snapshotIsolation,25);
  checks.push('public snapshot is detached from persisted character state');
- await f().locator('.app-icon[data-app="roles"]').evaluate(el=>el.closest('.home-page')?.scrollIntoView({behavior:'instant',block:'nearest',inline:'start'}));
- await f().locator('.app-icon[data-app="roles"]').tap();
+ await f().locator('.home-page .app-icon[data-app="roles"]').evaluate(el=>el.closest('.home-page')?.scrollIntoView({behavior:'instant',block:'nearest',inline:'start'}));
+ await f().locator('.home-page .app-icon[data-app="roles"]').tap();
  await f().locator('.view[data-app="roles"]').waitFor({state:'visible'});
  await f().waitForFunction(()=>!document.querySelector('.screen')?.hasAttribute('data-opening'));
  await f().locator('[data-action="status-directory"]').click();
@@ -121,16 +121,16 @@ try{
  const oldRevision=profile.revision;
  await page.evaluate(async index=>{
   const c=qa.context,m=c.chat[index];m.swipe_id=1;
-  m.mes='<CSB_UPDATE>'+JSON.stringify({version:1,characters:[{id:'c_xia',set:{spirit:125},reason:'本次分支完成進階修練'}]})+'</CSB_UPDATE>';
+  m.mes='<CSB_UPDATE>'+JSON.stringify({version:1,scene:{time:'次日清晨',location:'書院'},characters:[{id:'c_xia',set:{spirit:125},reason:'本次分支完成進階修練'}]})+'</CSB_UPDATE>';
   c.updateMessageBlock(index,m);await qa.emit('MESSAGE_SWIPED',index);
  },mixedIndex);
- await waitProfile(r=>r?.csb?.values?.spirit===125);
+ await waitProfile(r=>r?.csb?.values?.spirit===75&&r.time==='次日清晨');
  const stale=await api(async revision=>{try{await window.qaApi.pocketOpenContactState('林知夏',revision);return false;}catch{return true;}},oldRevision);
  assert(stale);
- checks.push('swipe replays current branch; prior manual anchor and stale phone editor revision do not carry over');
+ checks.push('swipe replays branch scene time while durable character information survives and stale phone editor revisions are rejected');
  await page.evaluate(async index=>{qa.context.chat.splice(index,1);document.querySelector(`.mes[mesid="${index}"]`)?.remove();await qa.emit('MESSAGE_DELETED',index);},mixedIndex);
- await waitProfile(r=>r?.csb?.values?.spirit===25);
- checks.push('deleting the update reverts the phone projection to surviving state');
+ await waitProfile(r=>r?.csb?.values?.spirit===75&&r.time==='初秋午後');
+ checks.push('deleting the update reverts story scene time while preserving the saved character information');
  await page.evaluate(async()=>{window.csbSavedScope={chat:qa.context.chat,metadata:qa.context.chatMetadata,chatId:qa.context.chatId};qa.context.chat=[];qa.context.chatMetadata={};qa.context.chatId='csb-other-chat';await qa.emit('CHAT_CHANGED');});
  const other=await api(()=>window.qaApi.pocketContactProfile('林知夏'));
  assert(!other?.csb);assert(!JSON.stringify(other).includes('靈力'));
@@ -142,7 +142,7 @@ try{
  // A separately installed CSB 1.0.0 exposes only its interceptor and formats
  // messages directly. Simulate that actual legacy contract in a fresh context.
  await browser.close();
- browser=await playwright.chromium.launch({headless:true,executablePath:process.env.TP_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--no-zygote','--single-process']});
+ browser=await playwright.chromium.launch({headless:true,executablePath:process.env.TP_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--use-gl=angle','--use-angle=swiftshader']});
  const externalPage=await browser.newPage({viewport:{width:1280,height:1000},deviceScaleFactor:1});page=externalPage;
  externalPage.setDefaultTimeout(12000);externalPage.on('pageerror',e=>errors.push(e.message));
  await externalPage.addInitScript(()=>{globalThis.csbCharacterStateIntercept=function(){};});

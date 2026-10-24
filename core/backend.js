@@ -2,23 +2,20 @@ import { MomentStore } from './moments-store.js';
 import { AppStore } from './app-store.js';
 import { FORUM_LIMITS, buildForumRequest, cleanPost as cleanForumPost, cleanReply as cleanForumReply, startingHeat } from './forum.js';
 import { buildPeekRequest, cleanPeek, peekId } from './peek.js';
-import { languageCode } from './languages.js';
 import { normalizeMoments, buildMomentsRequest } from './moments.js';
 import { normalizeCalls, buildCallRequest } from './call.js';
 import { normalizeText, activeText, customRequest, listModels, streamText, asMessages, TEXT_PRESET_ID } from './llm.js';
 import { normalizeSync, runSync, SYNC_PARTS } from './sync.js';
-import { decodeMono, encodeWav } from './audio-join.js';
 import { BACKUP_PARTS, PART_STORES, writeBackup, readBackup, sealKeys, openKeys } from './backup.js';
 import { WALLET_LIMITS, PREMIUM, DECOR_KINDS, SHOP_GIFTS, LEDGER_KINDS, premiumOf, decorKey, cents, yuan, shopGifts, normalizeGift, validateGift, walletAmount, purchaseItem } from './wallet.js';
 import { DRAW_ENGINES, DRAW_ENGINE_NAMES, GPT_IMAGE_MODELS, GPT_QUALITIES, normalizeGpt, gptBase, gptSize, gptPrompt, gptGenerate, normalizeComfy, comfyUrl, checkWorkflow, comfySize, comfyPrompt, comfyValues, fillWorkflow, comfyGenerate, comfyCatalog, tavernWorkflows, tavernWorkflow, orientationOf, DEFAULT_COMFY_WORKFLOW } from './image-engines.js';
-import { normalizeSettings, validateSettings, modelRules, freshState } from './state.js';
+import { normalizeSettings, validateSettings, freshState } from './state.js';
 import { normalizeRoute, switchRouteEngine, removeRoute } from './routes.js';
-import { DEFAULT_PROMPT, DEFAULT_FORMAT, promptPlan, validatePreset, parseDialogue, isPlaceholderRole, knownFormats } from './protocol.js';
+import { DEFAULT_FORMAT, validatePreset, parseDialogue, isPlaceholderRole, knownFormats } from './protocol.js';
 import { TTSParameters } from './parameters.js';
 import { KeyStore, keyTail, validateKey, parseTextKeys, joinTextKeys } from './keys.js';
-import { Providers, buildRequest } from './providers.js';
+import { Providers } from './providers.js';
 import { AudioCache } from './cache.js';
-import { DialoguePlayer } from './player.js';
 import { LocalLibrary, PHONE_APPS, PHONE_WALLPAPERS, PHONE_GLYPHS, PHONE_SKINS } from './library.js';
 import { NovelAIClient, relayUrl, FISH_PATHS, NAI_MODELS, NAI_MODEL_NAMES, NAI_SAMPLERS, NAI_SCHEDULES, buildImageRequest, guardParams, isFree, isV5, normalizeDrawParams } from './novelai.js';
 import { PIC_TAG_FORMAT, DEFAULT_DRAW_RULE, DRAW_COUNT_MAX, PRESET_REV as DRAW_PRESET_REV, drawPromptPlan, planRequest, validateDrawPreset, normalizeDraw, defaultDraw, normalizeVibeSettings } from './draw.js';
@@ -49,12 +46,30 @@ const engineCheck = engine => { if (!ENGINES.includes(engine)) throw Error('引�
 const keyCheck = engine => { if (engine !== 'nai' && engine !== 'llm' && engine !== 'gpt') engineCheck(engine); };
 const modelCheck = (engine, model) => { engineCheck(engine); if (model && !TTSParameters.catalogs[engine].models.includes(model)) throw Error('請選擇列表中的模型'); };
 const message = error => error instanceof TypeError ? '设置格式无效，请检查字段和条目' : error.message;
+export const TTS_REMOVED_MESSAGE = 'TTS 語音功能已移除；角色資料仍保留在角色庫。';
+const speechRemoved = () => { throw Object.assign(Error(TTS_REMOVED_MESSAGE), { code: 'TTS_REMOVED' }); };
+
+/** Compatibility state for old host listeners. It never creates an audio sink or a synthesis queue. */
+function inactivePlayer() {
+    let volume = 1;
+    return {
+        phase: 'idle', message: '', index: 0, queue: [], pending: null, requestKey: null, epoch: 0, played: new Set(),
+        snapshot() { return { phase: 'idle', message: '', index: 0, total: 0, engine: '', speaker: '', line: null, source: 'dialogue', requestKey: null, volume }; },
+        setVolume(value) { if (Number.isFinite(value)) volume = Math.max(0, Math.min(1, value)); return volume; },
+        getVolume: () => volume,
+        stop() { this.epoch++; },
+        start: speechRemoved, playBlob: speechRemoved, toggle: speechRemoved, continuePending: speechRemoved,
+        lineState: async () => 'disabled', lineKey: async () => null,
+        sink: Object.freeze({ levels: () => [0, 0, 0, 0, 0], stop() {}, close() {}, unlock: speechRemoved }),
+        async close() { this.stop(); },
+    };
+}
 
 /** Framework-independent operations. Host callbacks own SillyTavern persistence and rendering. */
 // Audio files are named after who said what: 诺亚 - 午安，格林小姐.
 const audioName = (role, said) => [String(role || '').trim(), String(said || '').replace(/\s+/g, ' ').trim().slice(0, 30)].filter(Boolean).join(' - ') || '傳音玉符 语音';
 
-export class TTSBackend {
+export class PhoneBackend {
     constructor({ settings, persist = () => {}, notify = () => {}, change = () => {}, unknown = () => {},
         providers = new Providers(), cache, library, keyStore, sink, novelai, chats, indexedDB = globalThis.indexedDB, syncStorage = () => globalThis.localStorage,
         imageFetch = (...args) => globalThis.fetch(...args), tavernHeaders = () => globalThis.SillyTavern?.getContext?.()?.getRequestHeaders?.() || {} } = {}) {
@@ -99,11 +114,7 @@ export class TTSBackend {
         this.revision = 0;
         this.closed = false;
         this.prepared = null;
-        this.player = new DialoguePlayer({
-            settings: () => this.settings, providers, cache: this.cache, ...(sink ? { sink } : {}), unknown,
-            change: state => { change(state); this.emit('playback', state); },
-            prepared: audio => { this.prepared = audio; this.emit('audio-ready', this.audioInfo(audio)); },
-        });
+        this.player = inactivePlayer();
     }
     async initialize() {
         this.assertOpen();
@@ -112,18 +123,12 @@ export class TTSBackend {
         try {
             const phone = await this.library.getPhone();
             if (!this.closed) this.player.setVolume(phone.volume);
-            await this.loadReferences();
             await this.loadVibes();
         } catch (error) { this.notify(error.message); }
         return this;
     }
-    /** Reads the Fish reference audio and the MiMo clone samples the settings use into memory, for requests. */
-    async loadReferences() {
-        for (const reference of [...this.settings.connections.fish.params.references, ...(this.settings.connections.mimo?.params.samples || [])]) {
-            const record = await this.library.getReference(reference.audio);
-            if (record && !this.closed) { const audio = await this.base64(record.blob); if (!this.closed) this.providers.references.set(record.id, audio); }
-        }
-    }
+    /** Legacy samples remain in backups; the character library never loads them into a speech provider. */
+    async loadReferences() {}
     /** A backup file of the chosen parts (core/backup.js BACKUP_PARTS). Keys and the account scope are never written. */
     async exportBackup(parts = Object.keys(BACKUP_PARTS), version = '', { password = '' } = {}) {
         this.assertOpen();
@@ -295,10 +300,7 @@ export class TTSBackend {
         next.activePreset = id;
         return this.save(next);
     }
-    previewPrompt(preset) {
-        const state = preset ? { ...this.settings, activePreset: preset.id, presets: [clone(preset)] } : this.settings;
-        return promptPlan(state, modelRules(state)).map(entry => entry.text).join('\n\n');
-    }
+    previewPrompt() { return ''; }
     parse(text) {
         const formats = knownFormats(this.settings);
         for (const format of formats) { const lines = parseDialogue(text, format); if (lines.length) return { format, lines }; }
@@ -364,17 +366,7 @@ export class TTSBackend {
         this.emit('keys', { engine, configured: false });
     }
     /** What is left on a voice account (ElevenLabs credits, Fish API balance); null without a key. Cached for a minute. */
-    async voiceBalance(engine, refresh = false) {
-        keyCheck(engine);
-        if (!['eleven', 'fish'].includes(engine)) throw Error('這家引擎沒有提供餘額查詢');
-        if (!this.keyStatus(engine)) return null;
-        const cached = this.balances.get(engine);
-        if (!refresh && cached && Date.now() - cached.checkedAt < 60 * 1000) return clone(cached.value);
-        const value = await this.providers.balance(engine, this.settings.connections[engine]);
-        this.balances.set(engine, { value, checkedAt: Date.now() });
-        this.emit('balance', { engine, balance: clone(value) });
-        return clone(value);
-    }
+    async voiceBalance() { return speechRemoved(); }
     /** The last 4 characters of the saved key ('' without one), so the user can tell which key is in use. */
     keyHint(engine) { keyCheck(engine); if (engine === 'gpt') return keyTail(this.gptKey); if (engine !== 'nai' && engine !== 'llm') return keyTail(this.providers.currentKey(engine)); if (engine === 'llm') return this.textKeyHint(this.settings.text.active); try { return keyTail(this.keyStore.load().get(engine) || ''); } catch { return ''; } }
     /** For a voice engine with keys: how many, which one is in use (1-based) and how many were refused while this page is open. */
@@ -1181,7 +1173,7 @@ export class TTSBackend {
         return ['━━ 私聊 ━━', text(buildChatRequest({ preset: p, thread, members: [member], story, user: '{{user}}', voiceFormat: this.voiceFormat(), lore })),
             '━━ 群聊 ━━', text(buildChatRequest({ preset: p, thread: group, members: [member, other], story, user: '{{user}}', voiceFormat: this.voiceFormat(), lore })),
             '━━ 朋友圈（刷新时） ━━', text(buildMomentsRequest({ preset: p, people: [member, other], story, user: '{{user}}', images: this.settings.moments.images, lore })),
-            '━━ 电话（接通后第一句） ━━', text(buildCallRequest({ preset: p, mode: 'incoming', contact: { ...member, voice: true }, history: thread.messages, story, user: '{{user}}', voiceFormat: this.voiceFormat(), voiceRules: '（这里是这个角色的语音引擎朗读规则）', lore })),
+            '━━ 电话（接通后第一句） ━━', text(buildCallRequest({ preset: p, mode: 'incoming', contact: { ...member, voice: false }, history: thread.messages, story, user: '{{user}}', lore })),
             '━━ 论坛（刷新时） ━━', text(buildForumRequest({ preset: p, people: [member, other], story, user: '{{user}}', lore })),
             '━━ 查手机 ━━', text(buildPeekRequest({ preset: p, person: member, story, user: '{{user}}', history: thread.messages, lore }))].join('\n\n');
     }
@@ -1291,12 +1283,7 @@ export class TTSBackend {
         this.emit('chat', { threadId });
         return result;
     }
-    /** Plays one voice message through the normal player (cache, favourites and the island all work). */
-    speak(line) {
-        const lines = (Array.isArray(line) ? line : [line]).filter(l => l?.role && l.text);
-        if (!lines.length) throw Error('這條語音沒有內容');
-        return this.player.start(lines.map(l => ({ role: l.role, emotion: l.emotion || 'calm', text: l.text, translation: l.translation || '' })), () => !this.closed);
-    }
+    speak() { return speechRemoved(); }
     /** Album photos made by the drawing app or in-text pictures (named NovelAI-<seed>.png / chat-<seed>.png). */
     async generatedPhotos() {
         const rows = (await this.library.listPhotos()).filter(row => /^(?:NovelAI|chat)-\d+\.png$/.test(row.name));
@@ -1343,21 +1330,7 @@ export class TTSBackend {
         for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192));
         return btoa(text);
     }
-    /** Keeps a reference audio (Fish) or clone sample (MiMo). wav: MiMo takes only mp3 and wav, so anything else
-     *  (an iPhone recording is m4a) is decoded here and kept as a mono wav. */
-    async reference(file, { wav = false } = {}) {
-        const plain = /wav|wave|mpeg|mp3/i.test(file?.type || '') || /\.(wav|mp3)$/i.test(file?.name || '');
-        if (wav && file && !plain) {
-            let samples;
-            try { samples = await decodeMono(globalThis, file, 24000); } catch { throw Error('這個音訊讀不出來，請換成 mp3 或 wav'); }
-            file = new File([encodeWav(samples, 24000)], String(file.name || '样本').replace(/\.[^.]+$/, '') + '.wav', { type: 'audio/wav' });
-        }
-        const record = await this.library.saveReference({ name: file?.name || '参考音频', blob: file });
-        const audio = await this.base64(file);
-        this.assertOpen();
-        this.providers.references.set(record.id, audio);
-        return record.id;
-    }
+    async reference() { return speechRemoved(); }
     async deleteReference(id) {
         const next = this.getState();
         next.connections.fish.params.references = next.connections.fish.params.references.filter(reference => reference.audio !== id);
@@ -1409,29 +1382,8 @@ export class TTSBackend {
         this.emit('library', { collection: 'favorites' });
         return favorite;
     }
-    async playFavorite(id) {
-        this.assertOpen();
-        // Unlock is called during the original click, before the database await.
-        this.player.stop('准备播放收藏');
-        const unlock = Promise.resolve(this.player.sink.unlock());
-        const epoch = this.player.epoch;
-        const [favorite] = await Promise.all([this.library.getFavorite(id), unlock]);
-        this.assertOpen();
-        if (epoch !== this.player.epoch) return;
-        if (!favorite) throw Error('收藏不存在');
-        this.player.playBlob(favorite.blob, { speaker: favorite.role, engine: favorite.engine, requestKey: favorite.requestKey,
-            line: { role: favorite.role, text: favorite.text, translation: favorite.translation, emotion: '' } });
-    }
-    audition(route) {
-        const temporary = this.getState();
-        route = normalizeRoute(clone(route));
-        if (!route.name?.trim() || isPlaceholderRole(route.name)) throw Error('請填寫實際角色名');
-        route.name = route.name.trim();
-        temporary.routes = temporary.routes.filter(row => row.name !== route.name); temporary.routes.push(route);
-        const revision = this.revision;
-        const text = ({ zh: '雨还没停，再坐一会儿吧。', en: 'The rain has not stopped. Stay a little longer.', ja: '雨はまだ止んでいません。もう少しここにいましょう。', ko: '비가 아직 그치지 않았어요.' })[languageCode(route.language || temporary.general.defaultLanguage)] || 'Hello.';
-        this.player.start([{ role: route.name, emotion: 'calm', text, translation: '' }], () => !this.closed && revision === this.revision, temporary);
-    }
+    async playFavorite() { return speechRemoved(); }
+    audition() { return speechRemoved(); }
     async clearCache() {
         this.player.stop('缓存已清理'); this.prepared = null;
         await this.cache.clear(); this.assertOpen(); this.player.played.clear();
@@ -1462,12 +1414,12 @@ export class TTSBackend {
             saveConnection: (engine, patch) => this.saveConnection(engine, patch),
             savePreset: preset => this.savePreset(preset), deletePreset: id => this.deletePreset(id), selectPreset: id => this.selectPreset(id),
             validatePreset: preset => { try { validatePreset(preset); return ''; } catch (error) { return message(error); } },
-            previewPrompt: preset => this.previewPrompt(preset), promptPlan: () => clone(promptPlan(this.settings, modelRules(this.settings))), parse: text => this.parse(text),
+            previewPrompt: preset => this.previewPrompt(preset), promptPlan: () => [], parse: text => this.parse(text),
             voiceBalance: (engine, refresh) => this.voiceBalance(engine, refresh), keyStatus: engine => this.keyStatus(engine), keyHint: engine => this.keyHint(engine), keyPool: engine => this.keyPool(engine), keyList: engine => this.keyList(engine), addKeys: (engine, value) => this.addKeys(engine, value), removeKey: (engine, index) => this.removeKey(engine, index), useKey: (engine, index) => this.useKey(engine, index), setKey: (engine, key) => this.setKey(engine, key), clearKey: engine => this.clearKey(engine),
             saveDraw: patch => this.saveDraw(patch), saveStyle: style => this.saveStyle(style), deleteStyle: id => this.deleteStyle(id),
             drawReady: () => this.drawReady(), drawMissing: () => this.drawMissing(), paidPrompt: () => this.paidPrompt(), comfyCatalog: url => this.comfyCatalog(url), comfyWorkflows: () => this.comfyWorkflows(), comfyWorkflow: name => this.comfyWorkflow(name),
             saveDrawPreset: preset => this.saveDrawPreset(preset), deleteDrawPreset: id => this.deleteDrawPreset(id), previewDrawPrompt: preset => this.previewDrawPrompt(preset),
-            naiSubscription: refresh => this.naiSubscription(refresh), naiProbe: () => this.naiProbe(), fishProbe: () => { this.assertOpen(); keyCheck('fish'); return this.providers.probeFish(clone(this.settings.connections.fish)); },
+            naiSubscription: refresh => this.naiSubscription(refresh), naiProbe: () => this.naiProbe(), fishProbe: speechRemoved,
             listVibes: () => this.listVibes(), importVibes: (files, options) => this.importVibes(files, clone(options || {})), updateVibe: (id, patch) => this.updateVibe(id, clone(patch || {})), deleteVibe: id => this.deleteVibe(id), deleteVibes: ids => this.deleteVibes([...(ids || [])]), exportVibes: target => this.exportVibes(clone(target || {})), vibePlan: model => clone(this.vibePlan(model || this.settings.draw.params.model)), drawQuote: params => this.drawQuote(params),
             generateImage: input => this.generateImage(input).then(({ blob, ...result }) => result),
             drawQueue: () => this.drawQueue.list(), cancelDraw: key => this.drawQueue.cancel(key), cancelAllDraws: () => this.drawQueue.cancelAll(),
@@ -1475,8 +1427,7 @@ export class TTSBackend {
             reference: (file, options) => this.reference(file, clone(options || {})), listReferences: () => this.library.listReferences(), deleteReference: id => this.deleteReference(id),
             engineSchema: (engine, connection) => this.getEngineSchema(engine, connection),
             validateConnection: (engine, connection) => { try { modelCheck(engine, connection.model); return TTSParameters.validate(engine, connection); } catch (error) { return message(error); } },
-            voices: (engine, connection, query) => { engineCheck(engine); return this.providers.voices(engine, connection || this.settings.connections[engine], query); },
-            previewRequest: (engine, connection, route, line) => { const request = buildRequest(engine, connection || this.settings.connections[engine], route, line, this.providers.references); if (request.body.provider?.options?.['fish-audio']?.references) for (const ref of request.body.provider.options['fish-audio'].references) ref.audio = '[本地参考音频]'; if (request.body.audio?.voice?.startsWith?.('data:')) request.body.audio.voice = '[本地克隆样本：' + route.voice + ']'; return request; },
+            voices: speechRemoved, previewRequest: speechRemoved,
             status: () => this.player.snapshot(), subscribe: listener => this.subscribe(listener), levels: () => this.player.sink.levels(),
             pendingRole: () => this.player.pending, stop: () => this.player.stop(), toggle: () => this.player.toggle(), resume: () => this.player.continuePending(),
             audition: route => this.audition(route), lineState: line => this.player.lineState(line),
@@ -1532,7 +1483,7 @@ export class TTSBackend {
             markThreadRead: id => this.chatMutate(id, () => this.chats.markRead(id)),
             speak: line => this.speak(clone(line)), voiceFormat: () => this.voiceFormat(),
         };
-        return Object.freeze({ apiVersion: BACKEND_API_VERSION, defaultPrompt: DEFAULT_PROMPT, defaultFormat: DEFAULT_FORMAT,
+        return Object.freeze({ apiVersion: BACKEND_API_VERSION, capabilities: Object.freeze({ tts: false }), defaultPrompt: '', defaultFormat: DEFAULT_FORMAT,
             picTagFormat: PIC_TAG_FORMAT, defaultDrawRule: DEFAULT_DRAW_RULE, drawCountMax: DRAW_COUNT_MAX, defaultChatPreset: Object.freeze((({ id, ...rest }) => rest)(defaultChat().presets[0])),
             // The shipped presets of each kind, without ids: for 恢复默认 in the preset app.
             defaultVoicePreset: Object.freeze((({ id, ...rest }) => rest)(freshState().presets[0])), defaultDrawPreset: Object.freeze((({ id, ...rest }) => rest)(defaultDraw().presets[0])),
@@ -1553,3 +1504,6 @@ export class TTSBackend {
         await this.closing;
     }
 }
+
+// Keep imports from older host integrations working while callers migrate to the character-library backend.
+export { PhoneBackend as TTSBackend };

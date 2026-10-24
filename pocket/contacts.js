@@ -101,7 +101,7 @@ export function createContactBridge({context, backend, notice = () => {}, publis
       if (manual) result.push({name, source: 'manual', id: manual.id, persona: manual.persona || '', voice: false, engine: 'none', language: ''});
       else {
         const route = routesByName.get(name);
-        if (route) result.push({name, source: 'role', persona: '', voice: !!route.voice, engine: route.voice ? route.engine : 'none', language: route.language || s.general?.defaultLanguage || ''});
+        if (route) result.push({name, source: 'role', persona: route.persona || '', voice: false, engine: 'none', language: route.language || s.general?.defaultLanguage || ''});
       }
       visible.add(name);
     }

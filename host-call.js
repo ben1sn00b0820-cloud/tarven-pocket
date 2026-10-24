@@ -1,12 +1,10 @@
 // 来电, tavern side. One call at a time: it rings (the contact calling, or the user dialing), is answered, and each turn
-// the contact's words are generated with the tavern's connected model (generateRaw) and read aloud with the contact's
-// own voice through the normal player. A missed call gets a short voice message. When the call ends it is kept in
+// the contact's words are generated as text with the tavern's connected model. A missed call gets a short text message. When the call ends it is kept in
 // the private chat with that contact. Nothing is written into the story.
 import {buildCallRequest, parseCallReply, CALL_LIMITS} from './core/call.js';
 import {chatContacts, activeChatPreset, messageLine, cleanTagged} from './core/chat.js';
 import {worldInfoFor, loreOptions} from './host-lore.js';
 import {storyLines} from './core/moments.js';
-import {modelRules} from './core/state.js';
 
 const DAY_KEY = 'st-iphonie-calls-day';
 const today = () => new Date().toLocaleDateString('en-CA');
@@ -26,7 +24,7 @@ export function createCallHost({context, settings, backend, notice, ringing = ()
   function contactOf(name) {
     const s = settings(), c = chatContacts(s).find(x => x.name === name);
     if (!c) throw Error(`联系人里没有「${name}」`);
-    return {name, persona: c.persona || '', card: c.persona ? '' : card(name), voice: c.voice && s.general.voiceEnabled !== false, language: c.language || s.general.defaultLanguage};
+    return {name, persona: c.persona || '', card: c.persona ? '' : card(name), voice: false, language: c.language || s.general.defaultLanguage};
   }
   /** What the phone shows: a copy without timers. */
   const snapshot = () => call && structuredClone({id: call.id, name: call.name, dir: call.dir, state: call.state, since: call.since, answeredAt: call.answeredAt,
@@ -125,9 +123,9 @@ export function createCallHost({context, settings, backend, notice, ringing = ()
     const lore = preset.lore === false ? '' : await worldInfoFor(context, {...loreOptions(preset), persona: userPersona(), characters: c.contact.persona || c.contact.card || '',
       texts: [c.name, c.reason, ...story.map(r => `${r.name}: ${r.text}`), ...history.map(m => messageLine(m, user)), ...c.lines.map(l => `${l.from === 'me' ? user : c.name}: ${l.translation || l.text}`)]});
     const prompt = buildCallRequest({preset, mode, contact: c.contact, lines: c.lines, history, story, user, userPersona: userPersona(),
-      voiceFormat, voiceRules: c.voiced ? modelRules(s, [c.name]) : '', reason: c.reason, lore});
+      reason: c.reason, lore});
     const text = cleanTagged(await backend.generateText(ctx, {prompt, trimNames: false}), preset.cleanTags);
-    return parseCallReply(text, {name: c.name, user, voiceFormat, voiced: c.voiced});
+    return parseCallReply(text, {name: c.name, user, voiceFormat, voiced: false});
   }
 
   /** One turn of the contact: generate, show, read aloud; hangs up afterwards when the contact wanted to. */
@@ -151,14 +149,9 @@ export function createCallHost({context, settings, backend, notice, ringing = ()
     c.lines.push(...lines);
     if (c.lines.length > CALL_LIMITS.lines) c.lines = c.lines.slice(-CALL_LIMITS.lines);
     emit();
-    if (c.voiced && lines.length) {
-      c.speaking = true; emit();
-      try { await backend.player.start(lines.map(l => ({role: c.name, emotion: l.emotion, text: l.text, translation: l.translation})), () => live(id)); } catch { /* the words are on screen */ }
-      if (call?.id === id) { c.speaking = false; emit(); }
-    }
     if (found.hangup && live(id)) {
       // A short pause after the last words, like a real hang-up.
-      await new Promise(resolve => setTimeout(resolve, timing.hang?.() ?? (c.voiced ? 600 : 1800)));
+      await new Promise(resolve => setTimeout(resolve, timing.hang?.() ?? 1800));
       if (live(id)) await end('answered', {by: c.name});
     }
   }
@@ -189,7 +182,7 @@ export function createCallHost({context, settings, backend, notice, ringing = ()
     let day = {day: today(), n: 0};
     try { const saved = JSON.parse(localStorage.getItem(DAY_KEY) || 'null'); if (saved?.day === day.day) day = saved; } catch { /* no storage: count this session only */ }
     if (day.n >= o.dailyMax) return;
-    const callers = backend.contacts().filter(c => c.source === 'role' && c.voice), now = context()?.name2;
+    const callers = backend.contacts().filter(c => c.source === 'role'), now = context()?.name2;
     const name = callers.find(c => c.name === now)?.name || callers[Math.floor(Math.random() * callers.length)]?.name;
     if (!name) return;
     try {

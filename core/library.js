@@ -16,10 +16,12 @@
  */
 import {connectionLost, lostError} from './idb.js';
 export const LIBRARY_LIMITS = Object.freeze({total:256*1024*1024,photo:12*1024*1024,reference:20*1024*1024,vibe:40*1024*1024});
-export const PHONE_APPS = Object.freeze(['characterinfo','me','roles','engines','presets','library','gallery','notes','listen','settings','draw','chat','forum','peek','instagram','diary','storyshop','pocketsettings']);
+export const PHONE_APPS = Object.freeze(['characterinfo','me','roles','engines','presets','gallery','notes','settings','draw','chat','forum','peek','instagram','diary','storyshop','pocketsettings']);
+// Accepted only for restoring existing icon preferences; these apps no longer appear in the phone.
+const LEGACY_PHONE_APPS = ['library','listen'];
 export const PHONE_WALLPAPERS = Object.freeze(['sky','silver','midnight','rose','sand','aero','fresh']);
 export const PHONE_SKINS = Object.freeze(['sky','aero','fresh']);
-export const PHONE_GLYPHS = Object.freeze(['default',...PHONE_APPS,'wave','book','music','camera','sliders','note','person','microphone','star','headphones']);
+export const PHONE_GLYPHS = Object.freeze(['default',...PHONE_APPS,...LEGACY_PHONE_APPS,'wave','book','music','camera','sliders','note','person','microphone','star','headphones']);
 const STORES = ['notes','photos','favorites','phone','references','vibes'];
 const IMAGE_TYPES = new Set(['image/jpeg','image/png','image/webp','image/avif','image/gif']);
 const encoder = new TextEncoder();
@@ -179,7 +181,7 @@ export class LocalLibrary {
   if('lockOnOpen'in clean&&typeof clean.lockOnOpen!=='boolean')throw fail('锁屏设置无效');
   if('volume'in clean&&(typeof clean.volume!=='number'||!Number.isFinite(clean.volume)||clean.volume<0||clean.volume>1))throw fail('音量必须在 0 到 1 之间');
   if('wallpaper'in clean)this.#appearance(clean.wallpaper,'wallpaper');
-  if('icons'in clean){fields(clean.icons,PHONE_APPS);for(const value of Object.values(clean.icons))if(value!==null)this.#appearance(value,'icon');}
+  if('icons'in clean){fields(clean.icons,[...PHONE_APPS,...LEGACY_PHONE_APPS]);for(const value of Object.values(clean.icons))if(value!==null)this.#appearance(value,'icon');}
   return this.#mutate(({rows,put})=>{
    const existing=rows.phone.get('preferences'),now=this.#time(),next={...defaults(),...(existing?publicRow(existing):{}),...clean};
    next.icons={...(existing?.icons||{})};for(const [key,value] of Object.entries(clean.icons||{})){if(value===null)delete next.icons[key];else next.icons[key]=value;}
@@ -234,7 +236,7 @@ export class LocalLibrary {
   if(name==='favorites'){if(!['fish','mini','eleven','mimo'].includes(row.engine))throw fail('备份里的收藏语音引擎无效');const blob=blobValue(row.blob,LIBRARY_LIMITS.total,'音频','audio');return {id:identifier(row.id),requestKey:string(row.requestKey,'音频编号',512,true),role:string(row.role,'角色名',200,true),text:string(row.text,'原文',1_000_000,true),translation:string(row.translation??'','译文',1_000_000),engine:row.engine,model:string(row.model??'','模型',200),voice:string(row.voice??'','音色',512),blob,type:blob.type,size:blob.size,...dates};}
   if(name==='vibes'){if(!row.meta||typeof row.meta!=='object'||Array.isArray(row.meta))throw fail('备份里的 Vibe 信息无效');const blob=blobValue(row.blob,LIBRARY_LIMITS.vibe,'Vibe 文件','data');return {id:identifier(row.id),name:string(row.name,'Vibe 名字',80,true),meta:structuredClone(row.meta),blob,size:blob.size,...dates};}
   const {wallpaper,icons,iconStyle,skin,lockOnOpen,volume}={...defaults(),...row};
-  this.#appearance(wallpaper,'wallpaper');fields(icons,PHONE_APPS);for(const icon of Object.values(icons))this.#appearance(icon,'icon');
+  this.#appearance(wallpaper,'wallpaper');fields(icons,[...PHONE_APPS,...LEGACY_PHONE_APPS]);for(const icon of Object.values(icons))this.#appearance(icon,'icon');
   return {wallpaper,icons,iconStyle:['color','glass','mono'].includes(iconStyle)?iconStyle:'color',skin:PHONE_SKINS.includes(skin)?skin:'sky',lockOnOpen:lockOnOpen===true,volume:Number.isFinite(volume)?Math.min(1,Math.max(0,volume)):1,...dates};
  }
  async stats(){

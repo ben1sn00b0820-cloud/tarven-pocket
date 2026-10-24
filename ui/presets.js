@@ -1,12 +1,12 @@
-import {createView, esc, btn, field, input, select, textArea, toggle, heading, help, groupTitle, plate, empty} from './common.js';
+import {createView, esc, btn, field, input, select, textArea, toggle, heading, help, groupTitle, plate} from './common.js';
 import {icon, glyph} from './icons.js';
 import {APPS} from './apps.js';
 
 const positions = [['in_chat', '聊天內'], ['before_prompt', '主提示詞之前'], ['in_prompt', '主提示詞之後']];
 const roles = [['system', '系統'], ['user', '使用者'], ['assistant', '助手']];
-// Preset kinds: voice (dialogue tags), chat (phone chat replies, 朋友圈, and bringing chats into the story), drawing
+// Preset kinds: chat (phone replies, 朋友圈, and bringing chats into the story), drawing
 // (<img> tags in the chat text). A chat rule says where it is used: 私聊, 群聊, 朋友圈.
-const KINDS = [['tts', '配音', 'listen'], ['chat', '聊天', 'chat'], ['draw', '繪圖', 'draw']];
+const KINDS = [['chat', '聊天', 'chat'], ['draw', '繪圖', 'draw']];
 const USES = [['dm', '私聊'], ['group', '群聊'], ['moments', '朋友圈'], ['call', '電話'], ['forum', '論道臺'], ['peek', '查手機']];
 // Drawing rules: which engines an entry is sent with (none ticked or all ticked: every engine).
 const ENGINE_USES = [['nai', 'NovelAI'], ['gpt', 'GPT 生圖'], ['comfy', 'ComfyUI']];
@@ -14,21 +14,20 @@ const engineScope = e => e.engines?.length ? ' · 只給 ' + ENGINE_USES.filter(
 
 export function presetsApp(ctx) {
   const {api} = ctx, v = createView(ctx, 'presets'), drafts = new Map();
-  let current = null, currentKind = 'tts', kind = 'tts';
+  let current = null, currentKind = 'chat', kind = 'chat';
   const mark = () => { const el = v.root.querySelector('[data-save-state]'); if (el) el.textContent = '未儲存'; };
   /** A fresh copy of the shipped preset of a kind: new entry ids, no preset id. */
   const shipped = k => {
-    const base = structuredClone(k === 'chat' ? api.defaultChatPreset : k === 'draw' ? api.defaultDrawPreset : api.defaultVoicePreset);
-    base.entries = base.entries.map(e => ({...e, id: e.id && k !== 'tts' ? e.id : crypto.randomUUID()}));
+    const base = structuredClone(k === 'draw' ? api.defaultDrawPreset : api.defaultChatPreset);
+    base.entries = base.entries.map(e => ({...e, id: e.id || crypto.randomUUID()}));
     return base;
   };
   const tile = app => { const [t1, t2, tac] = APPS[app].colors; return `<span class="mini-tile" style="--t1:${t1};--t2:${t2};--tac:${tac}">${glyph(app)}</span>`; };
   // Operations differ only in which backend list they touch.
   const ops = k => k === 'draw'
     ? {list: () => api.getState().draw.presets, active: () => api.getState().draw.activePreset, save: p => api.saveDrawPreset(p), remove: id => api.deleteDrawPreset(id), use: id => api.saveDraw({activePreset: id}), preview: p => api.previewDrawPrompt(p), validate: () => ''}
-    : k === 'chat'
-    ? {list: () => api.getState().chat.presets, active: () => api.getState().chat.activePreset, save: p => api.saveChatPreset(p), remove: id => api.deleteChatPreset(id), use: id => api.selectChatPreset(id), preview: p => api.previewChatPrompt(p), validate: p => api.validateChatPreset(p)}
-    : {list: () => api.getState().presets, active: () => api.getState().activePreset, save: p => api.savePreset(p), remove: id => api.deletePreset(id), use: id => api.selectPreset(id), preview: p => api.previewPrompt({...p, id: p.id || 'preview'}), validate: p => api.validatePreset(p)};
+    : {list: () => api.getState().chat.presets, active: () => api.getState().chat.activePreset, save: p => api.saveChatPreset(p), remove: id => api.deleteChatPreset(id), use: id => api.selectChatPreset(id), preview: p => api.previewChatPrompt(p), validate: p => api.validateChatPreset(p)};
+
 
   function injection(i, index = 'preset') {
     const attrs = `data-injection-owner="${index}"`;
@@ -46,15 +45,13 @@ export function presetsApp(ctx) {
       const o = ops(kind), active = o.active();
       const draw = api.getState().draw;
       body = (kind === 'draw' && !draw.enabled ? '<p class="hint">正文出圖沒有開啟，在「設定 · 繪圖」裡開啟後，使用中的繪圖預設才會加進聊天請求。</p>' : '')
-        + o.list().map(p => `<button class="preset-card" data-action="edit-preset" data-kind="${kind}" data-id="${esc(p.id)}"${p.id === active ? ' data-active' : ''}>${tile(app)}<span><strong>${esc(p.name || '未命名預設')}</strong><small>${kind === 'chat' ? `讀正文 ${p.context} 條 · 聊天記錄 ${p.history} 條` : kind === 'draw' ? `每條回覆 ${p.count} 張 · ${p.entries.length} 條規則` : `${p.entries.length} 條規則 · ${esc(positions.find(x => x[0] === p.injection.position)?.[1] || '')}`}</small></span>${p.id === active ? plate('使用中') : icon('next')}</button>`).join('')
+        + o.list().map(p => `<button class="preset-card" data-action="edit-preset" data-kind="${kind}" data-id="${esc(p.id)}"${p.id === active ? ' data-active' : ''}>${tile(app)}<span><strong>${esc(p.name || '未命名預設')}</strong><small>${kind === 'chat' ? `讀正文 ${p.context} 條 · 聊天記錄 ${p.history} 條` : `每條回覆 ${p.count} 張 · ${p.entries.length} 條規則`}</small></span>${p.id === active ? plate('使用中') : icon('next')}</button>`).join('')
         + `<div class="actions">${btn('restore-default', icon('refresh') + '恢復預設預設', 'secondary')}</div>`
         + `<p class="hint">${kind === 'draw'
           ? '繪圖預設是給正文模型看的出圖規則：什麼時候出圖、標籤怎麼寫。畫師串和固定 tag 在繪圖 App 的“畫風”裡。'
-          : kind === 'chat'
-          ? '聊天預設決定手機裡的聯絡人怎麼回訊息、朋友圈怎麼發、能看到多少劇情，以及“帶進劇情”時怎麼寫進下一次正文。每條規則可以選用在私聊、群聊還是朋友圈。手機聊天和朋友圈單獨生成，不會寫進正文。'
-          : '配音預設讓模型把臺詞寫成帶 TTS 標籤的格式。角色配音不在預設裡，切換預設不會改動角色。'}</p>`;
+          : '聊天預設決定手機裡的聯絡人怎麼回訊息、朋友圈怎麼發、能看到多少劇情，以及“帶進劇情”時怎麼寫進下一次正文。每條規則可以選用在私聊、群聊還是朋友圈。手機聊天和朋友圈單獨生成，不會寫進正文。'}</p>`;
     }
-    v.draw(heading('法式集', btn('add-preset', icon('add'), 'round-button', `aria-label="新增${label}預設"`), 'Preset · 3 類') + tabs + body);
+    v.draw(heading('規則集', btn('add-preset', icon('add'), 'round-button', `aria-label="新增${label}預設"`), 'Preset · 2 類') + tabs + body);
   }
 
   /** The 世界书 line: how much is left out (picked in a sheet), and the tags cleaned away (status bars). */
@@ -108,19 +105,18 @@ export function presetsApp(ctx) {
   function renderEditor() {
     const p = current, o = ops(currentKind), draw = currentKind === 'draw', chat = currentKind === 'chat';
     const used = p.id && p.id === o.active();
-    v.draw(heading(p.id ? '編輯預設' : '新預設', '', draw ? 'Drawing Preset' : chat ? 'Chat Preset' : 'Voice Preset')
+    v.draw(heading(p.id ? '編輯預設' : '新預設', '', draw ? 'Drawing Preset' : 'Chat Preset')
       + `<div class="group pad">${field('名稱', input('name', p.name))}${chat
         ? `${field('讀取最近的正文', input('context', p.context, 'number', 'min="0" max="40" step="1"'), '回訊息時參考最近幾條正文，0 表示不看劇情。')}${field('讀取聊天記錄', input('history', p.history, 'number', 'min="2" max="200" step="1"'), '回訊息時帶上最近多少條手機聊天。')}${field('每次重新整理朋友圈最多幾條', input('posts', p.posts ?? 2, 'number', 'min="1" max="5" step="1"'), '在動態裡重新整理時，由模型挑 1 到這麼多個人發動態。')}${toggle('lore', '帶上世界書', p.lore !== false, '聊天、電話和朋友圈也帶上酒館的世界書：和寫正文時一樣，常駐的條目，以及在名字、最近的正文和聊天裡觸發關鍵詞的條目（當前角色卡的世界書、全域性和聊天繫結的世界書都算）。人設寫在世界書裡的話要開啟。\n\n條目多的話會多佔一些上下文。')}${p.lore !== false ? loreFields(p) : ''}${field('帶進劇情的寫法', textArea('bring', p.bring, 'class="code" rows="4"'), '選中的聊天訊息會按這段文字注入下一次正文，只用一次。需要包含 {{聊天記錄}}；也可以用 {{使用者}}、{{物件}}。')}`
-        : draw
-        ? `${field('每條回覆出圖數量', input('count', p.count ?? 1, 'number', `min="1" max="${api.drawCountMax}" step="1"`), '每條回覆固定出這麼多張圖。規則裡寫 {{出圖數量}} 會換成這個數字；外掛還會在規則最後加一段硬性要求，讓張數更穩定。張數越多，出圖越久。')}<div class="field"><span>出圖塊格式${help('規則裡寫 {{出圖格式}} 會換成下面這段（回覆後單獨配圖時，還會多一行「位置」）；{{角色列表}} 會換成已登記的角色和他們的固定外貌；{{出圖數量}} 換成張數。別的外掛要排除出圖內容時，排除標籤填 <img></img>。')}</span><pre class="code-preview" style="margin:0">${esc(api.picTagFormat)}</pre></div>`
-        : field('臺詞格式', textArea('format', p.format, 'class="code"'), '{譯文}、{角色}、{情緒}、{文字} 各保留一次。譯文供閱讀，原語言供語音生成。預設格式是成對的 <tts></tts>，別的外掛要排除語音原文時，排除標籤填 <tts></tts>。')}</div>
+        : `${field('每條回覆出圖數量', input('count', p.count ?? 1, 'number', `min="1" max="${api.drawCountMax}" step="1"`), '每條回覆固定出這麼多張圖。規則裡寫 {{出圖數量}} 會換成這個數字；外掛還會在規則最後加一段硬性要求，讓張數更穩定。張數越多，出圖越久。')}<div class="field"><span>出圖塊格式${help('規則裡寫 {{出圖格式}} 會換成下面這段（回覆後單獨配圖時，還會多一行「位置」）；{{角色列表}} 會換成已登記的角色和他們的固定外貌；{{出圖數量}} 換成張數。別的外掛要排除出圖內容時，排除標籤填 <img></img>。')}</span><pre class="code-preview" style="margin:0">${esc(api.picTagFormat)}</pre></div>`
+        }</div>
         <details data-group="preset-injection"><summary>${chat ? '帶進劇情的插入位置' : '預設插入設定'} ${help(chat ? '帶進劇情的文字插在正文請求的哪裡。深度與身份僅在聊天內插入時生效。' : '深度與身份僅在聊天內插入時生效；條目可以單獨覆蓋。')}</summary><div>${injection(p.injection)}</div></details>
-        ${groupTitle(draw ? '出圖規則' : chat ? '聊天與朋友圈規則' : '提示詞條目', btn('add-entry', icon('add') + '條目', 'chip-button'))}
+        ${groupTitle(draw ? '出圖規則' : '聊天與朋友圈規則', btn('add-entry', icon('add') + '條目', 'chip-button'))}
         ${p.entries.map((e, i) => `<details data-group="entry:${esc(e.id)}" ${i === 0 ? 'open' : ''}><summary>${esc(e.title || '未命名條目')}${draw ? esc(engineScope(e)) : ''}${e.enabled ? '' : ' · 已停用'}</summary><div data-entry="${i}">
           ${toggle('enabled', '啟用此條目', e.enabled)}
           ${field('條目名稱', input('title', e.title))}
           ${draw ? `<div class="field"><span>用在哪個引擎${help('勾了哪個，用那個引擎畫圖時才把這條規則發給模型。都勾或都不勾就是三個都用。在繪圖 App 頂上選用哪個畫。')}</span><div class="use-row">${ENGINE_USES.map(([u, l]) => `<label class="use-chip"><input type="checkbox" data-engine-use="${u}" ${!e.engines?.length || e.engines.includes(u) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>` : ''}
-          ${chat ? `<div class="field"><span>用在</span><div class="use-row">${USES.map(([u, l]) => `<label class="use-chip"><input type="checkbox" data-use="${u}" ${(e.use || []).includes(u) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>` : ''}${field(draw || chat ? '規則' : '提示詞', textArea('text', e.text, 'class="code"'), draw ? '可以用 {{出圖格式}}、{{出圖數量}}、{{角色列表}}。外掛會在最後自動加上格式和張數的硬性要求。' : chat ? '可以用 {{使用者}}、{{物件}}；寫語音訊息規則時用 {{語音格式}}、{{可發語音}}。用在朋友圈的規則只能用 {{使用者}}。外掛會在最後自動加上輸出格式的硬性要求。' : '啟用規則的合計文字需包含 {{格式}} 和 {{語言}}。')}
+          ${chat ? `<div class="field"><span>用在</span><div class="use-row">${USES.map(([u, l]) => `<label class="use-chip"><input type="checkbox" data-use="${u}" ${(e.use || []).includes(u) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>` : ''}${field('規則', textArea('text', e.text, 'class="code"'), draw ? '可以用 {{出圖格式}}、{{出圖數量}}、{{角色列表}}。外掛會在最後自動加上格式和張數的硬性要求。' : '可以用 {{使用者}}、{{物件}}。用在朋友圈的規則只能用 {{使用者}}。外掛會在最後自動加上輸出格式的硬性要求。')}
           ${chat ? '' : toggle('customInjection', '單獨設定插入位置', !!e.injection)}${!chat && e.injection ? injection(e.injection, i) : ''}
           <div class="entry-tools">${btn('entry-up', icon('up') + '上移', 'text-button', `data-index="${i}" ${i === 0 ? 'disabled' : ''}`)}${btn('entry-down', icon('down') + '下移', 'text-button', `data-index="${i}" ${i === p.entries.length - 1 ? 'disabled' : ''}`)}${btn('delete-entry', icon('trash') + '刪除', 'text-button', `data-index="${i}"`)}</div>
         </div></details>`).join('')}
@@ -131,6 +127,7 @@ export function presetsApp(ctx) {
 
   const render = () => current ? renderEditor() : renderList();
   function edit(k, id) {
+    if (!KINDS.some(([key]) => key === k)) return;
     const key = k + ':' + id;
     current = drafts.get(key) || structuredClone(ops(k).list().find(p => p.id === id));
     if (!current) return;
@@ -138,7 +135,7 @@ export function presetsApp(ctx) {
     drafts.set(key, current);
     render();
   }
-  v.showKind = k => { current = null; kind = k; render(); };
+  v.showKind = k => { if (!KINDS.some(([key]) => key === k)) return; current = null; kind = k; render(); };
   v.back = () => { if (!current) return false; current = null; render(); return true; };
   v.refresh = () => { if (!current) render(); };
 
@@ -186,14 +183,14 @@ export function presetsApp(ctx) {
   v.on('click', '[data-action]', async el => {
     const index = Number(el.dataset.index);
     switch (el.dataset.action) {
-      case 'kind': kind = el.dataset.kind; render(); break;
+      case 'kind': v.showKind(el.dataset.kind); break;
       case 'add-preset':
         currentKind = kind;
-        current = drafts.get(kind + ':new') || {...shipped(kind), name: kind === 'chat' ? '新聊天預設' : kind === 'draw' ? '新出圖規則' : '新預設'};
+        current = drafts.get(kind + ':new') || {...shipped(kind), name: kind === 'chat' ? '新聊天預設' : '新出圖規則'};
         drafts.set(kind + ':new', current);
         render();
         break;
-      case 'edit-preset': edit(el.dataset.kind || 'tts', el.dataset.id); break;
+      case 'edit-preset': edit(el.dataset.kind || 'chat', el.dataset.id); break;
       // Adds the shipped preset again, for when it was deleted or edited beyond repair. Nothing else changes.
       case 'restore-default': {
         const names = ops(kind).list().map(p => p.name), base = shipped(kind);
@@ -231,7 +228,7 @@ export function presetsApp(ctx) {
         break;
       }
       case 'delete-preset':
-        if (await ctx.confirm('刪除這個預設？', '角色配音和畫風不會被刪除。')) { ops(currentKind).remove(current.id); drafts.delete(currentKind + ':' + current.id); current = null; render(); }
+        if (await ctx.confirm('刪除這個預設？', '角色資料和畫風會保留。')) { ops(currentKind).remove(current.id); drafts.delete(currentKind + ':' + current.id); current = null; render(); }
         break;
       case 'prompt-preview': {
         const o = ops(currentKind), error = o.validate(current);

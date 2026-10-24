@@ -51,7 +51,8 @@ test('voice-role contacts can be removed, remain absent after role discovery, an
   assert(!b.contacts().some(contact => contact.name === '雲璃'));
   assert.deepEqual(b.settings.routes, before);
   b.restoreContact('雲璃');
-  assert.equal(b.contacts().find(contact => contact.name === '雲璃').voice, true);
+  assert.equal(b.contacts().find(contact => contact.name === '雲璃').voice, false);
+  assert.equal(b.settings.routes[0].voice, true, 'legacy binding is preserved without enabling speech');
   assert.deepEqual(b.settings.routes, before);
 });
 

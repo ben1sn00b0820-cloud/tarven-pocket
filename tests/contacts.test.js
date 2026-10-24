@@ -76,7 +76,8 @@ test('existing voice roles are tagged for the current card instead of creating c
   await f.bridge.sync([event('a')], sourceScope(f.c));
   assert.equal(f.saved.length, 0);
   assert.deepEqual(f.tagged, [{names: ['林澈'], key: 'card:lin.png'}]);
-  assert.equal(f.backend.contacts()[0].voice, true);
+  assert.equal(f.backend.contacts()[0].voice, false);
+  assert.equal(f.backend.settings.routes[0].voice, true, 'legacy binding survives character contact discovery');
 });
 
 test('latest complete status, explicit physique, attribution, and empty manual body rows reach profiles', async () => {

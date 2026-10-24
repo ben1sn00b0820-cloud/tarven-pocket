@@ -58,14 +58,14 @@ export function callScreen(ctx, host) {
   layer.hidden = true;
   layer.setAttribute('role', 'dialog');
   layer.setAttribute('aria-modal', 'true');
-  layer.setAttribute('aria-label', '語音通話');
+  layer.setAttribute('aria-label', '文字通話');
   host.append(layer);
   const tone = ringtone(win, () => api.getVolume?.() ?? 1);
   let call = null, tick = 0, hideTimer = 0, drawnKey = '', typed = '';
 
   const engine = name => ctx.engineOf?.(name) || 'none';
   function status(c) {
-    if (c.state === 'ringing') return c.dir === 'in' ? '邀請你語音通話…' : '正在呼叫…';
+    if (c.state === 'ringing') return c.dir === 'in' ? '邀請你文字通話…' : '正在呼叫…';
     if (c.state === 'ended') return (ENDED[c.ended?.state] || '通話結束') + (c.ended?.duration ? ' ' + clock(c.ended.duration) : '');
     return clock((Date.now() - c.answeredAt) / 1000);
   }
@@ -73,9 +73,8 @@ export function callScreen(ctx, host) {
     if (c.state !== 'talking') return '';
     if (c.error) return '';
     if (c.thinking) return `${c.name} 在想……`;
-    if (c.speaking) return `${c.name} 正在說`;
     if (c.lines.at(-1)?.from === 'me') return `說完了點右邊的氣泡，${c.name} 才會回`;
-    return c.voiced ? '輪到你了，打字說話' : `${c.name} 還沒有配音，只顯示字幕`;
+    return '輪到你了，輸入文字回覆';
   }
   function linesHTML(c) {
     return c.lines.slice(-8).map(l => l.from === 'me'

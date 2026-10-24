@@ -5,7 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 const {chromium}=await import(process.env.CSB_PLAYWRIGHT||'playwright');
 const root=path.resolve(new URL('..',import.meta.url).pathname);
-const modules=['src/schema.js','src/identity.js','src/core.js','src/scan.js','src/controller.js','src/ui.js','src/bridge.js','index.js'];
+const modules=['src/schema.js','src/identity.js','src/core.js','src/scan.js','src/controller.js','src/ui.js','src/bridge.js','src/generation.js','index.js'];
 const js=modules.map(p=>fs.readFileSync(path.join(root,p),'utf8').replace(/^import .*?;\n/gm,'').replace(/^export /gm,'')).join('\n');
 const html=fs.readFileSync(path.join(root,'tests/host.html'),'utf8')
   .replace('<link rel="stylesheet" href="../style.css">','<style>'+fs.readFileSync(path.join(root,'style.css'),'utf8')+'</style>')
@@ -31,6 +31,40 @@ try{
  });
  await check('repeated local scan does not duplicate the same character',async()=>{
   await page.evaluate(()=>CSBCharacterState.openScanner({mode:'local'}));await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText(/沒有可採用的新資料/).waitFor();assert.equal(await count(),1);await closeScan();
+ });
+ await check('dry-run start without an end event never blocks a local scan',async()=>{
+  await page.evaluate(async()=>{await testHost.ctx.eventSource.emit('GENERATION_STARTED','normal',{},true);CSBCharacterState.openScanner({mode:'local'});});
+  await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText(/沒有可採用的新資料/).waitFor();await closeScan();
+ });
+ await check('background quiet generation does not lock completed narrative scanning',async()=>{
+  await page.evaluate(async()=>{window.hostGenerating=true;await testHost.ctx.eventSource.emit('GENERATION_STARTED','quiet',{},false);CSBCharacterState.openScanner({mode:'local'});});
+  await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText(/沒有可採用的新資料/).waitFor();await closeScan();
+  await page.evaluate(async()=>{window.hostGenerating=false;await testHost.ctx.eventSource.emit('GENERATION_ENDED');});
+ });
+ await check('quiet start remains background when the host lock arrives after initial scheduling',async()=>{
+  await page.evaluate(async()=>{window.hostGenerating=false;await testHost.ctx.eventSource.emit('GENERATION_STARTED','quiet',{},false);});
+  await page.waitForTimeout(120);
+  await page.evaluate(()=>{window.hostGenerating=true;CSBCharacterState.openScanner({mode:'local'});});
+  await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText(/沒有可採用的新資料/).waitFor();await closeScan();
+  await page.evaluate(async()=>{await testHost.ctx.eventSource.emit('GENERATION_ENDED');window.hostGenerating=false;CSBCharacterState.openScanner({mode:'local'});});
+  await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText(/沒有可採用的新資料/).waitFor();await closeScan();
+ });
+ await check('real narrative generation blocks local scanning',async()=>{
+  await page.evaluate(async()=>{window.hostGenerating=true;await testHost.ctx.eventSource.emit('GENERATION_STARTED','normal',{},false);CSBCharacterState.openScanner({mode:'local'});});
+  await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText('正文正在生成，請待本輪完成再掃描',{exact:true}).waitFor();
+ });
+ await check('live idle state releases a stale start even when the end event is missing',async()=>{
+  await page.evaluate(()=>{window.hostGenerating=false;});
+  await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText(/沒有可採用的新資料/).waitFor();await closeScan();
+ });
+ await check('active streaming remains protected after an unrelated end event',async()=>{
+  await page.evaluate(async()=>{window.hostGenerating=true;testHost.ctx.streamingProcessor={isFinished:false,isStopped:false,type:'normal'};await testHost.ctx.eventSource.emit('GENERATION_STARTED','normal',{},false);window.hostGenerating=false;await testHost.ctx.eventSource.emit('GENERATION_ENDED');CSBCharacterState.openScanner({mode:'local'});});
+  await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText('正文正在生成，請待本輪完成再掃描',{exact:true}).waitFor();
+ });
+ await check('finished streaming releases the scan without requiring another end event',async()=>{
+  await page.evaluate(()=>{testHost.ctx.streamingProcessor.isFinished=true;});
+  await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await scanner().getByText(/沒有可採用的新資料/).waitFor();await closeScan();
+  await page.evaluate(()=>{delete testHost.ctx.streamingProcessor;});
  });
  await check('phone-style mounted information view has scan and AI buttons',async()=>{
   await page.evaluate(()=>{const div=document.createElement('div');div.id='information-app';document.body.append(div);window.informationMount=CSBCharacterState.mount(div);});
@@ -74,6 +108,15 @@ try{
   await page.evaluate(()=>{testHost.ctx.generateRaw=()=>new Promise(r=>window.finishSwitch=r);CSBCharacterState.openScanner({mode:'ai',limit:1});});await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();await page.waitForFunction(()=>typeof finishSwitch==='function');
   await page.evaluate(async()=>{window.previousMetadata=testHost.ctx.chatMetadata;testHost.ctx.chatMetadata={};testHost.ctx.chat=[];testHost.ctx.chatId='chat-two';await testHost.ctx.eventSource.emit('CHAT_CHANGED');finishSwitch('{"characters":[]}');});
   await page.waitForTimeout(250);assert.equal(await count(),0);assert.equal(await scanner().count(),0);
+ });
+ await check('automatic local scan waits for generation and recovers without an end event',async()=>{
+  await page.evaluate(async()=>{testHost.ctx.extensionSettings.csb_character_state_v1.autoScan='local';window.hostGenerating=true;await testHost.ctx.eventSource.emit('GENERATION_STARTED','normal',{},false);});
+  await raw('姓名：沈清秋\n身分：掌門');
+  await page.evaluate(()=>testHost.ctx.eventSource.emit('MESSAGE_RECEIVED',testHost.ctx.chat.length-1));
+  await page.waitForTimeout(650);assert.equal(await count(),0);
+  await page.evaluate(()=>{window.hostGenerating=false;});
+  await page.waitForFunction(()=>Object.values(CB().state.characters).some(c=>c.name==='沈清秋'));
+  assert.equal(await count(),1);
  });
  for(const width of [320,390,768,1280])await check(`scan dialog remains horizontally contained at ${width}px`,async()=>{
   await page.setViewportSize({width,height:900});await page.evaluate(()=>CSBCharacterState.openScanner());const d=scanner();assert.ok(await d.evaluate(e=>e.scrollWidth<=e.clientWidth+1));await closeScan();

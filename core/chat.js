@@ -10,7 +10,6 @@ import {parseSpiritText, formatSpiritAmount, SPIRIT_CURRENCY_RULE} from './curre
 import {safePhotoUrl} from './photo-url.js';
 import {stripStatusPanels} from '../pocket/status.js';
 import {callSummary} from './call.js';
-import {languageName} from './languages.js';
 import {normalizeDeletedContacts, deletedContactNames} from './contact-book.js';
 
 export const CHAT_LIMITS = Object.freeze({contacts: 200, persona: 4000, story: 40, history: 200});
@@ -22,7 +21,6 @@ export const DEFAULT_CHAT_ENTRIES = Object.freeze([
   {id: 'persona', title: '守住人设', text: '严格按每个联系人的人设、和{{用户}}的关系、说话习惯来回复。最近的剧情只作背景：可以提到发生过的事，但不要复述剧情，也不要替{{用户}}说话。', use: ['dm', 'group']},
   {id: 'group', title: '群聊', text: '群聊里谁接话、几个人接话，看话题和各自性格：冷场时可能只有一个人回，热闹的话题可以好几个人抢着说；每个人发多少也按各自的说话习惯。成员之间也可以互相回应、吐槽。', use: ['group']},
   {id: 'features', title: '手机功能', text: '你们是在手机上聊天，可以像真人一样用手机功能，但要有理由、看场合，大多数时候还是发文字：\n- 照片：分享正在看的东西、自拍、吃的、窗外的景色，或者{{用户}}问起时。已知真实图片地址时写成「名字：[图片 https://已知地址/照片.png] 照片描述」或「名字：[照片 /user/images/已知照片.png] 照片描述」，只用上下文确实存在的地址，不编造链接。没有真实地址时写成「名字：[图片] 一句话描述照片里拍到的画面」；手机检测到角色新发来的照片后，会自动调用用户已配置的 NovelAI API 生成实图并补回同一条消息，不需用户逐张点击生成；等待或出错状态由手机处理，不要声称尚未生成的图片已经完成。\n- 位置：约见面、说自己在哪、让{{用户}}来找时。写成「名字：[位置] 地点」。\n- 红包：节日、道谢、道歉、哄人、庆祝、开玩笑时，金额和身份、关系相称。写成「名字：[红包 金额 下品靈石] 祝福语」。\n- 转账：还钱、付账、给零花钱这类真的涉及钱的事，只在私聊里用。写成「名字：[转账 金额 下品靈石] 备注」。\n- 拍一拍：想引起注意、撒娇、打招呼，或者{{用户}}很久没回时。写成「名字：[拍一拍]」。\n- {{用户}}发来的红包和转账，收不收按人设来：客气的人可能先推辞，嘴硬的人嘴上说不要，正直的人会退还不该收的钱。收下红包写「名字：[领取红包]」，收下转账写「名字：[收款]」，退还转账写「名字：[退还]」，通常再跟一句话。\n- {{用户}}撤回消息、拍了拍谁、掷骰子、发来照片或位置时，可以自然地接话。\n一轮回复里最多用一次这些功能，不要连着几轮都发红包或照片。', use: ['dm', 'group']},
-  {id: 'voice', title: '语音消息', text: '情绪强烈、不方便打字，或者想让对方听到声音时，可以发语音消息，偶尔发就好。语音消息整条写成：{{语音格式}}\n能发语音的人和各自的语音语言：{{可发语音}}', use: ['dm', 'group']},
   {id: 'post', title: '顺手发朋友圈', use: ['dm', 'group'], text: '聊天里发生了让人有感触的事（开心、委屈、被逗笑、吵了架、想念对方），很偶尔可以顺手发一条朋友圈，大多数时候不发。朋友圈是给所有朋友看的，可以含蓄、意有所指，不要直接复述聊天内容。'},
   {id: 'm-style', title: '朋友圈口吻', use: ['moments'], text: '你在替联系人发朋友圈。像真人发动态：一两句话到一小段，写日常、心情、吐槽、见闻，或者对最近发生的事的感受。口语、自然，可以用表情和颜文字，不写旁白、动作描写和心理描写。每个人发的内容和语气都要符合自己的人设和说话习惯，彼此不要雷同。'},
   {id: 'm-persona', title: '朋友圈里守住人设', use: ['moments'], text: '朋友圈是发给所有朋友看的，不是单独对{{用户}}说话。可以含蓄地提到和{{用户}}之间的事，但不要把只有两个人知道的秘密直接写出来，除非人设就是这样。最近的剧情只作背景，不要复述剧情，也不要替{{用户}}说话或发动态。'},
@@ -31,7 +29,7 @@ export const DEFAULT_CHAT_ENTRIES = Object.freeze([
   {id: 'c-dial', title: '打电话', use: ['dm'], text: '想马上听到{{用户}}的声音、有急事、吵完架想和好、半夜睡不着想念的时候，很偶尔可以直接打电话过去。大多数时候发消息就好，只有真的有理由时才打。'},
   {id: 'f-style', title: '论坛口吻', use: ['forum'], text: '论坛是公开的，谁都能看：发帖和回帖的有角色，也有不认识的网友（路人）。路人有自己的网名和说话习惯，吃瓜、八卦、玩梗、抬杠、安利、求助都可以，口吻像真的网友，别都是好话。角色在论坛上用自己的名字，发言符合人设；公开场合说话一般比私聊更注意分寸，除非人设就是这样。话题可以来自最近的剧情、这个世界的设定、日常生活和身边的事；路人不知道只有当事人才知道的秘密。'},
   {id: 'p-style', title: 'TA 的手机', use: ['peek'], text: '{{用户}}正在偷看{{对象}}的手机。手机里的东西都要像真的：{{对象}}和朋友、家人、同事或别的角色的聊天，搜索记录，备忘录，相册。内容要符合{{对象}}的人设、生活和最近发生的事，聊天对象各有各的说话方式；可以藏着{{对象}}没对{{用户}}说出口的心思、小秘密或者反差，但不要编出和剧情矛盾的大事件。'},
-  {id: 'c-style', title: '通话口吻', use: ['call'], text: '你在和{{用户}}打语音电话，说的每一句都会被念出来。像真人打电话一样说话：口语，会接话、会反问，会有停顿和语气词。说多少按人设和情境来：话少的人三言两语，健谈的人、激动的时候、正在讲一件事的时候可以一口气说一大段；不要每次都说差不多长。身边发生的小事用说的话带出来（比如「等一下，我这边有点吵」），不写动作、旁白、心理描写和表情符号。守住人设和你们的关系，最近的剧情和聊天可以自然提起。'}
+  {id: 'c-style', title: '通话口吻', use: ['call'], text: '你在和{{用户}}进行文字模拟通话，直接输出对话文字。像真人打电话一样说话：口语，会接话、会反问，会有停顿和语气词。说多少按人设和情境来：话少的人三言两语，健谈的人、激动的时候、正在讲一件事的时候可以一口气说一大段；不要每次都说差不多长。身边发生的小事用说的话带出来（比如「等一下，我这边有点吵」），不写动作、旁白、心理描写和表情符号。守住人设和你们的关系，最近的剧情和聊天可以自然提起。'}
 ]);
 export const DEFAULT_BRING = '以下是{{用户}}刚才在手机上和{{对象}}的聊天记录。接下来的正文可以自然地承接、提到或回应这段聊天，不要原样复述：\n{{聊天记录}}';
 const DEFAULT_INJECTION = {position: 'in_chat', depth: 1, role: 'system'};
@@ -116,7 +114,7 @@ export function normalizeChatPreset(p = {}) {
     cleanTags: tagList(p.cleanTags),
     bring: text(p.bring ?? DEFAULT_BRING, 4000),
     injection: {...DEFAULT_INJECTION, ...p.injection, depth: count(p.injection?.depth, 0, 10000, DEFAULT_INJECTION.depth)},
-    entries: entries.map(e => ({id: String(e.id || crypto.randomUUID()), title: text(e.title, 80), enabled: e.enabled !== false, text: text(e.text, 20000), use: ruleUse(e)}))
+    entries: entries.map(e => ({id: String(e.id || crypto.randomUUID()), title: text(e.title, 80), enabled: e.id !== 'voice' && e.enabled !== false, text: text(e.text, 20000), use: ruleUse(e)}))
   };
 }
 
@@ -197,7 +195,7 @@ export function chatContacts(settings, space = null) {
   // A card's contacts: its own character(s), the roles that have spoken in its story, and contacts added under it.
   const here = r => !space?.key || (space.members || []).includes(r.name) || (Array.isArray(r.cards) && r.cards.includes(space.key));
   const removed = deletedContactNames(settings.chat);
-  const roles = settings.routes.filter(r => !removed.has(r.name) && !isPlaceholderRole(r.name) && here(r)).map(r => ({name: r.name, source: 'role', voice: !!r.voice, engine: r.voice ? r.engine : 'none', language: r.language || settings.general.defaultLanguage, persona: ''}));
+  const roles = settings.routes.filter(r => !removed.has(r.name) && !isPlaceholderRole(r.name) && here(r)).map(r => ({name: r.name, source: 'role', voice: false, engine: 'none', language: r.language || settings.general.defaultLanguage, persona: r.persona || ''}));
   const roleNames = new Set(roles.map(role => role.name));
   const manual = settings.chat.contacts.filter(c => !removed.has(c.name) && !roleNames.has(c.name) && inSpace(c, space)).map(c => ({name: c.name, source: 'manual', id: c.id, voice: false, engine: 'none', language: '', persona: c.persona}));
   return [...roles, ...manual];
@@ -240,13 +238,12 @@ const fill = (template, values) => Object.entries(values).reduce((s, [k, v]) => 
 export function buildChatRequest({preset, thread, members, story = [], user = '我', userPersona = '', voiceFormat, lore = ''}) {
   const group = thread.type === 'group';
   const partner = group ? thread.name : members[0]?.name || thread.name;
-  const speakers = members.filter(m => m.voice);
   const values = {
     '用户': user, '对象': partner,
-    '语音格式': voiceFormat,
-    '可发语音': speakers.length ? speakers.map(m => `${m.name}（${languageName(m.language || 'zh')}）`).join('、') : '（暂时没有人能发语音，只发文字）'
+    '语音格式': '',
+    '可发语音': '（只发文字）'
   };
-  const used = preset.entries.filter(e => e.enabled && e.text.trim() && e.use.includes(group ? 'group' : 'dm')).filter(e => speakers.length || e.id !== 'voice');
+  const used = preset.entries.filter(e => e.enabled && e.text.trim() && e.use.includes(group ? 'group' : 'dm')).filter(e => e.id !== 'voice');
   const rules = used.map(e => fill(e.text, values)), posting = used.some(e => e.id === 'post' || /朋友圈/.test(e.text)), dialing = !group && used.some(e => e.id === 'c-dial');
   const people = members.map(m => `- ${m.name}：${(m.persona || m.card || '').trim() || '（没有资料，按剧情里的表现来）'}`).join('\n');
   const names = members.map(m => m.name).join('、');
@@ -259,7 +256,7 @@ export function buildChatRequest({preset, thread, members, story = [], user = '�
     ['【输出格式】',
       `只输出新消息，每条消息单独一行，写成「名字：消息内容」。名字只能是：${names}。`,
       `不要写${user}的消息，不要写时间、编号、引号或任何解释。`,
-      speakers.length ? `语音消息的整行写成「名字：${voiceFormat}」，标签里的角色填同一个名字；标签里的原文（{文本}）是念出来的话，用这个人的语音语言写（${speakers.map(m => `${m.name}：${languageName(m.language || 'zh')}`).join('，')}），引号里的{译文}写中文。` : '',
+      '对话直接写成文字，不输出 TTS 标签、朗读原文或重复的译文。',
       `需要时也可以像真人一样用手机功能，每种单独一行，偶尔用，别每轮都用：「名字：[图片] 一句话描述拍的照片」「名字：[位置] 地点」「名字：[红包 金额 下品靈石] 祝福语」「名字：[转账 金额 下品靈石] 备注」「名字：[拍一拍]」（拍一拍${user}）；很偶尔（节日、纪念日、道歉、想对${user}好的时候）可以送${user}礼物：「名字：[礼物 物品名] 附言」。`,
       '照片已有真实图片地址时，格式为「名字：[图片 https://已知地址/照片.png] 描述」或「名字：[照片 /user/images/已知照片.png] 描述」。只引用上下文确实存在的地址；不能编造链接。没有地址就使用 [图片] 清楚描述画面，手机会自动使用用户已配置的 NovelAI API 生成图片并填回同一条消息；未生成完成时不要声称已获得真实图片。',
       `${user}发来红包或转账时，收下红包单独写一行「名字：[领取红包]」，收下转账写「名字：[收款]」，退还转账写「名字：[退还]」；${user}送来礼物时，收下写「名字：[收下礼物]」，不收写「名字：[退还礼物]」；收不收按人设决定。`,
@@ -319,9 +316,9 @@ function special(from, content, {names, user}) {
 
 /**
  * Turns the model's reply into chat messages. Lines look like 「名字：内容」; a voice line holds a voice tag
- * in `voiceFormat`. Voice from someone without a voice becomes a text message with the translation.
+ * in `voiceFormat`. Legacy voice tags are always read as text; no new audio message is created.
  */
-export function parseChatReply(reply, {members, user = '我', voiceFormat, voiceNames = []}) {
+export function parseChatReply(reply, {members, user = '我', voiceFormat}) {
   const names = members.map(m => m.name), out = [];
   const body = String(reply || '').replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '').replace(/```[a-z]*\n?|```/g, '');
   for (const raw of body.split(/\r?\n/)) {
@@ -337,8 +334,8 @@ export function parseChatReply(reply, {members, user = '我', voiceFormat, voice
     if (feature) { out.push(feature); if (out.length >= 12) break; continue; }
     const voice = voiceFormat ? parseDialogue(content, voiceFormat)[0] : null;
     if (voice) {
-      if (voiceNames.includes(from)) out.push({from, kind: 'voice', text: voice.text.trim(), translation: voice.translation.trim(), emotion: voice.emotion});
-      else out.push({from, kind: 'text', text: voice.translation.trim()});
+      const text = (voice.translation || voice.text).trim();
+      if (text) out.push({from, kind: 'text', text});
       continue;
     }
     const plain = unquote(content.replace(/<[^>]+>/g, ''));

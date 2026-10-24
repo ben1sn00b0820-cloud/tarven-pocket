@@ -1,7 +1,7 @@
 import {createView, esc, btn, field, input, select, textArea, toggle, heading, groupTitle, avatar, avatarPicture, empty, help, copyText} from './common.js';
 import {icon} from './icons.js';
 import {openImageViewer} from '../image-viewer.js';
-import {saveFile, downloadAction} from '../download.js';
+import {downloadAction} from '../download.js';
 import {momentsPanel, momentsNew, momentsSeen} from './moments.js';
 import {PROFILE_STATUS, BUBBLES, FRAMES, BACKGROUNDS} from '../core/chat.js';
 import {callSummary} from '../core/call.js';
@@ -13,7 +13,7 @@ import {contactDetailsHTML, openContactStatusEditor, deleteContactWithConfirmati
 
 // Chat app, QQ style: 消息 (conversations, with search, 置顶 and 免打扰), 联系人 (特别关心, friends, groups, profile cards)
 // and 动态 (朋友圈, ui/moments.js). Tapping your own avatar opens 我: name, status, signature and 个性装扮 (chat bubble,
-// avatar pendant, chat background). Private and group chats have voice messages, manual contacts, and "带进剧情"
+// avatar pendant, chat background). Private and group chats have text messages, manual contacts, and "带进剧情"
 // (carry selected messages into the next story reply).
 // The + button next to the message box opens the phone features: photos, emoji, red packets, transfers,
 // locations, 拍一拍, dice and "let them talk". Long-press (right-click) a message to quote, recall or delete it.
@@ -39,7 +39,7 @@ const LINE_KINDS = ['system', 'pat', 'notice', 'recall'];
 function preview(m) {
   if (!m) return '還沒有訊息';
   switch (m.kind) {
-    case 'voice': return `[語音] ${seconds(m)}″`;
+    case 'voice': return m.translation || m.text || '[舊訊息]';
     case 'photo': return '[圖片]';
     case 'redpacket': return '[紅包] ' + (m.text || BLESSING);
     case 'transfer': return '[轉賬] ' + yuan(m.amount);
@@ -55,9 +55,6 @@ function preview(m) {
 }
 const quotable = m => ['text', 'voice', 'photo', 'location'].includes(m.kind);
 const quoteText = m => m.kind === 'voice' ? m.translation || m.text : m.kind === 'photo' ? '[圖片]' + (m.text ? ' ' + m.text : '') : m.kind === 'location' ? '[位置] ' + m.text : m.text;
-const seconds = m => Math.max(1, Math.min(60, Math.round((m.text || '').length / 5)));
-const lineOf = m => ({role: m.from, emotion: m.emotion || 'calm', text: m.text, translation: m.translation || ''});
-const WAVE_HEIGHTS = [6, 12, 18, 10, 16, 22, 14, 8, 16, 20, 12, 7, 14, 10];
 // Dice pips on a 3×3 grid, by face.
 const PIPS = {1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]};
 const EMOJI = ['😀', '😂', '🥹', '😭', '😊', '🥰', '😘', '😳', '🤔', '😴', '😡', '🙄', '😏', '🤗', '🥺', '😱', '👍', '👌', '🙏', '👏', '💪', '❤️', '💔', '✨', '🎉', '🌸', '☕', '🌙', '🍰', '🐱', '🐶', '🌧️'];
@@ -80,17 +77,8 @@ export function chatApp(ctx) {
   let unreadTotal = 0, freshMoments = 0;
   let panel = null, quote = null;
   const drafts = new Map(), live = typeof api.chatReply === 'function';
-  const photoURLs = new Map(), recalled = new Map(), transcribed = new Set(), generatingPhotos = new Set();
+  const photoURLs = new Map(), recalled = new Map(), generatingPhotos = new Set();
   let press = null, pressedAt = 0, photoEditor = null, photoEditEpoch = 0;
-  const voiceText = () => api.getState().chat.voiceText || {mode: 'translation', auto: false};
-  /** 转文字 for a voice message: the translation, the original line, or both (original first). */
-  function transcriptHTML(m) {
-    const mode = voiceText().mode, original = m.text || '', translation = m.translation || '';
-    if (mode === 'original' || !translation) return `<span class="v-text">${esc(original)}</span>`;
-    if (mode === 'both' && original && original !== translation) return `<span class="v-text both"><span class="v-orig">${esc(original)}</span><span>${esc(translation)}</span></span>`;
-    return `<span class="v-text">${esc(translation)}</span>`;
-  }
-
   // ---------- The user (我) ----------
   const profile = () => api.getState().chat.profile;
   const myName = () => profile().name || api.userName?.() || '我';
@@ -99,7 +87,7 @@ export function chatApp(ctx) {
   const statusLine = () => { const p = profile(); return `<i class="qq-dot" data-status="${p.status}"></i>${esc(PROFILE_STATUS[p.status])}${p.statusText ? ' · ' + esc(p.statusText) : ''}`; };
   const starred = () => api.getState().chat.starred || [];
   /** A contact's one line: a manual contact's persona, or where a role comes from. */
-  const signatureOf = c => c.source === 'manual' ? (c.persona || '還沒有寫人設').split('\n')[0].slice(0, 40) : c.voice ? '角色 · 能發語音訊息' : '角色 · 還沒有配音';
+  const signatureOf = c => c.source === 'manual' ? (c.persona || '還沒有寫人設').split('\n')[0].slice(0, 40) : c.source === 'story' ? '劇情聯絡人' : '角色';
   const moments = momentsPanel(ctx, {v, frame: html => frame(html), me: () => ({name: myName(), avatar: myAvatar}), visible: () => ctx.visible?.('chat') !== false && mode === 'list' && tab === 'moments'});
   /** A tab page with the tab bar under it. */
   function frame(html) {
@@ -171,7 +159,7 @@ export function chatApp(ctx) {
     if (!c) { mode = 'list'; return render(); }
     const star = starred().includes(c.name), manual = c.source === 'manual' && api.getState().chat.contacts.find(x => x.name === c.name);
     const shell = body => `<div class="qq-card" data-engine="${c.engine}" data-contact-name="${esc(c.name)}"><span class="qq-card-cover" aria-hidden="true"></span>${avatar(c.name, c.engine, 84)}<h2>${esc(c.name)}</h2><p>${esc(signatureOf(c))}</p>
-        <div class="qq-card-tags"><span class="chip">${c.source === 'role' ? '角色' : c.source === 'story' ? '劇情聯絡人' : '聯絡人'}</span>${c.voice ? '<span class="chip">能發語音</span>' : ''}${star ? '<span class="chip">★ 特別關心</span>' : ''}</div></div>
+        <div class="qq-card-tags"><span class="chip">${c.source === 'role' ? '角色' : c.source === 'story' ? '劇情聯絡人' : '聯絡人'}</span>${star ? '<span class="chip">★ 特別關心</span>' : ''}</div></div>
       <div class="actions">${btn('profile-chat', icon('chat') + '發訊息', 'primary')}${api.pocketSaveContactProfile ? btn('profile-status-edit', icon('edit') + '修改角色信息', 'secondary') : ''}${api.callDial ? btn('profile-call', icon('phone') + '打電話', 'secondary') : ''}${btn('profile-moments', icon('moments') + 'TA 的動態', 'secondary')}</div>
       <div class="group">${btn('avatar-pick', `${icon('image')}<span><strong>換頭像</strong><small>${esc(avatarState(c.name))}</small></span>`, 'list-row', `data-key="${esc(c.name)}"`)}${btn('star', `<span>${star ? '★ 取消特別關心' : '☆ 設為特別關心'}</span>`, 'list-row')}${manual ? `<button class="list-row" data-action="contact-edit" data-id="${esc(manual.id)}">${icon('edit')}<span><strong>編輯資料和人設</strong></span></button>` : ''}</div>
       ${body}${c.persona ? `<details class="tp-contact-section" data-group="tp-contact-persona"><summary>聯絡人人設</summary><p class="tp-contact-persona">${esc(c.persona)}</p></details>` : ''}
@@ -203,14 +191,15 @@ export function chatApp(ctx) {
       + `<div class="group pad"><div class="field"><span>聊天氣泡</span>${chips('bubble', BUBBLES, p.bubble)}</div><div class="field"><span>頭像掛件</span>${chips('frame', FRAMES, p.frame)}</div><div class="field"><span>聊天背景</span>${chips('background', BACKGROUNDS, p.background)}</div>
         <div class="actions" style="margin-top:0">${btn('me-bg-photo', icon('image') + (p.backgroundPhoto ? '換一張照片當背景' : '用相簿裡的照片當背景'), 'secondary')}${p.backgroundPhoto ? btn('me-bg-clear', '不用照片', 'text-button') : ''}</div></div>`
       + groupTitle('聊天設定')
-      + `<div class="group"><button class="list-row" data-action="me-voice">${icon('book')}<span><strong>語音訊息</strong><small>轉文字顯示什麼、要不要自動轉</small></span>${icon('next')}</button><button class="list-row" data-action="me-calls">${icon('phone')}<span><strong>來電</strong><small>角色會不會自己打來、響鈴多久</small></span>${icon('next')}</button><button class="list-row" data-action="me-presets">${icon('edit')}<span><strong>聊天預設</strong><small>怎麼回訊息、朋友圈怎麼發、電話裡怎麼說</small></span>${icon('next')}</button></div>`);
+      + `<div class="group"><button class="list-row" data-action="me-calls">${icon('phone')}<span><strong>來電</strong><small>角色會不會自己打來、響鈴多久</small></span>${icon('next')}</button><button class="list-row" data-action="me-presets">${icon('edit')}<span><strong>聊天預設</strong><small>怎麼回訊息、朋友圈怎麼發、電話裡怎麼說</small></span>${icon('next')}</button></div>`);
   }
 
   // ---------- Thread ----------
   function bodyHTML(m) {
     const mid = `data-mid="${esc(m.id)}"`;
     switch (m.kind) {
-      case 'voice': return `<button class="voice-msg" data-action="voice" ${mid} data-state="ungenerated" aria-label="播放 ${esc(m.from)} 的語音"><span class="v-ico">${icon('play', true)}</span><span class="v-wave">${WAVE_HEIGHTS.map(h => `<i style="height:${h}px"></i>`).join('')}</span><span class="v-sec">${seconds(m)}″</span></button>${voiceText().auto || transcribed.has(m.id) ? transcriptHTML(m) : ''}`;
+      // Keep legacy voice records readable after removing speech synthesis.
+      case 'voice': return `<button class="chat-bubble" data-action="message" ${mid}>${esc(m.translation || m.text || '[舊訊息沒有文字]')}</button>`;
       case 'photo': {
         const url = messagePhotoURL(m.image, ctx.win), busy = generatingPhotos.has(`${threadId}:${m.id}`);
         const auto = m.photoAuto || {}, state = busy ? 'generating' : auto.state;
@@ -287,15 +276,14 @@ export function chatApp(ctx) {
     if (!thread) { mode = 'list'; threadId = null; return render(); }
     if (thread.unread) api.markThreadRead(threadId).catch(() => {});
     const group = thread.type === 'group', contacts = api.chatContacts();
-    const voiced = thread.members.filter(n => contacts.find(c => c.name === n)?.voice).length;
-    const sub = group ? `${thread.members.length} 人 · ${voiced} 人能發語音` : contacts.find(c => c.name === thread.members[0])?.source === 'manual' ? '手動聯絡人' : voiced ? '能發語音訊息' : '還沒有配音 · 只發文字';
+    const sub = group ? `${thread.members.length} 人` : contacts.find(c => c.name === thread.members[0])?.source === 'manual' ? '手動聯絡人' : '角色聯絡人';
     const bring = pendingBring(), scroller = v.root.querySelector('.msgs'), atBottom = !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
     const focused = ctx.doc.activeElement?.dataset?.field === 'draft' && v.root.contains(ctx.doc.activeElement);
     const list = thread.messages;
     const look = profile();
     v.draw(`<div class="chat-thread${selecting ? ' selecting' : ''}" data-bubble="${esc(look.bubble)}" data-bg="${esc(look.backgroundPhoto ? 'photo' : look.background)}">
       <div class="th-head" data-engine="${group ? 'none' : engine(thread.members[0])}">${threadAvatar(thread, 38)}<div class="th-title">${group ? `<strong>${esc(thread.name)}</strong>` : `<button class="tp-thread-person" data-action="profile" data-name="${esc(thread.members[0])}" aria-label="檢視 ${esc(thread.name)} 的資料"><strong>${esc(thread.name)}</strong></button>`}<small>${esc(sub)}</small></div>
-        ${btn('bring', selecting ? '取消' : icon('book') + '<span class="bring-label">帶進劇情</span>', 'chip-button', selecting ? '' : 'aria-label="帶進劇情" title="帶進劇情"')}${!group && api.callDial ? btn('call', icon('phone'), 'round-button call-go', 'aria-label="語音通話"') : ''}${btn('thread-menu', icon('more'), 'round-button', 'aria-label="更多"')}</div>
+        ${btn('bring', selecting ? '取消' : icon('book') + '<span class="bring-label">帶進劇情</span>', 'chip-button', selecting ? '' : 'aria-label="帶進劇情" title="帶進劇情"')}${!group && api.callDial ? btn('call', icon('phone'), 'round-button call-go', 'aria-label="文字通話"') : ''}${btn('thread-menu', icon('more'), 'round-button', 'aria-label="更多"')}</div>
       <div class="msgs" role="log" aria-live="polite">${list.length ? list.map((m, i) => messageHTML(m, i, list)).join('') : `<p class="chat-empty">${live ? '發幾條訊息都行，發完點右下角的氣泡按鈕讓對方回覆；輸入框空著時傳送鍵就會變成它。也可以直接點它，讓對方先開口。' : '在酒館裡開啟傳音玉符時，聯絡人才會回覆。'}</p>`}
         ${bring?.threadId === threadId ? `<div class="sys">${icon('book')}${bring.count} 條訊息會帶進下一次正文 ${btn('cancel-bring', '取消', 'text-button')}</div>` : ''}
         ${typing() ? `<div class="msg" data-engine="${group ? 'none' : engine(thread.members[0])}">${avatar(group ? '…' : thread.members[0], group ? 'none' : engine(thread.members[0]), 34)}<div class="m-body"><div class="chat-bubble typing" aria-label="對方正在輸入"><i></i><i></i><i></i></div></div></div>` : ''}</div>
@@ -307,7 +295,6 @@ export function chatApp(ctx) {
     if (atBottom || stick) msgs.scrollTop = msgs.scrollHeight;
     stick = false;
     if (focused) v.root.querySelector('[data-field=draft]')?.focus({preventScroll: true});
-    paintVoices();
     paintPhotos();
     if (look.backgroundPhoto) photoURL(look.backgroundPhoto).then(url => { const box = v.root.querySelector('.msgs'); if (box && url) box.style.backgroundImage = `url("${url}")`; });
   }
@@ -324,18 +311,6 @@ export function chatApp(ctx) {
     }
     wrap.querySelector('[data-action=panel]')?.setAttribute('aria-expanded', String(!!panel));
     if (msgs && atBottom) msgs.scrollTop = msgs.scrollHeight;
-  }
-  async function paintVoices() {
-    const status = api.status();
-    for (const el of v.root.querySelectorAll('.voice-msg[data-mid]')) {
-      const m = thread?.messages.find(x => x.id === el.dataset.mid);
-      if (!m) continue;
-      const on = ['playing', 'paused', 'generating'].includes(status.phase) && status.line?.text === m.text && status.line?.role === m.from;
-      const state = on ? (status.phase === 'generating' ? 'generating' : 'playing') : await api.lineState(lineOf(m));
-      if (!el.isConnected) continue;
-      el.dataset.state = state;
-      el.querySelector('.v-ico').innerHTML = state === 'generating' ? icon('spin') : icon(state === 'playing' ? 'pause' : 'play', true);
-    }
   }
   // Album photos sent in the chat; each picture is read once and kept while the app is open.
   async function photoURL(id) {
@@ -758,23 +733,14 @@ export function chatApp(ctx) {
     const copyable = ['text', 'voice', 'location', 'photo'].includes(m.kind) && quoteText(m);
     const canRecall = !contact && !['redpacket', 'transfer', 'gift'].includes(m.kind);
     const shown = m.kind === 'voice' ? (m.translation || m.text) : m.kind === 'dice' ? `骰子 ${m.text} 點` : ['redpacket', 'transfer', 'gift'].includes(m.kind) ? preview(m) : quoteText(m);
-    const voice = m.kind === 'voice', open = voice && (voiceText().auto || transcribed.has(m.id));
     const editablePhoto = m.kind === 'photo' && contact && typeof api.pocketPhotoDraft === 'function' && typeof api.pocketEditPhoto === 'function';
-    const d = sheet('訊息', `${editablePhoto ? `<div class="actions">${btn('edit-photo', icon('edit') + '編輯圖片提示詞', 'primary')}</div>` : ''}${voice ? '' : `<p class="help-copy">${esc(shown)}</p>`}
-      ${voice ? `<div class="actions">${btn('transcribe', icon('book') + (open ? '收起文字' : '轉文字'), 'primary')}${btn('download', icon('download') + '下載語音', 'secondary')}</div>` : ''}
+    const d = sheet('訊息', `${editablePhoto ? `<div class="actions">${btn('edit-photo', icon('edit') + '編輯圖片提示詞', 'primary')}</div>` : ''}<p class="help-copy">${esc(shown)}</p>
       <div class="actions">${quotable(m) ? btn('quote', icon('reply') + '引用', 'secondary') : ''}${copyable ? btn('copy', icon('copy') + '複製', 'secondary') : ''}</div>
       <div class="actions">${canRecall ? btn('recall', icon('undo') + '撤回', 'secondary') : ''}${btn('delete', icon('trash') + '刪除', 'danger')}</div>
       ${last && live ? `<div class="actions">${btn('reroll', icon('refresh') + '重新回覆這一輪', 'secondary')}</div>` : ''}`, {
       'edit-photo': () => { d.close(); return editPhoto(m, photoThreadId); },
-      transcribe: () => {
-        d.close();
-        if (open && voiceText().auto) { ctx.notify('語音自動轉文字開著，可以在右上角「⋯ → 語音訊息」裡關掉'); return; }
-        if (open) transcribed.delete(m.id); else transcribed.add(m.id);
-        render();
-      },
-      download: async () => { d.close(); const {blob, name} = await api.audioFile({line: lineOf(m)}); ctx.notify('已下載 ' + await saveFile(ctx.doc, blob, name)); },
       quote: () => { d.close(); quote = {from: m.from, text: quoteText(m).slice(0, 200)}; panel = null; render(); },
-      copy: async () => { d.close(); ctx.notify(await copyText(ctx.win, m.kind === 'voice' ? m.text : quoteText(m)) ? '已複製' : '這個瀏覽器不讓複製，可以長按文字手動複製'); },
+      copy: async () => { d.close(); ctx.notify(await copyText(ctx.win, quoteText(m)) ? '已複製' : '這個瀏覽器不讓複製，可以長按文字手動複製'); },
       recall: async () => {
         d.close();
         if (m.kind === 'text') recalled.set(m.id, m.text);
@@ -794,7 +760,7 @@ export function chatApp(ctx) {
   function newChat() {
     const contacts = api.chatContacts();
     const d = ctx.dialog('新建聊天', contacts.length
-      ? `${groupTitle('私聊')}<div class="pick-list">${contacts.map(c => `<button class="list-row" data-new-dm="${esc(c.name)}">${avatar(c.name, c.engine, 36)}<span><strong>${esc(c.name)}</strong><small>${c.source === 'role' ? (c.voice ? '角色 · 能發語音' : '角色 · 只發文字') : '手動聯絡人'}</small></span>${icon('next')}</button>`).join('')}</div>
+      ? `${groupTitle('私聊')}<div class="pick-list">${contacts.map(c => `<button class="list-row" data-new-dm="${esc(c.name)}">${avatar(c.name, c.engine, 36)}<span><strong>${esc(c.name)}</strong><small>${c.source === 'role' ? '角色' : c.source === 'story' ? '劇情聯絡人' : '手動聯絡人'}</small></span>${icon('next')}</button>`).join('')}</div>
         ${contacts.length > 1 ? `${groupTitle('群聊')}<div class="pick-list">${contacts.map(c => `<label class="setting-row"><span>${avatar(c.name, c.engine, 28)}${esc(c.name)}</span><input class="switch" type="checkbox" data-member="${esc(c.name)}" aria-label="拉 ${esc(c.name)} 進群"></label>`).join('')}</div>
           ${field('群名', input('group-name', '', 'text', 'maxlength="40" placeholder="可以不填"'))}<div class="actions">${btn('create-group', icon('group') + '建群', 'primary')}</div>` : ''}
         <div class="actions">${btn('manage-contacts', icon('person') + '管理聯絡人', 'text-button')}</div>`
@@ -815,22 +781,6 @@ export function chatApp(ctx) {
         }
         if (b.dataset.action === 'manage-contacts') { d.close(); mode = 'list'; tab = 'contacts'; contactDraft = null; render(); }
       }).catch(error => ctx.notify(error.message));
-    });
-  }
-  /** Options for voice messages in every chat: what 转文字 shows, and whether it happens by itself. */
-  function voiceTextSheet() {
-    const draw = () => {
-      const o = voiceText();
-      return `<p class="help-copy">語音訊息平時只顯示語音條，長按（電腦上右鍵）選「轉文字」才顯示文字。</p>
-        <div class="field"><span>轉文字顯示</span><div class="segmented" style="margin:0">${[['translation', '中文譯文'], ['original', '原文'], ['both', '原文和譯文']].map(([k, l]) => `<button data-action="vt-mode" data-mode="${k}" aria-pressed="${o.mode === k}">${l}</button>`).join('')}</div></div>
-        <div class="setting-row"><span>新舊語音都自動轉文字</span><input class="switch" type="checkbox" data-field="vt-auto" aria-label="語音自動轉文字" ${o.auto ? 'checked' : ''}></div>`;
-    };
-    const d = sheet('語音訊息', `<div class="vt-body">${draw()}</div>`, {
-      'vt-mode': b => { api.saveChatOptions({voiceText: {mode: b.dataset.mode}}); d.body.querySelector('.vt-body').innerHTML = draw(); render(); }
-    });
-    d.body.addEventListener('change', e => {
-      if (!e.target.matches('[data-field=vt-auto]')) return;
-      try { api.saveChatOptions({voiceText: {auto: e.target.checked}}); render(); } catch (error) { ctx.notify(error.message); }
     });
   }
   /** Where an avatar comes from, in words. */
@@ -866,7 +816,7 @@ export function chatApp(ctx) {
   /** 来电 options: characters calling by themselves (off by default), and how long a call rings. */
   function callsSheet() {
     const o = () => api.getState().calls;
-    const draw = () => `<div class="setting-row"><span>角色自己打來${help('角色可以給你打語音電話：接通後用 TA 的音色說話，你打字回。開啟這裡後，每隔幾條正文回覆，角色可能會自己打來；不開啟時，聊天裡角色偶爾也會直接打過來（聊天預設的「打電話」規則）。每句話都要呼叫一次模型並生成語音。')}</span><input class="switch" type="checkbox" data-field="call-auto" aria-label="角色自己打來" ${o().auto ? 'checked' : ''}></div>
+    const draw = () => `<div class="setting-row"><span>角色自己打來${help('角色可以邀請你文字通話，雙方的內容都顯示在畫面上。開啟這裡後，每隔幾條正文回覆，角色可能會自己打來；不開啟時，聊天裡角色偶爾也會直接打過來（聊天預設的「打電話」規則）。每次請角色回覆都會呼叫目前連線的模型。')}</span><input class="switch" type="checkbox" data-field="call-auto" aria-label="角色自己打來" ${o().auto ? 'checked' : ''}></div>
       <div class="field"><span>每幾條正文回覆可能打來一次</span><input data-field="call-every" type="number" min="1" max="100" value="${o().every}"></div>
       <div class="field"><span>每天最多</span><input data-field="call-dailyMax" type="number" min="1" max="10" value="${o().dailyMax}"></div>
       <div class="field"><span>響鈴多久算未接（秒）</span><input data-field="call-ring" type="number" min="15" max="60" value="${o().ring}"></div>`;
@@ -877,14 +827,13 @@ export function chatApp(ctx) {
       try { api.saveCalls({[key]: key === 'auto' ? e.target.checked : Number(e.target.value)}); d.body.querySelector('.calls-body').innerHTML = draw(); } catch (error) { ctx.notify(error.message); }
     });
   }
-  /** A finished call: what was said, the voice message of a missed call, and calling back. */
+  /** A finished call: what was said, the text message of a missed call, and calling back. */
   function callLog(m) {
     const name = m.from === 'me' ? thread.members[0] : m.from, who = l => l.from === 'me' ? '你' : l.from;
     const said = m.lines?.length ? `<div class="call-log">${m.lines.map(l => `<p><b>${esc(who(l))}：</b>${esc(l.translation || l.text)}</p>`).join('')}</div>` : '';
-    const mail = m.voicemail?.length ? `<p class="help-copy"><b>語音留言：</b>${esc(m.voicemail.map(l => l.translation || l.text).join(' '))}</p>` : '';
+    const mail = m.voicemail?.length ? `<p class="help-copy"><b>留言：</b>${esc(m.voicemail.map(l => l.translation || l.text).join(' '))}</p>` : '';
     const d = sheet(callSummary(m), `${said || mail ? '' : '<p class="help-copy">這通電話沒有說話內容。</p>'}${mail}${said}
-      <div class="actions">${m.voicemail?.length && ctx.routeFor(name)?.voice ? btn('call-mail', icon('play', true) + '聽留言', 'secondary') : ''}${api.callDial ? btn('call-back', icon('phone') + '回撥', 'primary') : ''}</div>`, {
-      'call-mail': () => api.speak(m.voicemail.map(l => ({role: name, text: l.text, translation: l.translation, emotion: l.emotion}))),
+      <div class="actions">${api.callDial ? btn('call-back', icon('phone') + '回撥', 'primary') : ''}</div>`, {
       'call-back': async () => { d.close(); await api.callDial(name); }
     });
   }
@@ -947,7 +896,6 @@ export function chatApp(ctx) {
     const d = ctx.dialog(thread.name, `<div class="pick-list">
       ${live ? `<button class="list-row" data-menu="reroll">${icon('refresh')}<span><strong>重新回覆最後一輪</strong></span></button>` : ''}
       ${group ? `<button class="list-row" data-menu="rename">${icon('edit')}<span><strong>改群名</strong></span></button>` : ''}
-      <button class="list-row" data-menu="voice-text">${icon('book')}<span><strong>語音訊息</strong><small>轉文字顯示什麼、要不要自動轉</small></span></button>
       <button class="list-row" data-menu="clear">${icon('trash')}<span><strong>清空聊天記錄</strong></span></button>
       <button class="list-row" data-menu="delete">${icon('close')}<span><strong>刪除這段聊天</strong></span></button></div>`);
     d.body.addEventListener('click', e => {
@@ -960,7 +908,6 @@ export function chatApp(ctx) {
           const r = ctx.dialog('改群名', `${field('群名', input('rename', thread.name, 'text', 'maxlength="40"'))}<div class="actions">${btn('rename-save', '儲存', 'primary')}</div>`);
           r.body.addEventListener('click', ev => { if (ev.target.closest('[data-action=rename-save]')) { const name = r.body.querySelector('[data-field=rename]').value; r.close(); api.updateThread(threadId, {name}).catch(err => ctx.notify(err.message)); } });
         }
-        if (action === 'voice-text') voiceTextSheet();
         if (action === 'clear' && await ctx.confirm('清空聊天記錄？', '這段聊天會保留，訊息全部刪除。')) await api.deleteChatMessages(threadId, thread.messages.map(m => m.id));
         if (action === 'delete' && await ctx.confirm('刪除這段聊天？', '聊天記錄會一起刪除，聯絡人不受影響。')) { await api.deleteThread(threadId); mode = 'list'; threadId = null; render(); }
       }).catch(error => ctx.notify(error.message));
@@ -1029,9 +976,9 @@ export function chatApp(ctx) {
     if (mode === 'list' && tab === 'moments' && await moments.click(el)) return;
     // The click that ends a long-press on a conversation only opened its menu.
     if (action === 'open' && el.dataset.conv && Date.now() - convPressedAt < 700) return;
-    // The click that ends a long-press only closes the press, it does not play or open anything.
+    // The click that ends a long-press only closes the press, it does not open anything.
     if (Date.now() - pressedAt < 700 && el.closest('.msg')) return;
-    if (selecting && ['message', 'voice', 'photo', 'photo-options', 'photo-retry', 'photo-setup', 'packet', 'transfer', 'gift', 'profile'].includes(action)) return;
+    if (selecting && ['message', 'photo', 'photo-options', 'photo-retry', 'photo-setup', 'packet', 'transfer', 'gift', 'profile'].includes(action)) return;
     const find = () => thread.messages.find(x => x.id === el.dataset.mid);
     switch (action) {
       case 'pocket-confirm-payment': {
@@ -1065,7 +1012,6 @@ export function chatApp(ctx) {
       case 'me-shop': openShop(); break;
       case 'me-bg-photo': await pickBackground(); break;
       case 'me-bg-clear': api.saveChatOptions({profile: {backgroundPhoto: ''}}); render(); break;
-      case 'me-voice': voiceTextSheet(); break;
       case 'me-calls': callsSheet(); break;
       case 'avatar-pick': await avatarSheet(el.dataset.key); break;
       case 'call': await api.callDial(thread.members[0]); break;
@@ -1136,14 +1082,6 @@ export function chatApp(ctx) {
       case 'packet': { const m = find(); if (m) openPacket(m); break; }
       case 'transfer': { const m = find(); if (m) openTransfer(m); break; }
       case 'gift': { const m = find(); if (m) openGift(m); break; }
-      case 'voice': {
-        const m = find();
-        if (!m) break;
-        if (!ctx.routeFor(m.from)?.voice) { ctx.notify(`${m.from} 還沒有配音`); break; }
-        if (el.dataset.state === 'playing') { api.stop(); break; }
-        await api.speak(lineOf(m));
-        break;
-      }
       case 'thread-menu': threadMenu(); break;
       case 'bring': selecting = selecting ? null : new Set(); panel = null; render(); break;
       case 'bring-go': {
@@ -1194,7 +1132,6 @@ export function chatApp(ctx) {
     if (mode === 'profile') return render();
     if (mode === 'thread' && (!event.threadId || event.threadId === threadId)) return render();
   };
-  v.onPlayback = () => { if (mode === 'thread') paintVoices(); };
   v.onMoments = () => { if (mode === 'list') render(); };
   const dispose = v.dispose;
   v.dispose = () => { closePhotoEditor(); cancelScrollPress(); ctx.win.clearTimeout(convPress?.timer); v.root.removeEventListener('scroll', cancelScrollPress, true); moments.dispose(); for (const url of photoURLs.values()) if (url) ctx.win.URL.revokeObjectURL(url); photoURLs.clear(); dispose(); };

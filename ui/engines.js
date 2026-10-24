@@ -1,51 +1,22 @@
-import {createView, esc, engines, btn, field, input, select, textArea, toggle, heading, help, groupTitle, plate} from './common.js';
+import {createView, esc, btn, field, input, select, textArea, toggle, heading, help, groupTitle, plate} from './common.js';
 
 const TIERS = {0: '未訂閱', 1: 'Tablet', 2: 'Scroll', 3: 'Opus'};
 import {icon, spark} from './icons.js';
 
 export function enginesApp(ctx) {
-  const {api} = ctx, v = createView(ctx, 'engines'), drafts = new Map();
+  const {api} = ctx, v = createView(ctx, 'engines');
   let engine = null, dirty = false, subscription = null, subscriptionError = '', subscriptionStatus = 0, textDraft = null, models = [];
   // ComfyUI: what the last connection check found ({models, samplers, schedulers} or {error}), and the tavern's workflows.
   let comfyInfo = null;
   // The wallet is a stack: the last card is the one in front. A tap on another card draws it to the front; a tap on
   // the front card opens it.
-  let order = ['llm', ...Object.keys(engines), 'comfy', 'gpt', 'nai'];
+  let order = ['llm', 'comfy', 'gpt', 'nai'];
   const IMAGE = ['nai', 'gpt', 'comfy'];
-  // Voice balances shown on the ElevenLabs and Fish cards: engine -> {value, error, loading}.
-  const balances = new Map(), PRICED = ['eleven', 'fish'];
-  const number = n => Number(n).toLocaleString('zh-TW');
-  const balanceText = id => {
-    const b = balances.get(id)?.value;
-    if (!b) return '—';
-    return b.kind === 'characters' ? number(b.left) : '$' + b.credit.toFixed(2);
-  };
-  async function loadBalance(id, refresh = false) {
-    if (!PRICED.includes(id) || !api.keyStatus(id)) return;
-    const entry = balances.get(id) || {};
-    balances.set(id, {...entry, loading: true});
-    try { balances.set(id, {value: await api.voiceBalance(id, refresh), error: '', loading: false}); }
-    catch (error) { balances.set(id, {value: entry.value || null, error: error.message, loading: false}); }
-    if (!v.disposed && (engine === null || engine === id)) render();
-  }
-  const draft = () => drafts.get(engine);
   const changed = () => { dirty = true; const e = v.root.querySelector('[data-save-state]'); if (e) e.textContent = '未儲存'; };
 
-  /** 已保存，末尾 ab12 · or, with several keys: 已保存 3 个，正在用第 2 个（末尾 ab12），1 个这次被拒已跳过. */
-  const keyState = id => {
-    const tail = api.keyHint?.(id) || '', pool = api.keyPool?.(id);
-    if (!pool || pool.count < 2) return '已儲存' + (tail ? '，末尾 ' + esc(tail) : '');
-    return `已儲存 ${pool.count} 個，正在用第 ${pool.current} 個${tail ? '（末尾 ' + esc(tail) + '）' : ''}${pool.refused ? `，${pool.refused} 個這次被拒已跳過` : ''}`;
-  };
-  /** The saved keys of a voice engine, one row each: never the key, only its last characters. */
-  const keyRows = id => {
-    const list = api.keyList?.(id) || [];
-    if (!list.length) return '';
-    return `<div class="key-list">${list.map((k, i) => `<div class="key-row${k.current ? ' current' : ''}"><span class="key-no" aria-label="第 ${i + 1} 個">${i + 1}</span><span class="mono">•••• ${esc(k.tail)}</span>${k.current ? plate('正在用') : ''}${k.refused ? '<small class="error-copy">這次被拒</small>' : ''}${!k.current && list.length > 1 ? `<button class="text-button" data-action="use-key" data-index="${i}" aria-label="改用第 ${i + 1} 個金鑰">用這個</button>` : ''}<button class="text-button" data-action="remove-key" data-index="${i}" aria-label="刪除第 ${i + 1} 個金鑰">刪除</button></div>`).join('')}</div>`;
-  };
   /** The text model preset being edited (the draft's active one). */
   const textPreset = () => textDraft.presets.find(p => p.id === textDraft.active) || textDraft.presets[0];
-  const nameOf = id => id === 'nai' ? 'NovelAI' : id === 'gpt' ? 'GPT 生圖' : id === 'comfy' ? 'ComfyUI' : id === 'llm' ? '文字模型' : engines[id];
+  const nameOf = id => id === 'nai' ? 'NovelAI' : id === 'gpt' ? 'GPT 生圖' : id === 'comfy' ? 'ComfyUI' : id === 'llm' ? '文字模型' : '';
   function card(id, tag = 'button') {
     const comfy = id === 'comfy', saved = comfy ? !!api.getState().draw.comfy.url : api.keyStatus(id), nai = id === 'nai', llm = id === 'llm', d = api.getState().draw;
     const name = nameOf(id), t = llm ? (engine === 'llm' && textDraft ? textDraft : api.getState().text) : null, custom = t?.source === 'custom';
@@ -55,15 +26,13 @@ export function enginesApp(ctx) {
       ? [['SOURCE', custom ? 'CUSTOM API' : 'TAVERN'], ['MODEL', custom ? t.presets.find(p => p.id === t.active)?.model || '未填寫' : '跟隨酒館']]
       : nai
       ? [['TIER', subscription ? TIERS[subscription.tier] || '未知' : '—'], ['ANLAS', subscription ? String(subscription.anlas) : '—']]
-      : PRICED.includes(id) && saved
-        ? [['MODEL', api.getState().connections[id].model], [id === 'eleven' ? 'CREDITS' : 'BALANCE', balanceText(id)]]
-        : [['MODEL', api.getState().connections[id].model], ['ROLES', api.getState().routes.filter(r => r.engine === id && r.voice).length + ' 個角色']];
+      : [];
     const front = order.at(-1) === id;
     const attrs = tag === 'button' ? `data-action="engine" data-engine="${id}" aria-label="${name}，${front ? '點一下開啟' : '點一下抽到最前面'}"` : `data-engine="${id}"`;
     const dots = comfy ? '' : `•••• •••• •••• ${api.keyHint?.(id) || '••••'}`;
     const number = comfy ? d.comfy.url.replace(/^https?:\/\//, '') : llm ? (custom ? (saved ? dots : '未繫結金鑰 · 點卡片去填寫') : '用酒館當前連線的模型') : saved ? dots : '未繫結金鑰 · 點卡片去填寫';
     return `<${tag} class="bank-card${tag === 'div' ? ' detail-card' : ''}" ${attrs}>${spark()}
-      <span class="card-top"><span class="card-name">${name}</span><span class="card-kind">${IMAGE.includes(id) ? 'IMAGE' : llm ? 'TEXT' : 'VOICE'}${icon('nfc')}</span></span>
+      <span class="card-top"><span class="card-name">${name}</span><span class="card-kind">${IMAGE.includes(id) ? 'IMAGE' : 'TEXT'}${icon('nfc')}</span></span>
       <span class="card-chip"></span>
       <span class="card-number${number.startsWith('•') || comfy ? '' : ' none'}${comfy ? ' address' : ''}">${number}</span>
       <span class="card-bottom">${fields.map(([k, value]) => `<span><span class="k">${k}</span><span class="v">${esc(value)}</span></span>`).join('')}<span class="card-brand">傳音玉符</span></span></${tag}>`;
@@ -176,27 +145,9 @@ export function enginesApp(ctx) {
     if (!v.disposed && engine === 'comfy') render();
   }
 
-  function control(f, c, rowIndex = null, parent = null) {
-    const value = rowIndex === null ? c.params[f.key] : c.params[parent.key][rowIndex][f.key];
-    const reason = parent?.unavailable || f.unavailable || '';
-    const attrs = `data-param="${esc(parent?.key || f.key)}" ${rowIndex !== null ? `data-row="${rowIndex}" data-column="${esc(f.key)}"` : ''} aria-label="${esc(f.label)}" ${reason ? 'disabled' : ''}`;
-    const note = [f.help, reason, '官方欄位：' + (parent ? parent.key + '.' : '') + f.key].filter(Boolean).join('\n');
-    if (f.type === 'rows') {
-      return `<div class="parameter-field" aria-disabled="${!!reason}"><div class="row-heading"><span>${esc(f.label)}${help(note)}</span>${btn('add-row', icon('add') + '增加', 'chip-button', `data-param-key="${esc(f.key)}" ${reason || value.length >= f.max ? 'disabled' : ''}`)}</div>${value.map((row, i) => `<div class="parameter-row">${f.columns.map(col => control(col, c, i, f)).join('')}${btn('remove-row', '刪除這一條', 'text-button', `data-param-key="${esc(f.key)}" data-index="${i}" ${reason ? 'disabled' : ''}`)}</div>`).join('')}</div>`;
-    }
-    if (f.type === 'boolean') return `<div class="setting-row"><span>${esc(f.label)}${help(note)}</span><input type="checkbox" class="switch" ${attrs} ${value ? 'checked' : ''}></div>`;
-    let html;
-    if (f.type === 'select') html = `<span class="select"><select ${attrs}>${f.options.map(([option, label]) => `<option value="${esc(option)}" ${value === option ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></span>`;
-    // The browser's own file box says 「未选择任何文件」 again once the page redraws, although the audio is kept: a button
-    // that says what is there instead.
-    else if (f.type === 'file') html = `<label class="file-pick${value ? ' done' : ''}"><input type="file" accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg,.opus" ${attrs}><span>${value ? '✓ 已存好 · 點這裡換一個' : '選擇音訊檔案'}</span></label>`;
-    else if (['textarea', 'lines'].includes(f.type)) html = `<textarea rows="4" ${attrs}>${esc(value)}</textarea>`;
-    else html = `<input type="${f.type === 'number' ? 'number' : 'text'}" ${attrs} value="${esc(value)}" ${f.min !== undefined ? `min="${f.min}"` : ''} ${f.max !== undefined ? `max="${f.max}"` : ''} ${f.step !== undefined ? `step="${f.step}"` : ''}>`;
-    return field(f.label, html, note);
-  }
-
   /** Draws a card to the front of the stack: the cards move from where they were to where they end up (FLIP). */
   function bringFront(id) {
+    if (!['llm', ...IMAGE].includes(id)) return;
     const wallet = v.root.querySelector('.wallet');
     order = [...order.filter(x => x !== id), id];
     if (!wallet) return render();
@@ -217,85 +168,8 @@ export function enginesApp(ctx) {
 
   function renderList() {
     delete v.root.dataset.engine;
-    v.draw(heading('靈樞', help('每個服務一張卡：文字模型、四家語音引擎（Fish Audio、MiniMax、ElevenLabs、小米 MiMo），加上繪圖用的 NovelAI、GPT 生圖和 ComfyUI（繪圖 App 裡選用哪個畫）。點一張卡片把它抽到最前面，再點一下開啟，檢視連線和全部引數。ElevenLabs 和 Fish 的卡片上顯示剩餘額度。\n卡片只顯示金鑰是否儲存，不顯示內容；“已儲存”不代表鑑權成功。'), 'Wallet · 05')
+    v.draw(heading('接入設定', help('設定手機的文字模型，以及 NovelAI、GPT 生圖和 ComfyUI 的連線。點一張卡片把它抽到最前面，再點一下開啟。\n卡片只顯示金鑰是否儲存，不顯示內容；「已儲存」不代表連線成功。'), 'Connections · 04')
       + `<div class="wallet">${order.map(id => card(id)).join('')}</div>`);
-    for (const id of PRICED) if (!balances.has(id)) loadBalance(id);
-  }
-  /** The 额度 group of the ElevenLabs and Fish cards. */
-  /** Fish relay (中转): an address in front of Fish Audio, saved on its own, and a check of what it forwards. */
-  function fishRelay() {
-    const fish = api.getState().connections.fish, relay = fish.relay || '';
-    return `${field('中轉地址', input('relay', relay, 'url', 'autocomplete="off" placeholder="留空直連 Fish Audio，例如 https://fish.example.com"'), '用中轉（公益站、自己搭的反代）時填這裡，留空就直連 Fish Audio。\n\n外掛會把請求發到「中轉地址」加上 Fish 官方的路徑：合成 /compat/v1/audio/speech，音色列表 /model，餘額 /wallet/self/api-credit。所以只填到這些路徑前面為止；把完整地址粘進來也行，會自動去掉。\n\n中轉要允許網頁直接訪問（CORS）；酒館用 HTTPS 開啟時，中轉也要是 HTTPS。金鑰填中轉要求的那個（可能是 Fish 的，也可能是站長髮的），一樣可以存好幾個。')}
-      ${relay ? field('中轉介面格式', select('relayApi', fish.relayApi || 'fish', [['fish', 'Fish 官方路徑（/compat/v1/audio/speech）'], ['openai', 'OpenAI 格式（/v1/audio/speech）']]), '儲存中轉或者測試連線時會自動認出來，一般不用自己選。\n\nOpenAI 格式的中轉只收文字、音色 ID、模型和語速：情緒標籤寫在文字裡，照樣有效；沒有音色列表（音色 ID 手動填）、不能帶參考音訊、看不到餘額，溫度等其他引數由中轉決定。') : ''}
-      <div class="key-actions">${btn('save-fish-relay', relay ? '儲存中轉' : '使用中轉', 'primary')}${btn('test-fish-relay', icon('refresh') + '測試連線', 'secondary', api.keyStatus('fish') ? '' : 'disabled')}</div>`;
-  }
-  function fishProbeReport(r, switched = '') {
-    const where = r.relay ? '中轉' : 'Fish Audio', path = p => `「${esc(r.base)}${p}」`;
-    const speech = r.speech.status === 0 ? `✗ 連不上${where}：地址不對，或${r.relay ? '中轉沒有允許跨域（CORS）；酒館用 HTTPS 開啟時中轉也要用 HTTPS' : '網路不通'}`
-      : [401, 403].includes(r.speech.status) ? `✗ ${where}拒絕了金鑰（${r.speech.status}）：請填寫${r.relay ? '中轉要求的' : '正確的'}金鑰`
-      : r.speech.status === 404 ? `✗ 合成介面 404：試過${path('/compat/v1/audio/speech')}${r.relay ? `和「${esc(r.openaiUrl || r.base + '/v1/audio/speech')}」` : ''}，${where}都不認。中轉地址只填到這些路徑前面為止；如果這個中轉用的是別的路徑，把它的說明發給外掛作者。`
-      : r.speech.status === 402 ? `✓ 合成介面通了，但${where}說額度不夠（402）`
-      : r.speech.status === 429 ? `✓ 合成介面通了，現在請求太多（429），稍後再試`
-      : r.speech.status >= 500 ? `✗ ${where}自己出錯了（HTTP ${r.speech.status}），稍後再試或者問問站長`
-      : `✓ 合成介面通了（測試請求故意是空的，返回 ${r.speech.status} 是正常的）`;
-    const kind = switched ? `<p class="probe-line">✓ 這個中轉是${switched === 'openai' ? ' OpenAI 格式（/v1/audio/speech）' : ' Fish 官方路徑'}，已經自動切換</p>` : '';
-    const voices = (r.detected || r.api) === 'openai' ? '— 這種中轉沒有音色列表：在角色的「音色」裡直接填 Fish 的音色 ID' : r.voices.ok ? '✓ 音色列表也能讀' : r.voices.status === 0 ? '— 讀不到音色列表（不影響合成，音色 ID 可以手動填）' : `— 音色列表返回 ${r.voices.status}（不影響合成，音色 ID 可以手動填）`;
-    return `<div class="group pad">${kind}<p class="probe-line">${speech}</p><p class="probe-line">${voices}</p></div>`;
-  }
-  /** Checks the relay and, when it speaks the other form, switches to it. Returns the form it switched to ('' if none). */
-  async function detectFish() {
-    const r = await api.fishProbe();
-    let switched = '';
-    if (r.relay && r.detected && r.detected !== r.api) { api.saveConnection('fish', {relayApi: r.detected}); draft().relayApi = r.detected; switched = r.detected; balances.delete('fish'); }
-    return {r, switched};
-  }
-  function balanceGroup() {
-    if (!PRICED.includes(engine)) return '';
-    const saved = api.keyStatus(engine), entry = balances.get(engine) || {}, b = entry.value;
-    const state = !saved ? '填寫金鑰後可以檢視' : entry.loading && !b ? '讀取中' : entry.error && !b ? '讀取失敗' : '';
-    let rows;
-    if (b?.kind === 'characters') {
-      const ratio = b.limit ? Math.min(1, b.used / b.limit) : 0;
-      const status = {active: '生效中', trialing: '試用中', past_due: '待付款', incomplete: '未完成付款', free_disabled: '免費額度已停用'}[b.status] || '';
-      const tier = b.tier ? b.tier.charAt(0).toUpperCase() + b.tier.slice(1).replace(/_/g, ' ') : '未知';
-      rows = `<div class="setting-row"><span>檔位</span><small>${esc(tier)}${status ? ' · ' + status : ''}</small></div>
-        <div class="field balance-meter"><div class="meter-label"><span>本期已用</span><output>${number(b.used)} / ${number(b.limit)}</output></div><span class="meter-track" role="img" aria-label="已用 ${Math.round(ratio * 100)}%"><i style="width:${(ratio * 100).toFixed(1)}%"></i></span></div>
-        <div class="setting-row"><span>剩餘額度</span><strong>${number(b.left)}</strong></div>
-        <div class="setting-row"><span>下次重置</span><small>${b.resetAt ? new Date(b.resetAt).toLocaleString('zh-TW', {hour12: false}) : '—'}</small></div>`;
-    } else if (b?.kind === 'credit') {
-      rows = `<div class="setting-row"><span>API 餘額</span><strong>$${b.credit.toFixed(2)}</strong></div>
-        <div class="setting-row"><span>免費額度</span><small>${b.free ? '還有' : '沒有或已用完'}</small></div>`;
-    } else rows = `<div class="setting-row"><span>額度</span><small>${state || '—'}</small></div>`;
-    return groupTitle('額度', btn('refresh-balance', icon('refresh') + '重新整理', 'chip-button', saved ? '' : 'disabled'))
-      + `<div class="group${b?.kind === 'characters' ? ' pad' : ''}">${rows}</div>${entry.error ? `<p class="error-copy hint">${esc(entry.error)}</p>` : ''}`
-      + `<p class="hint">${engine === 'eleven' ? '每生成一句新語音後自動重新讀取。ElevenLabs 按字元扣積分，v3/v4 等模型的倍率以官網為準。' : '每生成一句新語音後自動重新讀取。金額是 Fish Audio 後臺的 API 餘額。'}</p>`;
-  }
-
-  function renderDetail() {
-    const schema = api.engineSchema(engine, draft());
-    drafts.set(engine, schema.connection);
-    const c = draft(), saved = api.keyStatus(engine);
-    v.root.dataset.engine = engine;
-    const unsupported = schema.models.filter(m => !m.supported).map(m => m.id + '：' + m.reason).join('\n');
-    v.draw(heading(engines[engine], '', 'Engine Card')
-      + card(engine, 'div')
-      + groupTitle('連線')
-      + `<div class="group pad">
-          <div class="setting-row"><span>金鑰</span><span class="key-state ${saved ? 'ok' : 'no'}">${saved ? keyState(engine) : '還沒有填寫'}</span></div>
-          ${keyRows(engine)}
-          ${field(saved ? '新增金鑰' : 'API Key', textArea('key', '', `rows="2" class="code" autocomplete="off" spellcheck="false" placeholder="${saved ? '貼上新的金鑰，會加在後面' : '貼上金鑰；有多個賬號可以每行一個'}"`), '可以儲存多個賬號的金鑰，新加的排在後面，不用的可以單獨刪掉。先用排在前面的；某個金鑰被拒（401、403）、額度用完（402）或請求太頻繁（429）時，自動換下一個重試，這次開啟頁面裡不再用它。想手動換，點那個金鑰的「用這個」：馬上改用它，並把它排到第一個，以後開啟也先用它。\n\n金鑰只儲存在當前瀏覽器和酒館地址，按賬戶分別儲存。')}
-          <div class="key-actions">${btn('add-key', icon('key') + (saved ? '新增' : '儲存金鑰'), 'primary')}${saved ? btn('clear-key', '全部清除', 'danger') : ''}</div>
-          ${field('預設模型', select('model', c.model, schema.models.map(m => [m.id, m.id, !m.supported])), unsupported || '角色沒有單獨指定模型時使用這裡的模型。')}
-          ${engine === 'mini' ? field('服務區域', select('region', c.region, [['cn', '國內'], ['global', '國際'], ['uw', '國際 · 低延遲入口']])) : ''}
-          ${engine === 'fish' ? fishRelay() : ''}
-          <div class="actions">${btn('read-voices', icon('refresh') + '讀取音色列表', 'secondary')}</div><p class="hint" data-connection-status></p>
-        </div>`
-      + balanceGroup()
-      + groupTitle('引數')
-      + schema.groups.map((g, i) => `<details data-group="${engine}:${g.id}" ${i === 0 ? 'open' : ''}><summary>${esc(g.title)}</summary><div>${g.fields.map(f => control(f, c)).join('')}</div></details>`).join('')
-      + `<details data-group="tags"><summary>情緒與語氣標籤</summary><div>${schema.tagNote ? `<p class="hint">${esc(schema.tagNote)}</p>` : ''}<div class="tags">${schema.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>${engine === 'mini' && c.model.startsWith('speech-2.8') ? '<div class="tags">' + ['laughs', 'chuckle', 'coughs', 'clear-throat', 'groans', 'breath', 'pant', 'inhale', 'exhale', 'gasps', 'sniffs', 'sighs', 'snorts', 'burps', 'lip-smacking', 'humming', 'hissing', 'emm', 'sneezes'].map(x => `<span class="tag">(${x})</span>`).join('') + '</div>' : ''}${schema.sounds?.length ? '<div class="tags">' + schema.sounds.map(x => `<span class="tag">(${esc(x)})</span>`).join('') + '</div>' : ''}<a href="${esc(schema.source)}" target="_blank" rel="noopener noreferrer">檢視官方文件</a></div></details>`
-      + `<div class="actions">${engine === 'fish' ? btn('references', '管理參考音訊', 'secondary') : ''}${btn('request-preview', icon('eye') + '請求預覽', 'text-button')}</div>`
-      + `<div class="savebar"><span class="save-state" data-save-state>${dirty ? '未儲存' : '已儲存'}</span>${btn('save-connection', '儲存配置', 'primary')}</div>`);
   }
 
   /** 文字模型: the tavern's model, or an OpenAI-compatible API of the user's own. */
@@ -326,17 +200,14 @@ export function enginesApp(ctx) {
       + `<div class="savebar"><span class="save-state" data-save-state>${dirty ? '未儲存' : '已儲存'}</span>${btn('save-text', '儲存', 'primary')}</div>`);
   }
 
-  const render = () => engine === 'nai' ? renderNovelAI() : engine === 'gpt' ? renderGpt() : engine === 'comfy' ? renderComfy() : engine === 'llm' ? renderText() : engine ? renderDetail() : renderList();
+  const render = () => engine === 'nai' ? renderNovelAI() : engine === 'gpt' ? renderGpt() : engine === 'comfy' ? renderComfy() : engine === 'llm' ? renderText() : renderList();
   function edit(id) {
+    if (!['llm', ...IMAGE].includes(id)) return;
     engine = id;
     if (!order.length || order.at(-1) !== id) order = [...order.filter(x => x !== id), id];
     if (id === 'llm') { textDraft = structuredClone(api.getState().text); dirty = false; render(); v.root.scrollTop = 0; return; }
     if (id === 'nai') { render(); v.root.scrollTop = 0; loadSubscription(false); return; }
     if (id === 'gpt' || id === 'comfy') { render(); v.root.scrollTop = 0; return; }
-    if (!drafts.has(id)) drafts.set(id, structuredClone(api.getState().connections[id]));
-    dirty = JSON.stringify(draft()) !== JSON.stringify(api.getState().connections[id]);
-    render();
-    v.root.scrollTop = 0;
   }
   v.edit = edit;
   v.back = () => { if (!engine) return false; engine = null; render(); return true; };
@@ -358,44 +229,7 @@ export function enginesApp(ctx) {
     if (el.dataset.field === 'guard') { api.saveDraw({guard: el.checked}); render(); return; }
     if (el.dataset.field === 'relayOpus') { api.saveDraw({relay: {assumeOpus: el.checked}}); render(); return; }
     if (el.dataset.field === 'relay') return;
-    if (el.dataset.field === 'relayApi') { api.saveConnection('fish', {relayApi: el.value}); draft().relayApi = el.value; balances.delete('fish'); render(); return; }
-    draft()[el.dataset.field] = el.value; changed(); render();
   });
-  const readValue = (el, f) => f.type === 'boolean' ? el.checked : f.type === 'number' ? (el.value === '' ? '' : Number(el.value)) : f.type === 'select' ? f.options.find(([key]) => String(key) === el.value)?.[0] : el.value;
-  async function updateParam(el, redraw) {
-    const c = draft(), schema = api.engineSchema(engine, c), f = schema.groups.flatMap(g => g.fields).find(x => x.key === el.dataset.param);
-    if (!f) return;
-    if (el.dataset.row !== undefined) {
-      const row = c.params[f.key][Number(el.dataset.row)], col = f.columns.find(x => x.key === el.dataset.column);
-      if (!row) return;
-      if (col.type === 'file') {
-        const file = el.files?.[0];
-        if (!file) return;
-        el.disabled = true;
-        const label = el.nextElementSibling;
-        if (label) label.textContent = '正在存……';
-        try {
-          const id = await api.reference(file, {wav: engine === 'mimo'});
-          if (!c.params[f.key].includes(row)) return;
-          row[col.key] = id;
-          // A clone sample is named after its file when it has no name yet; the list is saved right away when every
-          // row is complete, so the audio is not lost if 保存配置 is forgotten.
-          const named = f.columns.some(x => x.key === 'name');
-          if (named && !String(row.name || '').trim()) row.name = file.name.replace(/\.[^.]+$/, '').trim().slice(0, 40) || '樣本';
-          let saved = false;
-          try { api.saveConnection(engine, {params: {[f.key]: structuredClone(c.params[f.key])}}); saved = true; } catch {}
-          if (draft() === c) { dirty = JSON.stringify(c) !== JSON.stringify(api.getState().connections[engine]); render(); }
-          ctx.notify(!saved ? '音訊已存進瀏覽器，把這一行填完整後點「儲存配置」' : named ? `樣本「${row.name}」已儲存，角色的音色填「${row.name}」` : '參考音訊已儲存');
-        } finally { if (el.isConnected) el.disabled = false; }
-        return;
-      }
-      row[col.key] = readValue(el, col);
-    } else c.params[f.key] = readValue(el, f);
-    changed();
-    if (redraw && ['select', 'boolean'].includes(f.type)) render();
-  }
-  v.on('input', '[data-param]', el => { if (!['checkbox', 'file'].includes(el.type) && el.tagName !== 'SELECT') return updateParam(el, false); });
-  v.on('change', '[data-param]', el => updateParam(el, true));
   // ComfyUI: a workflow JSON file, checked and saved as it is chosen.
   v.on('change', '[data-comfy-file]', async el => {
     const file = el.files?.[0];
@@ -445,15 +279,12 @@ export function enginesApp(ctx) {
         });
         break;
       }
-      case 'save-connection': {
-        // A key typed in the box is kept too: people expect the big button to save everything on the page.
-        const typed = v.root.querySelector('[data-field=key]')?.value || '';
-        if (typed.trim()) { api.setKey(engine, typed); balances.delete(engine); }
-        api.saveConnection(engine, draft()); dirty = false; render(); ctx.notify(typed.trim() ? '金鑰和引擎配置都已儲存' : '引擎配置已儲存');
-        if (typed.trim()) loadBalance(engine, true);
+      case 'save-key':
+        if (engine === 'llm') api.setTextKey(textDraft.active, v.root.querySelector('[data-field=key]').value);
+        else api.setKey(engine, v.root.querySelector('[data-field=key]').value);
+        render(); ctx.notify('金鑰已儲存');
+        if (engine === 'nai') loadSubscription(true);
         break;
-      }
-      case 'save-key': if (engine === 'llm') { api.setTextKey(textDraft.active, v.root.querySelector('[data-field=key]').value); render(); ctx.notify('金鑰已儲存'); break; } api.setKey(engine, v.root.querySelector('[data-field=key]').value); balances.delete(engine); render(); ctx.notify('金鑰已儲存'); if (engine === 'nai') loadSubscription(true); else loadBalance(engine, true); break;
       case 'refresh-subscription': await v.busy(el, () => loadSubscription(true)); break;
       case 'save-relay': {
         const url = v.root.querySelector('[data-field=relay]').value;
@@ -463,23 +294,11 @@ export function enginesApp(ctx) {
         if (api.keyStatus('nai')) loadSubscription(true);
         break;
       }
-      case 'save-fish-relay': {
-        api.saveConnection('fish', {relay: v.root.querySelector('[data-field=relay]').value});
-        draft().relay = api.getState().connections.fish.relay;
-        balances.delete('fish'); render();
-        ctx.notify(draft().relay ? 'Fish 中轉地址已儲存' : '已改回直連 Fish Audio');
-        // Which form the relay speaks: checked right away when there is a key to check with.
-        if (draft().relay && api.keyStatus('fish')) await v.busy(el, async () => { const {switched} = await detectFish(); if (switched) { render(); ctx.notify(switched === 'openai' ? '這個中轉是 OpenAI 格式（/v1/audio/speech），已經自動切換' : '這個中轉用 Fish 官方路徑，已經自動切換'); } }).catch(() => {});
-        if (api.keyStatus('fish')) loadBalance('fish', true);
-        break;
-      }
-      case 'test-fish-relay': await v.busy(el, async () => { const {r, switched} = await detectFish(); if (switched) render(); ctx.dialog('測試連線', fishProbeReport(r, switched)); }); break;
       case 'test-relay': await v.busy(el, async () => {
         const result = await api.naiProbe();
         await loadSubscription(false);
         ctx.dialog('測試連線', probeReport(result));
       }); break;
-      case 'refresh-balance': await v.busy(el, () => loadBalance(engine, true)); break;
       case 'open-draw': ctx.open('draw'); break;
       case 'use-draw-engine': api.saveDraw({engine: el.dataset.engine}); render(); ctx.notify(`繪圖改用 ${nameOf(el.dataset.engine)} 畫`); break;
       case 'save-gpt-url': {
@@ -503,86 +322,17 @@ export function enginesApp(ctx) {
           catch (error) { ctx.notify(error.message); }
         });
       }); break;
-      case 'add-key': {
-        const added = api.addKeys(engine, v.root.querySelector('[data-field=key]').value);
-        balances.delete(engine); render(); ctx.notify(added > 1 ? `已新增 ${added} 個金鑰` : '金鑰已儲存'); loadBalance(engine, true);
-        break;
-      }
-      case 'use-key': {
-        const index = Number(el.dataset.index), k = api.keyList(engine)[index];
-        if (!k) break;
-        api.useKey(engine, index); balances.delete(engine); render(); loadBalance(engine, true);
-        ctx.notify(`已改用末尾 ${k.tail} 的金鑰${index > 0 ? '，它排到了第一個，以後開啟也先用它' : ''}`);
-        break;
-      }
-      case 'remove-key': {
-        const index = Number(el.dataset.index), k = api.keyList(engine)[index];
-        if (!k || !await ctx.confirm('刪除這個金鑰？', `第 ${index + 1} 個（末尾 ${k.tail}）會被刪掉，其他的保留。`)) break;
-        api.removeKey(engine, index); balances.delete(engine); render(); ctx.notify('已刪除'); loadBalance(engine, true);
-        break;
-      }
       case 'clear-key': if (engine === 'llm') { if (await ctx.confirm('清除這套介面的金鑰？', '其他介面預設的金鑰不受影響。')) { api.clearTextKey(textDraft.active); render(); } break; }
-        if (await ctx.confirm(['nai', 'gpt'].includes(engine) ? '清除金鑰？' : '清除全部金鑰？', '之後使用這個引擎需要重新填寫。')) { api.clearKey(engine); if (engine === 'nai') subscription = null; balances.delete(engine); render(); } break;
+        if (await ctx.confirm('清除金鑰？', '之後使用這個引擎需要重新填寫。')) { api.clearKey(engine); if (engine === 'nai') subscription = null; render(); } break;
       case 'reveal-key': {
         const field = v.root.querySelector('[data-field=key]');
         field.type = field.type === 'password' ? 'text' : 'password';
         el.textContent = field.type === 'password' ? '顯示' : '隱藏';
         break;
       }
-      case 'read-voices': {
-        const current = engine;
-        await v.busy(el, async () => {
-          const r = await api.voices(current, draft());
-          if (current === engine) { const status = v.root.querySelector('[data-connection-status]'); if (status) status.textContent = r.note + ' · ' + r.voices.length + ' 個'; }
-        });
-        break;
-      }
-      case 'add-row': {
-        const f = api.engineSchema(engine, draft()).groups.flatMap(g => g.fields).find(x => x.key === el.dataset.paramKey);
-        if (draft().params[f.key].length < f.max) draft().params[f.key].push(Object.fromEntries(f.columns.map(c => [c.key, c.value ?? (c.type === 'boolean' ? false : c.type === 'number' ? c.min ?? 0 : '')])));
-        changed();
-        render();
-        break;
-      }
-      case 'remove-row': draft().params[el.dataset.paramKey].splice(Number(el.dataset.index), 1); changed(); render(); break;
-      case 'request-preview': {
-        const state = api.getState(), r = state.routes.find(r => r.engine === engine) || {name: '預覽角色', voice: 'voice-id', engine, language: state.general.defaultLanguage};
-        const request = api.previewRequest(engine, draft(), {...r, model: ''}, {role: r.name, emotion: 'calm', text: '雨還沒停，再坐一會兒吧。', translation: '雨還沒停，再坐一會兒吧。'});
-        ctx.dialog('請求預覽', `<pre class="code-preview">${esc(JSON.stringify(request, null, 2))}</pre>`);
-        break;
-      }
-      case 'references': await manageReferences(); break;
     }
   });
 
-  async function manageReferences() {
-    const d = ctx.dialog('參考音訊', '<p class="hint">正在讀取…</p>');
-    const refresh = async () => {
-      const rows = await api.listReferences();
-      if (!d.live) return;
-      d.body.innerHTML = rows.length
-        ? '<div class="group">' + rows.map(r => `<div class="list-row"><span><strong>${esc(r.name)}</strong><small>${Math.round(r.size / 1024)} KB</small></span><button class="text-button" data-delete-reference="${esc(r.id)}">刪除</button></div>`).join('') + '</div>'
-        : '<p class="hint">還沒有儲存參考音訊。</p>';
-    };
-    d.body.addEventListener('click', async e => {
-      const el = e.target.closest('[data-delete-reference]');
-      if (!el) return;
-      el.disabled = true;
-      try {
-        await api.deleteReference(el.dataset.deleteReference);
-        for (const c of drafts.values()) if (c.params.references) c.params.references = c.params.references.filter(r => r.audio !== el.dataset.deleteReference);
-        await refresh();
-      } catch (error) { ctx.notify(error.message); }
-      finally { if (el.isConnected) el.disabled = false; }
-    });
-    await refresh();
-  }
-
   render();
-  v.onBalance = event => {
-    if (!event.stale || !PRICED.includes(event.engine)) return;
-    if (engine === event.engine || (engine === null && balances.has(event.engine))) loadBalance(event.engine, true);
-    else balances.delete(event.engine);
-  };
   return v;
 }

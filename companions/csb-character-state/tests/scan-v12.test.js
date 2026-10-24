@@ -15,6 +15,39 @@ function harness(generateScan){
 }
 const aiRow=(more={})=>({name:'雲璃',set:{age:19,identity:'隨行侍女'},evidence:{name:{source:'m0.0',quote:'雲璃今年十九歲'},age:{source:'m0.0',quote:'雲璃今年十九歲'},identity:{source:'m0.0',quote:'雲璃今年十九歲，是隨行侍女。'}},...more});
 const choose=p=>p.rows.map(r=>({key:r.key,name:r.name,fields:r.changes.map(c=>c.field)}));
+
+test('live narrative blocks local and AI scans without making a model call',async()=>{
+  let calls=0;const h=harness(async()=>{calls++;return '{"characters":[]}';});
+  h.add('姓名：雲璃');h.host.adapter.isBusy=()=>true;
+  await assert.rejects(h.host.scan({mode:'local'}),/正文正在生成/);
+  await assert.rejects(h.host.scan({mode:'ai'}),/正文正在生成/);
+  assert.equal(calls,0);assert.equal(h.host.db().manual.length,0);
+});
+
+test('a preview cannot be applied after a real generation starts',async()=>{
+  const h=harness();h.add('姓名：雲璃');const proposal=await h.host.scan();
+  h.host.adapter.isBusy=()=>true;
+  await assert.rejects(h.host.applyScan(proposal.token,choose(proposal)),/正文正在生成/);
+  assert.equal(h.host.db().manual.length,0);
+  h.host.adapter.isBusy=()=>false;
+  assert.equal((await h.host.applyScan(proposal.token,choose(proposal))).applied,1);
+});
+
+test('automatic scan skipped during generation can retry the same message after idle',async()=>{
+  const h=harness();h.add('姓名：雲璃');h.host.adapter.isBusy=()=>true;
+  await h.host.scanner.automatic(0);assert.equal(h.host.db().manual.length,0);
+  h.host.adapter.isBusy=()=>false;
+  await h.host.scanner.automatic(0);assert.equal(h.host.db().manual.length,1);
+  await h.host.scanner.automatic(0);assert.equal(h.host.db().manual.length,1);
+});
+
+test('AI analysis result is rejected if narrative generation starts before it returns',async()=>{
+  let finish;const h=harness(()=>new Promise(resolve=>{finish=resolve;}));h.add(story);
+  const running=h.host.scan({mode:'ai'});h.host.adapter.isBusy=()=>true;
+  finish(JSON.stringify({characters:[aiRow()]}));
+  await assert.rejects(running,/正文正在生成/);
+  assert.equal(h.host.scanPreview(),null);assert.equal(h.host.db().manual.length,0);
+});
 function known(h){const db=h.host.db();db.seed=applyUpdate(db.seed,db.schema,{version:1,characters:[{id:'c_yunli',name:'雲璃',aliases:['璃兒'],set:{age:'19',identity:'侍女'},reason:'seed'}]},{manual:true}).state;h.host.invalidate();}
 
 test('name diagnostics distinguish missing, object, blank and actual 101-character input',()=>{

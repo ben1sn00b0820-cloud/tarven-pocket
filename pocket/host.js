@@ -17,6 +17,7 @@ import {createStatusPublisher} from './status-publish.js';
 import {createPersonalMemory} from './personal-memory.js';
 import {createNarrativeMemory} from './narrative-memory.js';
 import {memoryMentionContext} from './mentions.js';
+import {createStoryClock} from './story-time.js';
 import {SHOP_PRESET_LIMITS,normalizeShopPresets,listShopPresets,saveShopPreset,selectShopPreset,deleteShopPreset,importShopPresets,exportShopPresets} from './shop-presets.js';
 
 const KEY='tavern_pocket_v3', clone=v=>structuredClone(v), uid=()=>crypto.randomUUID();
@@ -25,6 +26,7 @@ const empty=()=>({version:3,events:[],diaries:[],catalogue:[],worldbooks:[]});
 export function createPocketHost({context,backend,notice=()=>{},openStateEditor,openStateManager}){
  let alive=true,sourceEvents=[],sourceKey='',busy=false,actionQueue=Promise.resolve(),photoScope='',photoSyncs=0,renderTimer;
  const emit=()=>{if(alive)backend.emit('pocket',{});};
+ const storyClock=createStoryClock({context,onChange:emit,assertCurrent:check});
  const contacts=createContactBridge({context,backend,notice,openStateEditor,publishStatus:createStatusPublisher({context,notice})});
  const activity=createActivityBridge({context,backend,notice,getMirrorPolicy:()=>({forum:config().mirrorForum!==false,shop:config().mirrorShop!==false})});
  const memory=createPersonalMemory({context,backend,notice});
@@ -85,7 +87,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
   guard();return result;
  };
  function shopPresetState(){const saved=normalizeShopPresets(config().shopPresets);return {presets:listShopPresets(saved),selectedId:saved.selectedId,limits:SHOP_PRESET_LIMITS};}
- async function state(){const c=context(),options=getConnectionOptions(c);return {scope:sourceScope(c),userName:c.name1||'我',characterName:c.name2||'角色',shopPresets:shopPresetState(),...project(c),catalogue:clone(data(c).catalogue),catalogueSource:clone(data(c).catalogueSource||null),settings:{...clone(config()),worldbooks:clone(data(c).worldbooks),worldbookPins:clone(data(c).worldbookPins||[])},connections:options.modelProfiles,worldbooks:options.worldbookNames,sync:{...source.status(),errors:[...source.status().errors,...narrativeMemory.status().errors],memory:narrativeMemory.status(),statusRoles:contacts.profiles().filter(p=>p.body?.length||p.source?.version).length,busy},version:PHONE_VERSION};}
+ async function state(){const c=context(),options=getConnectionOptions(c);return {scope:sourceScope(c),userName:c.name1||'我',characterName:c.name2||'角色',storyTime:storyClock.current(),shopPresets:shopPresetState(),...project(c),catalogue:clone(data(c).catalogue),catalogueSource:clone(data(c).catalogueSource||null),settings:{...clone(config()),worldbooks:clone(data(c).worldbooks),worldbookPins:clone(data(c).worldbookPins||[])},connections:options.modelProfiles,worldbooks:options.worldbookNames,sync:{...source.status(),errors:[...source.status().errors,...narrativeMemory.status().errors],memory:narrativeMemory.status(),statusRoles:contacts.profiles().filter(p=>p.body?.length||p.source?.version).length,busy},version:PHONE_VERSION};}
  function taskPrompt(c,task,{app}={}){const char=c.characters?.[c.characterId];return `${app==='shop'?'你正在產生虛構商品目錄。只完成本次商城任務，不扮演角色發言，不續寫故事；角色與世界書只作為背景資料。':'你正在虛構手機中扮演角色。'}使用者是 ${c.name1}，目前角色是 ${c.name2}。\n[角色背景]\n${JSON.stringify({name:char?.name,description:char?.description||char?.data?.description,personality:char?.personality||char?.data?.personality,scenario:char?.scenario||char?.data?.scenario}).slice(0,12000)}\n[任務]\n所有面向使用者的商品名稱與說明、貼文、日記、聊天回覆使用繁體中文；繪圖英文標籤與 JSON 欄位名稱保持原格式。\n${task}`;}
 
  async function modelEvents(c,action,payload){
@@ -223,7 +225,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
    emit();
   }finally{photoSyncs--;}
  }
- return {api:()=>({pocketState:state,pocketImageState:async()=>imagePresets.state(),...photos.api(),
+ return {api:()=>({pocketState:state,setStoryTime:value=>storyClock.set(value),pocketImageState:async()=>imagePresets.state(),...photos.api(),
   pocketOpenContactState:(name,revision)=>contacts.openEditor(name,revision),pocketOpenStateManager:()=>{if(typeof openStateManager!=='function')throw Error('角色狀態工坊尚未啟用。');return openStateManager();},
   pocketContactProfile:async name=>contacts.profile(name),pocketContactProfiles:async()=>contacts.profiles(),pocketSaveContactProfile:(name,value)=>contacts.save(name,value),
   pocketConfirmPayment:confirmPayment,pocketPurchase:purchase,
@@ -232,5 +234,5 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
   pocketResolvePhoto:(threadId,messageId,options)=>photos.api().pocketResolvePhoto(threadId,messageId,options),
   pocketAction:(name,p)=>{const c=context(),scope=sourceScope(c);const run=actionQueue.then(()=>action(name,p,c,scope));actionQueue=run.catch(()=>{});return run;}}),
   sync:syncNow,memoryState:()=>memory.state(),promptPlan:({query:override}={})=>{if(!sourceScope(context()))return [];const c=context(),plan=[],query=typeof override==='string'?override:memoryQuery(c),facts=memory.contextText(query),refs=referenceFacts(query),archive=activity.recall(query);if(refs)plan.push({key:'sttts.entry.references',text:refs,position:1,depth:0,role:0});if(facts)plan.push({key:'sttts.entry.memory',text:facts,position:1,depth:1,role:0});if(archive)plan.push({key:'sttts.entry.archive',text:archive,position:1,depth:1,role:0});if(config().inject)plan.push({key:'sttts.entry.pocket',text:PHONE_PROMPT+'\n'+sharedPhoneText(c),position:1,depth:1,role:0});return plan;},
-  dispose(){alive=false;clearTimeout(renderTimer);source.dispose();photoUnsubscribe?.();photos.dispose();activity.dispose();narrativeMemory.dispose();memory.dispose?.();forumSource.dispose();contacts.dispose();backend.generateText=original;},status:()=>source.status()};
+  dispose(){alive=false;storyClock.dispose();clearTimeout(renderTimer);source.dispose();photoUnsubscribe?.();photos.dispose();activity.dispose();narrativeMemory.dispose();memory.dispose?.();forumSource.dispose();contacts.dispose();backend.generateText=original;},status:()=>source.status()};
 }

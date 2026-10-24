@@ -33,7 +33,7 @@ export function createChatHost({context, settings, backend, notice, onCall = () 
     const s = settings(), contacts = backend.contacts();
     return thread.members.map(name => {
       const c = contacts.find(x => x.name === name);
-      return {name, persona: c?.persona || '', card: c?.persona ? '' : card(name), voice: !!c?.voice, language: c?.language || s.general.defaultLanguage};
+      return {name, persona: c?.persona || '', card: c?.persona ? '' : card(name), voice: false, language: c?.language || s.general.defaultLanguage};
     });
   }
 
@@ -46,8 +46,6 @@ export function createChatHost({context, settings, backend, notice, onCall = () 
       const thread = await backend.chats.get(threadId);
       if (!thread) throw Error('这段聊天已不存在');
       const s = settings(), preset = activeChatPreset(s.chat), people = members(thread), voiceFormat = backend.voiceFormat(), user = userName();
-      // Voice switched off: nobody sends voice messages.
-      if (s.general.voiceEnabled === false) for (const p of people) p.voice = false;
       backend.emit('chat', {threadId, typing: true});
       const recent = story(preset.context);
       // 世界书: scanned over who is in the chat, the recent story and the chat itself, as the story's own request would be.
@@ -55,7 +53,7 @@ export function createChatHost({context, settings, backend, notice, onCall = () 
         texts: [people.map(p => p.name).join('、'), ...recent.map(r => `${r.name}: ${r.text}`), ...thread.messages.slice(-preset.history).map(m => messageLine(m, user))]});
       const prompt = buildChatRequest({preset, thread, members: people, story: recent, user, userPersona: userPersona(), voiceFormat, lore});
       const text = cleanTagged(await backend.generateText(ctx, {prompt, trimNames: false, pocketNames:people.map(p=>p.name)}), preset.cleanTags);
-      const items = parseChatReply(text, {members: people, user, voiceFormat, voiceNames: people.filter(p => p.voice).map(p => p.name)});
+      const items = parseChatReply(text, {members: people, user, voiceFormat});
       if (!items.length) throw Error('这次没有收到消息，可以再试一次');
       return backend.chatMutate(threadId, () => settle(threadId, items));
     })().finally(() => { busy.delete(threadId); backend.emit('chat', {threadId, typing: false}); });

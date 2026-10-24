@@ -1,13 +1,13 @@
 import '../core/compat.js';
 import {connectBackend} from './backend-client.js';
-import {glyph, icon, spark, wave} from './icons.js';
-import {esc, avatar, plate, setAvatarPictures} from './common.js';
+import {glyph, icon, spark} from './icons.js';
+import {esc, avatar, setAvatarPictures} from './common.js';
 import {APPS, HOME, SLOT} from './apps.js';
 import {wallpaperLook, motionLayer} from './wallpapers.js';
 import {rolesApp} from './roles.js';
 import {enginesApp} from './engines.js';
 import {presetsApp} from './presets.js';
-import {libraryApp, galleryApp, notesApp, listenApp} from './media-apps.js';
+import {galleryApp, notesApp} from './media-apps.js';
 import {settingsApp} from './settings.js';
 import {drawApp} from './draw.js';
 import {forumApp} from './forum.js';
@@ -22,9 +22,8 @@ import {characterInfoApp} from '../pocket/character-info.js';
 import {createViewRefreshQueue} from '../core/view-refresh.js';
 
 // App factories, keyed by the ids in apps.js.
-const FACTORIES = {characterinfo: characterInfoApp, me: meApp, roles: rolesApp, engines: enginesApp, presets: presetsApp, library: libraryApp, gallery: galleryApp, notes: notesApp, listen: listenApp, settings: settingsApp, draw: drawApp, chat: chatApp, forum: forumApp, peek: peekApp, instagram: instagramApp, diary: diaryApp, storyshop: storyshopApp, pocketsettings: pocketsettingsApp};
+const FACTORIES = {characterinfo: characterInfoApp, me: meApp, roles: rolesApp, engines: enginesApp, presets: presetsApp, gallery: galleryApp, notes: notesApp, settings: settingsApp, draw: drawApp, chat: chatApp, forum: forumApp, peek: peekApp, instagram: instagramApp, diary: diaryApp, storyshop: storyshopApp, pocketsettings: pocketsettingsApp};
 const POCKET_APPS = new Set(['characterinfo', 'me', 'instagram', 'diary', 'storyshop', 'pocketsettings']);
-const ACTIVE_PHASES = ['playing', 'paused', 'generating', 'waiting'];
 
 // Network and battery in the status bar come from the user's own device (where the browser tells them).
 const BARS = n => `<svg viewBox="0 0 18 12" fill="currentColor" aria-hidden="true">${[[0, 8, 4], [5, 5.5, 6.5], [10, 3, 9], [15, 0, 12]].map(([x, y, h], i) => `<rect x="${x}" y="${y}" width="3" height="${h}" rx="1"${i < n ? '' : ' opacity=".3"'}/>`).join('')}</svg>`;
@@ -44,14 +43,23 @@ export function batteryState(b) {
   return {level, charging: !!b.charging, low: level <= 20 && !b.charging};
 }
 
+export function storyClockView(story = {}) {
+  if (!story.known) return {date: '劇情時間未設定', time: '—', label: '劇情時間未設定'};
+  return {
+    date: story.date || '劇情日期未設定',
+    time: story.time || '—',
+    label: story.label || [story.date, story.time].filter(Boolean).join(' · ') || '劇情時間未設定',
+  };
+}
+
 export function createPhoneApp({window: win, api, mount = win.document.getElementById('root')}) {
   const doc = win.document;
   const controller = new win.AbortController(), signal = controller.signal;
   const views = new Map(), assets = new Map();
   const media = win.matchMedia('(prefers-color-scheme: dark)'), motion = win.matchMedia('(prefers-reduced-motion: reduce)');
   let panelVisible = true, active = null, locked = false, sheet = null, disposed = false;
-  let lastPhase = '', preferences = null, appearanceKey = '', appearanceEpoch = 0, toastTimer, animation, openTimer, unread = 0, unreadTimer, fresh = 0, freshTimer;
-  let playback = api.status();
+  let preferences = null, appearanceKey = '', appearanceEpoch = 0, toastTimer, openTimer, unread = 0, unreadTimer, fresh = 0, freshTimer;
+  let cachedStoryTime = {known: false}, storyScope = null, storyClockEpoch = 0, storyDialog = null;
   const refreshQueue = createViewRefreshQueue({
     visible: name => !disposed && panelVisible && !doc.hidden && !locked && active === name,
     run: (name, task) => { const view = views.get(name); return task.kind === 'chat' && view?.onChat ? view.onChat(task.event || {}) : view?.refresh?.(); },
@@ -68,7 +76,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
           <div class="wallpaper"></div>
           <div class="statusbar"><time data-clock="small"></time><button class="status-icons" data-system="control" aria-label="開啟控制中心，或向下拖動"><span class="net" data-net></span><span class="battery" data-battery aria-hidden="true"></span></button></div>
           <button class="pull-tab" data-system="control" aria-label="開啟控制中心，也可以從螢幕頂端往下拉"></button><span class="safe-probe" aria-hidden="true"></span>
-          <button class="island" data-system="island" aria-label="開啟聽取"><span class="island-avatar"></span><span class="island-title"></span><span class="island-wave" hidden>${wave}</span><span class="camera"></span></button>
+          <button class="island" data-system="island" aria-label="開啟角色庫"><span class="camera"></span></button>
           <main class="home">
             <button class="home-close" data-system="close" aria-label="返回酒館">${icon('close')}</button>
             <div class="home-pages"></div>
@@ -182,7 +190,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   const help = text => dialog('說明', `<p class="help-copy">${esc(text)}</p>`);
 
   const routeFor = name => api.getState().routes.find(r => r.name === name);
-  const engineOf = name => { const r = routeFor(name); return r?.voice ? r.engine : 'none'; };
+  const engineOf = () => 'none';
   const ctx = {api, doc, win, notify, dialog, confirm, help, lock, open, routeFor, engineOf, openPendingRole: name => openPendingRole(name), visible: name => active === name && !locked,
     editEngine: id => views.get('engines')?.edit?.(id), showPresetKind: kind => views.get('presets')?.showKind?.(kind), momentsSeen: () => { if (fresh) { fresh = 0; renderHome(); } }};
   installMotion(win, mount, signal);
@@ -231,7 +239,6 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     $('.app-nav [data-system=back]').focus({preventScroll: true});
     if (roleId && v.edit) v.edit(roleId);
     refreshQueue.resume();
-    v.onPlayback?.(playback);
   }
   function showHome() {
     sheet?.close(null);
@@ -285,12 +292,66 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   }
 
   // ---------- Clock and theme ----------
+  async function refreshStoryTime({reset = false} = {}) {
+    const ticket = ++storyClockEpoch;
+    if (reset) {
+      cachedStoryTime = {known: false}; storyScope = null;
+      storyDialog?.close();
+      clock();
+    }
+    let snapshot;
+    try { snapshot = await api.pocketState?.(); }
+    catch { snapshot = null; }
+    if (disposed || ticket !== storyClockEpoch) return null;
+    const scope = snapshot?.scope ?? null;
+    if (storyScope !== scope) storyDialog?.close();
+    storyScope = scope;
+    cachedStoryTime = snapshot?.storyTime || {known: false};
+    clock();
+    return snapshot;
+  }
   function clock() {
     if (disposed || !panelVisible || doc.hidden) return;
-    const now = new Date();
-    const time = now.toLocaleTimeString('zh-TW', {hour: '2-digit', minute: '2-digit', hour12: false});
-    const date = now.toLocaleDateString('zh-TW', {month: 'long', day: 'numeric', weekday: 'long'});
-    for (const el of mount.querySelectorAll('[data-clock]')) el.textContent = el.dataset.clock === 'date' ? date : time;
+    const view = storyClockView(cachedStoryTime);
+    for (const el of mount.querySelectorAll('[data-clock]')) {
+      el.textContent = el.dataset.clock === 'date' ? view.date : view.time;
+      if (el.dataset.clock === 'large') el.classList.toggle('story-clock-text', view.time !== '—' && !/^\d{1,2}:\d{2}$/.test(view.time));
+    }
+    for (const el of mount.querySelectorAll('[data-story-label]')) el.textContent = view.label;
+  }
+  async function editStoryTime() {
+    const snapshot = await refreshStoryTime();
+    if (!snapshot || disposed) return;
+    const current = cachedStoryTime, editingScope = storyScope;
+    const d = dialog('劇情時間', `<p class="hint">讀取正文或角色狀態裡明確寫出的時間。也可以手動設定這段聊天的劇情時間。</p>
+      <div class="group pad"><label class="field"><span>劇情日期</span><input data-story-field="date" value="${esc(current.date || '')}" placeholder="例如 霜月初三"></label>
+      <label class="field"><span>劇情時刻</span><input data-story-field="time" value="${esc(current.time || '')}" placeholder="例如 子時、夜間、23:30"></label></div>
+      <div class="actions"><button class="secondary" data-story-auto>跟隨劇情</button><button class="primary" data-story-save>儲存</button></div>`);
+    storyDialog = d;
+    d.onClose(() => { if (storyDialog === d) storyDialog = null; });
+    d.body.addEventListener('click', e => {
+      const button = e.target.closest('button');
+      if (!button || !(button.hasAttribute('data-story-auto') || button.hasAttribute('data-story-save'))) return;
+      run(async () => {
+        const value = button.hasAttribute('data-story-auto') ? null : {
+          date: d.body.querySelector('[data-story-field=date]').value.trim(),
+          time: d.body.querySelector('[data-story-field=time]').value.trim(), label: ''
+        };
+        if (value && !value.date && !value.time) { notify('請填寫劇情日期或時刻'); return; }
+        button.disabled = true;
+        try {
+          const latest = await refreshStoryTime();
+          if (!latest || !d.live || latest.scope !== editingScope) {
+            d.close(); notify('聊天已切換，請重新設定這段劇情的時間'); return;
+          }
+          await api.setStoryTime(value);
+          d.close();
+          await refreshStoryTime();
+          notify(value ? '劇情時間已儲存' : '已改為跟隨劇情');
+        }
+        finally { button.disabled = false; }
+      });
+    });
   }
   const isDark = () => doc.documentElement.dataset.theme === 'dark';
   function applyThemeMode() {
@@ -309,7 +370,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     if (id === SLOT) return `<button class="app-icon slot" data-slot aria-label="預留位置"><span class="icon-tile">${icon('add')}</span><span class="app-label">預留</span></button>`;
     const meta = APPS[id], custom = preferences?.icons?.[id], [t1, t2, tac] = meta.colors;
     const image = custom?.kind === 'photo' ? assets.get(custom.photoId) : null;
-    const art = image ? `<img src="${esc(image)}" alt="">` : glyph(custom?.kind === 'glyph' && custom.key !== 'default' ? custom.key : id);
+    const art = image ? `<img src="${esc(image)}" alt="">` : glyph(custom?.kind === 'glyph' && custom.key !== 'default' ? custom.key : meta.glyph || id);
     // The chat icon: unread messages as a number; new 动态 alone as a dot.
     const count = id === 'chat' ? unread : 0, dot = id === 'chat' && !unread && fresh;
     const badge = count ? `<span class="badge app-badge">${count > 99 ? '99+' : count}</span>` : dot ? '<span class="badge app-badge dot"></span>' : '';
@@ -318,7 +379,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   function renderHome() {
     const shown = HOME.pages.map(ids => ids.filter(id => id !== SLOT)).filter((ids, index) => index === 0 || ids.length);
     const pages = shown.map((ids, index) => `<div class="home-page">${index === 0
-      ? `<div class="clock-block"><p class="home-date" data-clock="date"></p><p class="home-clock" data-clock="large"></p></div><div class="widgets"><button class="widget live-wave" data-system="island" data-widget="playing"></button><div class="widget" data-widget="cast"></div></div>`
+      ? `<button class="clock-block story-clock-button" data-system="story-time" aria-label="設定劇情時間"><span class="story-clock-caption">劇情時間</span><span class="home-date" data-clock="date"></span><span class="home-clock" data-clock="large"></span></button><div class="widgets"><div class="widget cast-widget" data-widget="cast"></div></div>`
       : ''}<div class="apps-grid">${ids.map(appIcon).join('')}</div></div>`).join('');
     $('.home-pages').innerHTML = pages;
     $('.dots').innerHTML = shown.length > 1 ? shown.map((_, i) => `<i${i === 0 ? ' data-on' : ''}></i>`).join('') : '';
@@ -337,25 +398,17 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     }
   }
   function renderWidgets() {
-    const playing = $('[data-widget=playing]'), cast = $('[data-widget=cast]');
-    if (playing) {
-      const line = playback.line, speaker = playback.speaker, on = ACTIVE_PHASES.includes(playback.phase) && speaker;
-      playing.dataset.engine = on ? engineOf(speaker) : 'none';
-      playing.innerHTML = `<span class="widget-head"><span class="eyebrow">Now Playing</span>${wave}</span>${on
-        ? `<span class="who">${avatar(speaker, engineOf(speaker), 30)}${plate(speaker)}</span><span class="widget-line">${esc(line?.translation ? '“' + line.translation + '”' : playback.message || '')}</span>`
-        : '<span class="widget-line">還沒有在播放</span><small>點聊天裡的聲波，或開啟聽取</small>'}`;
-    }
+    const cast = $('[data-widget=cast]');
     if (cast) {
       const routes = api.getState().routes.slice(0, 4);
-      cast.innerHTML = `<span class="widget-head"><span class="eyebrow">Cast</span></span>${routes.length
-        ? `<div class="cast">${routes.map(r => `<button data-open-role="${esc(r.id)}" aria-label="開啟 ${esc(r.name)} 的配音">${avatar(r.name, r.voice ? r.engine : 'none', 28)}<span>${esc(r.name)}</span></button>`).join('')}</div>`
+      cast.innerHTML = `<span class="widget-head"><span class="eyebrow">角色庫</span><button class="chip-button" data-app="roles">查看全部</button></span>${routes.length
+        ? `<div class="cast">${routes.map(r => `<button data-open-role="${esc(r.id)}" aria-label="開啟 ${esc(r.name)} 的角色資料">${avatar(r.name, 'none', 28)}<span>${esc(r.name)}</span></button>`).join('')}</div>`
         : `<span class="widget-line">還沒有角色</span><button class="chip-button" data-app="roles">新增角色</button>`}`;
     }
   }
   function renderLock() {
-    const on = ACTIVE_PHASES.includes(playback.phase) && playback.speaker;
-    lockscreen.innerHTML = `${icon('lock')}<p class="home-date" data-clock="date"></p><p class="home-clock" data-clock="large"></p>
-      <div class="widget live-wave" data-engine="${on ? engineOf(playback.speaker) : 'none'}"><span class="widget-head"><span class="eyebrow">Now Playing</span>${wave}</span>${on ? `<span class="who">${avatar(playback.speaker, engineOf(playback.speaker), 30)}${plate(playback.speaker)}</span>` : ''}<span class="widget-line" data-playing-message>${esc(playback.line?.translation || playback.message || '點選臺詞開始')}</span></div>
+    lockscreen.innerHTML = `${icon('lock')}<span class="story-clock-caption">劇情時間</span><p class="home-date" data-clock="date"></p><p class="home-clock" data-clock="large"></p>
+      <div class="widget"><span class="widget-head"><span class="eyebrow">劇情進度</span></span><span class="widget-line" data-story-label></span></div>
       <div class="lock-bottom"><button class="primary" data-system="unlock">點這裡進入</button><button class="chip-button" data-system="unlock">跳過鎖屏</button></div>`;
     clock();
   }
@@ -390,54 +443,6 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   /** 动态壁纸 on or off (settings); the CSS also stops it for reduced motion and while an app is open. */
   function wallMotion() { const general = api.getState().general; screen.dataset.wallMotion = general.wallpaperMotion === false || general.fastMode !== false ? 'off' : 'on'; }
 
-  // ---------- Playback ----------
-  function animate() {
-    win.cancelAnimationFrame(animation);
-    for (const bar of mount.querySelectorAll('.wave i,.visualizer i')) bar.style.removeProperty('transform');
-    for (const el of mount.querySelectorAll('.portrait')) el.style.removeProperty('--level');
-    if (disposed || !panelVisible || doc.hidden || motion.matches || api.getState().general.fastMode !== false || playback.phase !== 'playing' || !api.getState().general.waveformEnabled) return;
-    let before = 0;
-    const draw = time => {
-      if (time - before > 32) {
-        const levels = api.levels();
-        const five = [...mount.querySelectorAll('.island-wave .wave i,.live-wave .wave i,[data-state=playing] .wave i')];
-        five.forEach((bar, i) => bar.style.transform = 'scaleY(' + (.2 + .8 * (levels[i % 5] || 0)) + ')');
-        for (const viz of mount.querySelectorAll('.visualizer')) {
-          const bars = viz.children, n = bars.length;
-          for (let i = 0; i < n; i++) {
-            const envelope = .35 + .65 * Math.sin(Math.PI * (i + .5) / n);
-            bars[i].style.transform = 'scaleY(' + (.08 + .92 * envelope * (levels[Math.floor(i * 5 / n)] || 0)) + ')';
-          }
-        }
-        const average = levels.reduce((a, b) => a + b, 0) / (levels.length || 1);
-        for (const el of mount.querySelectorAll('.portrait')) el.style.setProperty('--level', average.toFixed(3));
-        before = time;
-      }
-      animation = win.requestAnimationFrame(draw);
-    };
-    animation = win.requestAnimationFrame(draw);
-  }
-  function paintPlayback(state) {
-    playback = state;
-    const on = ACTIVE_PHASES.includes(state.phase);
-    const island = $('.island');
-    island.toggleAttribute('data-active', on && !!state.speaker);
-    island.dataset.engine = state.speaker ? engineOf(state.speaker) : 'none';
-    $('.island-avatar').textContent = (state.speaker || '').slice(0, 1);
-    $('.island-title').textContent = on ? (state.phase === 'waiting' ? '等待 ' + state.speaker : state.speaker || '聽取') : '';
-    $('.island-wave').hidden = !on || state.phase === 'waiting';
-    island.setAttribute('aria-label', on ? '檢視 ' + state.speaker + ' 的播放狀態' : '開啟聽取');
-    renderWidgets();
-    for (const el of mount.querySelectorAll('[data-playing-speaker]')) el.textContent = state.speaker || '等待播放';
-    for (const el of mount.querySelectorAll('[data-playing-message]')) el.textContent = state.line?.translation || state.message || '點選臺詞開始';
-    for (const el of mount.querySelectorAll('[data-system=toggle]')) {
-      el.innerHTML = icon(state.phase === 'playing' ? 'pause' : 'play', true);
-      el.disabled = !['playing', 'paused', 'generating'].includes(state.phase);
-    }
-    for (const v of views.values()) v.onPlayback?.(state);
-    animate();
-  }
-
   // ---------- Avatars ----------
   // Pictures for avatars: the user's choice (an album photo, or text), else the tavern's own avatar for that name
   // (character card, current persona). Loaded once and again when the choices or the tavern's avatars change.
@@ -464,7 +469,6 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     avatarKey = key;
     setAvatarPictures(map);
     renderHome();
-    paintPlayback(playback);
     const v = active && views.get(active);
     if (v) run === avatarRun && (v.onAvatars ? v.onAvatars() : v.refresh?.());
   }
@@ -501,22 +505,16 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
 
   // ---------- Control center ----------
   function control({pulling = false} = {}) {
-    const s = api.getState(), p = preferences || {volume: api.getVolume(), theme: s.theme};
-    const on = ACTIVE_PHASES.includes(playback.phase) && playback.speaker;
-    const toggles = [['fast', 'settings', '流暢模式', s.general.fastMode !== false], ['floating', 'float', '懸浮入口', s.general.floatingEnabled], ['waves', 'wave', '聲波動畫', s.general.waveformEnabled], ['motion', 'image', '動態桌布', s.general.wallpaperMotion !== false]];
+    const s = api.getState(), p = preferences || {theme: s.theme};
+    const toggles = [['fast', 'settings', '流暢模式', s.general.fastMode !== false], ['floating', 'float', '懸浮入口', s.general.floatingEnabled], ['motion', 'image', '動態桌布', s.general.wallpaperMotion !== false]];
     const d = dialog('控制中心', `<div class="control-grid">
       <div class="control-tile wide cc-device"><span class="net" data-net></span><span data-net-label></span><span class="cc-battery"><span class="battery" data-battery aria-hidden="true"></span><span data-battery-label></span></span></div>
-      <div class="control-tile wide live-wave" data-engine="${on ? engineOf(playback.speaker) : 'none'}">${on ? avatar(playback.speaker, engineOf(playback.speaker), 42) : wave}<div><strong data-playing-speaker></strong><small data-playing-message></small></div><button class="play-round" data-system="toggle" aria-label="暫停或繼續">${icon('play', true)}</button></div>
-      <div class="control-tile wide" style="flex-direction:column;align-items:stretch"><div class="meter-label"><span>播放音量</span><output>${Math.round(p.volume * 100)}%</output></div><input class="slider" data-control="volume" type="range" min="0" max="100" value="${Math.round(p.volume * 100)}" aria-label="播放音量"></div>
+      <button class="control-tile wide" data-system="story-time"><span class="bubble">${icon('notes')}</span><span>劇情時間<small data-story-label></small></span></button>
       <div class="control-tile wide cc-toggles">${toggles.map(([key, glyphKey, label, value]) => `<button class="cc-toggle" data-control="${key}" aria-pressed="${value}"><span class="bubble">${icon(glyphKey)}</span>${label}</button>`).join('')}<button class="cc-toggle" data-system="power" aria-pressed="true"><span class="bubble">${icon('lock')}</span>鎖屏</button></div>
       <div class="control-tile wide" style="flex-direction:column;align-items:stretch"><span>主題</span><div class="segmented">${[['system', '跟隨系統'], ['light', '日間'], ['dark', '夜間']].map(([key, label]) => `<button data-theme="${key}" aria-pressed="${p.theme === key}">${label}</button>`).join('')}</div></div>
-      <button class="control-tile" data-control="stop" aria-pressed="true"><span class="bubble">${icon('stop', true)}</span>停止播放<small>清空當前佇列</small></button>
-      <button class="control-tile" data-app="listen" aria-pressed="true"><span class="bubble">${icon('wave')}</span>開啟聽取<small>整條播放與記錄</small></button>
     </div>`, {top: true});
     d.control = true;
     if (pulling) pullTo(d, 0);
-    d.body.addEventListener('input', e => { if (e.target.dataset.control === 'volume') d.body.querySelector('output').textContent = e.target.value + '%'; });
-    d.body.addEventListener('change', e => { if (e.target.dataset.control === 'volume') run(() => api.setVolume(Number(e.target.value) / 100)); });
     d.body.addEventListener('click', e => {
       const el = e.target.closest('button');
       if (!el) return;
@@ -525,17 +523,16 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
           await api.savePhone({theme: el.dataset.theme});
           if (d.live) for (const b of d.body.querySelectorAll('[data-theme]')) b.setAttribute('aria-pressed', String(b === el));
         }
-        const flip = {fast: 'fastMode', floating: 'floatingEnabled', waves: 'waveformEnabled', motion: 'wallpaperMotion'}[el.dataset.control];
+        const flip = {fast: 'fastMode', floating: 'floatingEnabled', motion: 'wallpaperMotion'}[el.dataset.control];
         if (flip) {
           const enabled = el.getAttribute('aria-pressed') !== 'true';
           api.updateGeneral({[flip]: enabled});
           el.setAttribute('aria-pressed', String(enabled));
         }
-        if (el.dataset.control === 'stop') api.stop();
       });
     });
-    paintPlayback(playback);
     paintDevice();
+    clock();
     return d;
   }
   // Pulled down from the top of the screen it follows the finger (or mouse) and stays open once pulled far enough;
@@ -625,15 +622,11 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
         case 'back': back(); break;
         case 'power': locked ? unlock() : lock(); break;
         case 'unlock': unlock(); break;
-        case 'island': {
-          const pending = playback.phase === 'waiting' && api.pendingRole();
-          if (pending) openPendingRole(pending); else open('listen');
-          break;
-        }
+        case 'island': open('roles'); break;
+        case 'story-time': return editStoryTime();
         case 'control': if (Date.now() - pulledAt > 400) control(); break;
         case 'size': b.textContent = api.panelSize?.() || b.textContent; break;
-        case 'toggle': api.toggle(); break;
-        case 'help': help('桌面左右滑動翻頁，圖示開啟對應應用；底部橫條或左上角返回鍵回到桌面。\n從螢幕頂端往下拉（或點右上角的訊號和電量）開啟控制中心，往上推收起。側鍵可以看鎖屏，鎖屏隨時可以跳過。\n\n訊號和電量是你裝置上的真實狀態（有的瀏覽器不提供電量，比如 Safari、Firefox）。語音只在點選臺詞、播放或試聽時生成。'); break;
+        case 'help': help('桌面左右滑動翻頁，圖示開啟對應應用；底部橫條或左上角返回鍵回到桌面。\n從螢幕頂端往下拉（或點右上角的訊號和電量）開啟控制中心，往上推收起。側鍵可以看鎖屏，鎖屏隨時可以跳過。\n\n訊號和電量是你裝置上的真實狀態（有的瀏覽器不提供電量，比如 Safari、Firefox）。日期和時間跟隨劇情，點桌面時間可手動設定。角色庫保存角色名稱與固定外貌。'); break;
       }
     });
   }, {signal});
@@ -688,32 +681,24 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     }
   }, {signal});
   doc.addEventListener('pointerdown', () => delete doc.documentElement.dataset.keyboard, {signal});
-  doc.addEventListener('visibilitychange', () => { animate(); if (!doc.hidden) { clock(); countUnread(); countMoments(); refreshQueue.resume(); } }, {signal});
+  doc.addEventListener('visibilitychange', () => { if (!doc.hidden) { run(refreshStoryTime); countUnread(); countMoments(); refreshQueue.resume(); } }, {signal});
   media.addEventListener('change', theme, {signal});
-  motion.addEventListener('change', animate, {signal});
 
   const unsubscribe = api.subscribe(event => {
     if (disposed) return;
-    if (event.type === 'playback') {
-      // A failed play (试听, a line, a voice message) says why right where the user is, not only on the lock screen.
-      if (event.phase === 'error' && lastPhase !== 'error') notify(event.message || '播放失敗', {error: true});
-      lastPhase = event.phase;
-      paintPlayback(event);
-    }
-    if (event.type === 'settings') { theme(); renderWidgets(); animate(); wallMotion(); run(refreshAvatars); }
+    if (event.type === 'settings') { theme(); renderWidgets(); wallMotion(); run(refreshAvatars); }
     if (event.type === 'phone') run(() => appearance(event.preferences));
     if (event.type === 'library') {
-      const key = ({favorites: 'library', cache: 'library', photos: 'gallery', notes: 'notes'})[event.collection];
+      const key = ({photos: 'gallery', notes: 'notes'})[event.collection];
       if (active === key) run(() => views.get(key)?.refresh());
     }
-    if (event.type === 'audio-ready') views.get('listen')?.onPlayback?.(api.status());
     if (event.type === 'draw') views.get('draw')?.onDraw?.(event);
-    if (event.type === 'balance') run(() => views.get('engines')?.onBalance?.(event));
     if (event.type === 'chat') { refreshView('chat', 'chat', event); countUnread(); }
     if (event.type === 'moments') { refreshView('chat'); countMoments(); }
     if (event.type === 'call') calls.update(event.call);
     if (event.type === 'forum' || event.type === 'peek') { const app = event.type; if (active === app) run(() => views.get(app)?.refresh()); }
     if (event.type === 'pocket') refreshView('chat', 'chat');
+    if (event.type === 'pocket' || event.type === 'csb' || event.type === 'space') run(() => refreshStoryTime({reset: event.type === 'space'}));
     if (event.type === 'pocket' || event.type === 'csb') for (const name of POCKET_APPS) refreshView(name);
     // 分区: another card was opened in the tavern; the open app and the badges follow it.
     if (event.type === 'space') { for (const name of views.keys()) refreshView(name); countUnread(); countMoments(); }
@@ -764,16 +749,16 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   win.stTtsPanelVisibility = visible => {
     panelVisible = visible;
     doc.documentElement.toggleAttribute('data-panel-hidden', !visible);
-    if (visible) { callState(); run(refreshAvatars); floatingBar(); clock(); countUnread(); countMoments(); refreshQueue.resume(); if (active) refreshView(active); }
+    if (visible) { callState(); run(refreshAvatars); floatingBar(); run(refreshStoryTime); countUnread(); countMoments(); refreshQueue.resume(); if (active) refreshView(active); }
     if (!visible) sheet?.close(null);
     else if (takeDraw()) { /* opened from a chat picture */ }
-    else if (preferences?.lockOnOpen && !api.pendingRole()) lock();
-    animate();
+    else if (preferences?.lockOnOpen) lock();
   };
   function dispose() {
     if (disposed) return;
     disposed = true;
     appearanceEpoch++;
+    storyClockEpoch++;
     unsubscribe();
     refreshQueue.dispose();
     controller.abort();
@@ -784,11 +769,9 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
     setAvatarPictures({});
     for (const url of assets.values()) win.URL.revokeObjectURL(url);
     assets.clear();
-    win.clearInterval(clockTimer);
     win.clearTimeout(toastTimer);
     win.clearTimeout(openTimer);
     win.clearTimeout(unreadTimer); win.clearTimeout(freshTimer);
-    win.cancelAnimationFrame(animation);
     win.stTtsOpenRole = previousOpenRole;
     win.stTtsPanelVisibility = previousVisibility;
     win.stTtsOpenDraw = previousOpenDraw;
@@ -796,25 +779,22 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   win.addEventListener('pagehide', dispose, {signal});
   applyThemeMode();
   renderHome();
-  const clockTimer = win.setInterval(clock, 15000);
   paintDevice();
   countUnread();
   countMoments();
   callState();
   run(refreshAvatars);
   floatingBar();
-  paintPlayback(playback);
 
-  const fallback = {wallpaper: {kind: 'builtin', key: 'sky'}, icons: {}, iconStyle: 'color', lockOnOpen: false, volume: api.getVolume(), theme: api.getState().theme};
+  const fallback = {wallpaper: {kind: 'builtin', key: 'sky'}, icons: {}, iconStyle: 'color', lockOnOpen: false, theme: api.getState().theme};
   const ready = api.getPhone().then(async p => {
     if (disposed) return;
     preferences = p;
     theme();
     await appearance(p);
+    await refreshStoryTime();
     if (disposed) return;
-    const pending = api.pendingRole();
-    if (pending) openPendingRole(pending);
-    else if (takeDraw()) { /* opened from a chat picture */ }
+    if (takeDraw()) { /* opened from a chat picture */ }
     else if (p.lockOnOpen) lock();
   }).catch(error => {
     if (disposed) return;

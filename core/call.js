@@ -1,11 +1,6 @@
-// 来电 (voice calls) without DOM or network: call options, the request for each turn of a call, and the reply parser.
-//
-// A call is spoken: every line the contact says is written in the voice format of the active voice preset (the same
-// tags as story dialogue), so it can be read aloud with the contact's own voice. Rules come from the chat preset, the
-// ones used in 电话. The finished call is kept in the private chat as one message of kind 'call'.
+// Text simulations of calls: request builders, history and reply parsing, without speech synthesis.
 import {parseDialogue} from './protocol.js';
 import {messageLine} from './chat.js';
-import {languageName} from './languages.js';
 
 // perTurn: lines kept from one answer (each is read aloud one after another); a talkative contact may say a lot.
 export const CALL_LIMITS = Object.freeze({lines: 80, perTurn: 10, ring: [15, 60], history: 12});
@@ -41,10 +36,9 @@ export function callClock(seconds) {
  * contact: {name, persona, card, voice, language}; voiceRules: how this contact's lines are read (engine tags).
  */
 export function buildCallRequest({preset, mode, contact, lines = [], history = [], story = [], user = '我', userPersona = '', voiceFormat, voiceRules = '', reason = '', lore = ''}) {
-  const name = contact.name, voiced = !!contact.voice && !!voiceFormat;
-  const spoken = languageName(contact.language || 'zh');
-  const values = {'用户': user, '对象': name, '语音格式': voiceFormat || '', '可发语音': voiced ? `${name}（${spoken}）` : '（只说中文）'};
-  const rules = preset.entries.filter(e => e.enabled && e.text.trim() && e.use.includes('call')).map(e => fill(e.text, values));
+  const name = contact.name;
+  const values = {'用户': user, '对象': name, '语音格式': '', '可发语音': '（只发文字）'};
+  const rules = preset.entries.filter(e => e.id !== 'voice' && e.enabled && e.text.trim() && e.use.includes('call')).map(e => fill(e.text, values));
   const situation = {
     incoming: `${name}给${user}打了语音电话，${user}刚刚接通。${reason ? `（打来的原因：${reason}）` : '打电话要有个理由：想${user}了、有事要说、刚发生了什么、想听听声音……按人设和最近的事情来。'}`,
     outgoing: `${user}给${name}打了语音电话，${name}刚刚接起来。${name}不知道${user}为什么打来。`,
@@ -66,11 +60,11 @@ export function buildCallRequest({preset, mode, contact, lines = [], history = [
     history.length ? `【${name}和${user}最近的手机聊天】\n${history.map(m => messageLine(m, user)).filter(Boolean).join('\n')}` : '',
     `【现在】\n${situation}`,
     ['【输出格式】',
-      `只写${name}接下来说的话，每句单独一行；说多少按人设和情境，最多 ${CALL_LIMITS.perTurn - 1} 句${voiced ? `，整行写成：${voiceFormat}（标签里的角色写「${name}」）` : '，直接写说的话，不加名字和引号'}。`,
-      voiced ? `${name}在电话里说${spoken}：标签里的原文（{文本}）是${name}真正说出口、会被念出来的话，必须用${spoken}写${spoken === '中文' ? '' : '，不要写成中文'}；引号里的{译文}是给${user}看的中文翻译。` : '',
+      `只写${name}接下来说的话，每句单独一行；说多少按人设和情境，最多 ${CALL_LIMITS.perTurn - 1} 句，直接写说的话，不加名字和引号。`,
+      '这是文字模拟通话；不生成音频，不输出 TTS 标签、朗读原文或重复的译文。',
       `不要写${user}的话，不要写动作、旁白、表情符号、时间或任何解释。`,
       mode === 'voicemail' ? '' : `${name}想挂电话时（话说完了、被叫走了、生气了），最后单独一行写「[挂断]」。通话不要太短也不要没完没了，自然就好。`,
-      voiced && voiceRules ? voiceRules : ''].filter(Boolean).join('\n')
+      ].filter(Boolean).join('\n')
   ].filter(Boolean).join('\n\n');
   const said = lines.length ? `【通话内容】\n${callTranscript(lines, user)}\n\n` : '';
   return [{role: 'system', content: system}, {role: 'user', content: said + turn}];

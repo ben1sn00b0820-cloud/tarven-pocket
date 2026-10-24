@@ -1,0 +1,59 @@
+{
+  "release": "0.12.1",
+  "csb": "1.2.1",
+  "date": "2026-10-24",
+  "unit_csb": {
+    "tests": 119,
+    "pass": 119,
+    "fail": 0
+  },
+  "unit_pocket": {
+    "tests": 468,
+    "pass": 468,
+    "fail": 0
+  },
+  "browser": {
+    "fixture": "inline actual modules, mocked SillyTavern host and AI; no external navigation",
+    "passed": 24,
+    "checks": [
+      "runtime initializes, exposes scan entry, and the raw original message is kept",
+      "selected local proposal persists and renders the expected fields",
+      "repeated local scan does not duplicate the same character",
+      "dry-run start without an end event never blocks a local scan",
+      "background quiet generation does not lock completed narrative scanning",
+      "quiet start remains background when the host lock arrives after initial scheduling",
+      "real narrative generation blocks local scanning",
+      "live idle state releases a stale start even when the end event is missing",
+      "active streaming remains protected after an unrelated end event",
+      "finished streaming releases the scan without requiring another end event",
+      "phone-style mounted information view has scan and AI buttons",
+      "AI extraction previews a valid role, quarantines a malformed name, and uses exact evidence",
+      "replacing an existing value is opt-in per field and not prechecked",
+      "a cancelled AI request cannot write a late result",
+      "new user messages preserve information while not being auto-scanned",
+      "finished assistant response triggers no-cost local detection once",
+      "settings expose automatic AI separately with auto-apply disabled by default",
+      "automatic AI call queues a review without unapproved writes or recursive calls",
+      "switching chats while AI is running closes the dialog and rejects its late result",
+      "automatic local scan waits for generation and recovers without an end event",
+      "scan dialog remains horizontally contained at 320px",
+      "scan dialog remains horizontally contained at 390px",
+      "scan dialog remains horizontally contained at 768px",
+      "scan dialog remains horizontally contained at 1280px"
+    ],
+    "pageErrors": []
+  },
+  "installer": {
+    "passed": 7,
+    "checks": [
+      "bundled, standalone, custom names and per-user installs patched together; exact backups and unrelated files preserved",
+      "1.2.1 reinstall is accepted without creating duplicate plugins",
+      "no installed CSB refuses without writing",
+      "newer CSB anywhere aborts before patching other candidates",
+      "mid-update failure restores all installations and absent files and removes temporary files/lock",
+      "SillyDroid managed link patched in persistent storage and left intact",
+      "selected file symlink refuses without changing its external target"
+    ]
+  },
+  "scope": "Local source tests and real Chromium with mocked SillyTavern/model; filesystem installer fixtures. No physical phone or paid model test. Not published to GitHub."
+}

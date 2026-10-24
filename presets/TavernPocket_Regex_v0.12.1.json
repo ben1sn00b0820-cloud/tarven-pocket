@@ -1,0 +1,18 @@
+{
+  "id": "9b30c203-7f7c-4d94-98f7-bd3b4e87d71f",
+  "scriptName": "傳音玉符 v0.12.1 — 正文卡片・千里傳音・論道臺・靈石收據",
+  "findRegex": "/((?:(?:千里傳音|微信)(?:傳給|传给|轉帳給|轉賬給|转账给|紅包給|红包给)|(?:浮光錄|Instagram|IG)(?:傳給|传给|私訊給|私信给|發文|发文|發帖|发帖|發限動|发限动|限時動態|限时动态)|(?:論道臺|论道台|論壇|论坛)(?:發文|发文|發帖|发帖|回覆|回复|回帖))[^<>&\\r\\n：「」]{0,128})[：:][ \\t]*((?:[¥￥]?[ \\t]*[0-9]+(?:\\.[0-9]{1,8})?[ \\t]*(?:枚|顆|颗)?[ \\t]*(?:(?:極品|极品|中品|下品)(?:靈石|灵石)?|靈石|灵石|元)?[ \\t]*){0,3})「([^<>&「」\\r\\n]{1,4000})」/gmi",
+  "replaceString": "<span class=\"tp-story-fallback\" style=\"display:block;box-sizing:border-box;margin:12px 0;padding:13px 15px;max-width:430px;border:1px solid #dce6e1;border-radius:17px;background:#f4f8f3;color:#24362d;overflow-wrap:anywhere\"><span style=\"display:block;color:#27865a;font-size:12px;margin-bottom:7px\">玉符紀錄 · $1</span><span style=\"display:block;white-space:pre-wrap\">$2$3</span></span>",
+  "trimStrings": [],
+  "placement": [
+    1,
+    2
+  ],
+  "disabled": false,
+  "markdownOnly": true,
+  "promptOnly": false,
+  "runOnEdit": true,
+  "substituteRegex": 0,
+  "minDepth": null,
+  "maxDepth": null
+}
