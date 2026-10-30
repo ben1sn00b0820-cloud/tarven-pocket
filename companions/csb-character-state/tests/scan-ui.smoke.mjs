@@ -9,7 +9,7 @@ const modules=['src/schema.js','src/identity.js','src/core.js','src/scan.js','sr
 const js=modules.map(p=>fs.readFileSync(path.join(root,p),'utf8').replace(/^import .*?;\n/gm,'').replace(/^export /gm,'')).join('\n');
 const html=fs.readFileSync(path.join(root,'tests/host.html'),'utf8')
   .replace('<link rel="stylesheet" href="../style.css">','<style>'+fs.readFileSync(path.join(root,'style.css'),'utf8')+'</style>')
-  .replace('<script type="module" src="../index.js"></script>',()=>'<script type="module">'+js.replaceAll('</script','<\\/script')+'</script>');
+  .replace('<script type="module" src="../index.js"></script>',()=>'<script type="module">'+js.replaceAll('</script','<\\/script')+'\ninitialize();</script>');
 const browser=await chromium.launch({headless:true,...(process.env.CSB_CHROMIUM?{executablePath:process.env.CSB_CHROMIUM}:{}),args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
 const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});page.setDefaultTimeout(8000);
 const errors=[],checks=[];page.on('pageerror',e=>errors.push(e.message));

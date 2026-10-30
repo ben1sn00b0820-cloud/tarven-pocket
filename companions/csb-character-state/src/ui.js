@@ -32,12 +32,20 @@ export function barView(f,v,doc=document){
   const bar=el('div',{class:`csb-bar-track ${known?'':'csb-bar-unknown'}`,role:'progressbar','aria-label':f.label,'aria-valuemin':f.min,'aria-valuemax':f.max,...(known?{'aria-valuenow':v}:{'aria-valuetext':'未知'})},fill);
   return el('div',{class:'csb-gauge'},el('div',{class:'csb-gauge-top'},el('span',{},f.icon?`${f.icon} `:'',f.label),el('strong',{},label)),bar,stage?el('small',{class:'csb-stage'},stage):null);
 }
-export function characterCard(c,schema,{expanded=false,onEdit=null,onPresence=null,presenceMode='auto',pinned=false,document:doc=document}={}){
+export function characterCard(c,schema,{expanded=false,onEdit=null,onPresence=null,onCurrentPresence=null,onDelete=null,presenceMode='auto',pinned=false,document:doc=document}={}){
   const el=(tag,attrs,...children)=>elementIn(doc,tag,attrs,...children);
   const btn=(label,fn,cls='')=>el('button',{type:'button',class:`csb-btn ${cls}`,onclick:fn},label);
   const overview=[c.values.age?`${c.values.age} 歲`:null,c.values.identity,c.values.relation].filter(Boolean).join(' · ');
   const card=el('details',{class:'csb-character',open:expanded,'data-char':c.id});
   const presenceHead=el('span',{class:'csb-presence-head'},el('span',{class:`csb-presence ${c.present===true?'is-present':''}`},presenceLabel(c.present)));
+  if(onCurrentPresence){
+    const toggle=btn(c.present?'設為離場':'設為在場',null,'csb-small csb-current-presence'),error=el('span',{class:'csb-presence-error',role:'status','aria-live':'polite'});
+    toggle.setAttribute('data-current-presence',c.id);toggle.setAttribute('aria-label',`${c.name} 目前${presenceLabel(c.present)}，按下設為${c.present?'離場':'在場'}`);
+    toggle.title='立即調整目前狀態，並恢復跟隨後續劇情';
+    for(const event of ['click','keydown','pointerdown'])toggle.addEventListener(event,e=>e.stopPropagation());
+    toggle.addEventListener('click',async event=>{event.preventDefault();toggle.disabled=true;error.textContent='';try{await onCurrentPresence(c.id,!c.present);}catch(e){error.textContent=e.message??String(e);}finally{toggle.disabled=false;}});
+    presenceHead.append(toggle,error);
+  }
   if(onPresence){
     const picker=el('select',{'aria-label':`${c.name} 在場設定`,'data-presence-control':c.id},...PRESENCE_OPTIONS.map(([value,label])=>el('option',{value},label))),error=el('span',{class:'csb-presence-error',role:'status','aria-live':'polite'});
     picker.value=presenceMode;
@@ -49,7 +57,11 @@ export function characterCard(c,schema,{expanded=false,onEdit=null,onPresence=nu
     el('span',{class:'csb-person'},el('strong',{},c.name),el('small',{},overview||'人物資料待補充')),presenceHead,el('span',{class:'csb-chevron'},'⌄'));
   card.append(summary);
   let body;const build=()=>{if(body)return;body=el('div',{class:'csb-character-body'});
-  if(onEdit)body.append(el('div',{class:'csb-card-actions'},pinned?el('span',{class:'csb-chip'},'已優先載入'):null,btn('編輯角色',()=>onEdit(c.id),'csb-small')));
+  if(onEdit||onDelete){
+    const actions=el('div',{class:'csb-card-actions'},pinned?el('span',{class:'csb-chip'},'已優先載入'):null,onEdit?btn('編輯角色',()=>onEdit(c.id),'csb-small'):null);
+    if(onDelete){const error=el('span',{class:'csb-presence-error',role:'status'}),remove=btn('刪除角色',null,'csb-small csb-danger');remove.setAttribute('data-delete-character',c.id);remove.addEventListener('click',async()=>{remove.disabled=true;error.textContent='';try{await onDelete(c.id);}catch(e){error.textContent=e.message??String(e);}finally{remove.disabled=false;}});actions.append(remove,error);}
+    body.append(actions);
+  }
   for(const group of schema.groups){
     const fields=schema.fields.filter(f=>f.group===group.id&&!f.hidden&&(!f.hideEmpty||![null,undefined,''].includes(valueOf(c,f))));
     if(!fields.length)continue;
@@ -96,27 +108,34 @@ export function downloadJson(name,data){const url=URL.createObjectURL(new Blob([
 
 // Host contract: all mutations stay in host; the same UI is used by ST and the offline preview.
 export function openManager(host,initialTab='characters'){
-  let tab=initialTab,search='',filter='all',legacyDraft='';const body=el('div',{class:'csb-manager-body'}),tabs=el('nav',{class:'csb-tabs','aria-label':'角色信息功能'}),area=el('div',{class:'csb-tab-body'}),feedback=el('div',{class:'csb-feedback',role:'status','aria-live':'polite'});
+  let tab=initialTab,search='',filter='all',legacyDraft='',deletedExpanded=false;const expandedRoles=new Set();const body=el('div',{class:'csb-manager-body'}),tabs=el('nav',{class:'csb-tabs','aria-label':'角色信息功能'}),area=el('div',{class:'csb-tab-body'}),feedback=el('div',{class:'csb-feedback',role:'status','aria-live':'polite'});
   let dialog;
   const status=(message,error=false)=>{feedback.textContent=message;feedback.classList.toggle('is-error',error);};
   const run=async(fn,success='已儲存')=>{try{await fn();status(success);render();}catch(e){status(e.message,true);}};
   const tabspec=[['characters','角色庫'],['schema','欄位模板'],['data','匯入／備份'],['settings','設定／紀錄']];
   function render(){
+    const archived=area.querySelector('.csb-deleted-archive');if(archived)deletedExpanded=archived.open;
+    for(const card of area.querySelectorAll('.csb-roster [data-char]')){if(card.open)expandedRoles.add(card.dataset.char);else expandedRoles.delete(card.dataset.char);}
+    const scroll=dialog?.scrollTop??0;
     tabs.replaceChildren(...tabspec.map(([id,label])=>btn(label,()=>{tab=id;render();},tab===id?'is-active':'')));
     area.replaceChildren();const snap=host.getSnapshot();
     if(tab==='characters')renderCharacters(snap);
     if(tab==='schema')renderSchema(snap);
     if(tab==='data')renderData(snap);
     if(tab==='settings')renderSettings(snap);
+    if(dialog)dialog.scrollTop=scroll;
   }
   function renderCharacters(s){
     const chars=Object.values(s.state.characters),q=input('search',search,{placeholder:'搜尋姓名、身分、別名','aria-label':'搜尋角色'}),which=select([['all','全部角色'],['present','只看在場'],['absent','只看離場']],filter),grid=el('div',{class:'csb-roster'});
-    const refresh=()=>{const found=chars.filter(c=>(filter==='all'||(filter==='present')===c.present)&&[c.name,...c.aliases,String(c.values.identity??'')].some(x=>x.toLowerCase().includes(search.toLowerCase())));
-      grid.replaceChildren(...found.map(c=>characterCard(c,s.db.schema,{onEdit:id=>editCharacter(id),pinned:s.db.pinned.includes(c.id),presenceMode:presenceModeFor(s.db.presenceOverrides,c.id),onPresence:async(id,mode)=>{await host.setPresence(id,mode);status(mode==='auto'?'已恢復跟隨劇情':'已固定角色在場狀態');render();}})));if(!found.length)grid.append(empty('沒有符合條件的角色。'));
+    const refresh=()=>{for(const card of grid.querySelectorAll('[data-char]')){if(card.open)expandedRoles.add(card.dataset.char);else expandedRoles.delete(card.dataset.char);}const found=chars.filter(c=>(filter==='all'||(filter==='present')===c.present)&&[c.name,...c.aliases,String(c.values.identity??'')].some(x=>x.toLowerCase().includes(search.toLowerCase())));
+      grid.replaceChildren(...found.map(c=>characterCard(c,s.db.schema,{expanded:expandedRoles.has(c.id),onEdit:id=>editCharacter(id),onDelete:async id=>{if(!confirm(`刪除「${c.name}」的狀態欄角色？舊正文與掃描不會自動加回，可在已刪除角色中還原。`))return;await host.deleteCharacter(id);status('角色已刪除，可從已刪除角色還原');render();},onCurrentPresence:async(id,present)=>{await host.setCurrentPresence(id,present);status(`已設為目前${presenceLabel(present)}；後續跟隨劇情`);render();},pinned:s.db.pinned.includes(c.id),presenceMode:presenceModeFor(s.db.presenceOverrides,c.id),onPresence:async(id,mode)=>{await host.setPresence(id,mode);status(mode==='auto'?'已恢復跟隨劇情':'已固定角色在場狀態');render();}})));if(!found.length)grid.append(empty('沒有符合條件的角色。'));
     };
     q.addEventListener('input',()=>{search=q.value;refresh();});which.addEventListener('change',()=>{filter=which.value;refresh();});
     area.append(el('div',{class:'csb-section-heading'},el('div',{},el('h3',{},'每個角色，都有自己的故事。'),note(`${chars.filter(c=>c.present).length} 人在場 · ${chars.length} 份角色檔案`)),btn('＋ 新增角色',()=>editCharacter(null),'csb-primary')),
       el('div',{class:'csb-toolbar'},btn('掃描正文',()=>openScanner(host,{mode:'local'})),btn('AI 填表',()=>openScanner(host,{mode:'ai'}),'csb-primary')),el('div',{class:'csb-toolbar'},q,which),grid);refresh();
+    const deleted=Object.entries(s.db.deletedCharacters??{});
+    if(deleted.length){const list=el('div',{class:'csb-deleted-roster'});for(const [id,entry]of deleted)list.append(el('div',{class:'csb-deleted-row'},el('span',{},entry.character.name),btn('還原角色',()=>run(()=>host.restoreCharacter(id),'角色已還原'),'csb-small')));area.append(el('details',{class:'csb-data-section csb-deleted-archive',open:deletedExpanded},el('summary',{},`已刪除角色（${deleted.length}）`),note('這些角色不會因重讀舊正文或 AI 掃描而加回。還原會恢復刪除前保存的欄位與設定。'),list));}
+
   }
   function editCharacter(id){
     const s=host.getSnapshot(),c=id?s.state.characters[id]:{id:uid('c'),name:'',aliases:[],present:false,values:{}},form=el('form',{class:'csb-form'}),error=el('p',{class:'csb-error',role:'alert'});
@@ -138,7 +157,8 @@ export function openManager(host,initialTab='characters'){
       }
       form.append(el('details',{class:'csb-edit-group',open:!g.collapsed},el('summary',{},g.icon,' ',g.label),rows));
     }
-    const submit=el('button',{type:'submit',class:'csb-btn csb-primary'},'儲存角色');form.append(error,el('div',{class:'csb-form-footer'},submit));
+    const submit=el('button',{type:'submit',class:'csb-btn csb-primary'},'儲存角色'),footer=el('div',{class:'csb-form-footer csb-editor-actions'},submit);form.append(error,footer);
+    if(id&&typeof host.deleteCharacter==='function')footer.prepend(btn('刪除角色',async()=>{if(!confirm(`刪除「${c.name}」？可從已刪除角色還原，舊正文不會自動加回。`))return;try{await host.deleteCharacter(c.id);d.close();status('角色已刪除');render();}catch(e){error.textContent=e.message;}},'csb-danger'));
     const d=modal(id?'編輯角色':'新增角色',form);
     form.addEventListener('submit',async event=>{event.preventDefault();submit.disabled=true;try{
       const set={},locks={};
@@ -230,6 +250,8 @@ export function mountInformation(container,api,{scope:expectedScope}={}){
     const keep=new Set(characters.map(c=>c.id));for(const id of cards.keys())if(!keep.has(id))cards.delete(id);
     const nodes=shown.map(c=>{const mode=presenceModeFor(current.presenceOverrides,c.id),scope=current.scope,signature=JSON.stringify([scope,c,pinned.includes(c.id),mode]),old=cards.get(c.id);if(old&&!schemaChanged&&old.signature===signature)return old.node;
       const node=characterCard(c,current.schema,{expanded:!!old?.node.open,pinned:pinned.includes(c.id),presenceMode:mode,document:doc,onEdit:id=>{try{api.openEditor(id,{scope});}catch(error){showError(error);}},
+        onCurrentPresence:typeof api.setCurrentPresence==='function'?async(id,present)=>{const latest=api.getSnapshot();if(!alive||latest?.scope!==scope)throw Error('聊天已切換，請重新開啟角色信息。');try{await api.setCurrentPresence(id,present,{scope,revision:latest.revision});lastRevision='';refresh();}catch(error){showError(error);throw error;}}:null,
+        onDelete:typeof api.deleteCharacter==='function'?async id=>{if(!doc.defaultView?.confirm(`刪除「${c.name}」？可從管理頁的已刪除角色還原。`))return;const latest=api.getSnapshot();if(!alive||latest?.scope!==scope)throw Error('聊天已切換，請重新開啟角色信息。');try{await api.deleteCharacter(id,{scope,revision:latest.revision});lastRevision='';refresh();}catch(error){showError(error);throw error;}}:null,
         onPresence:typeof api.setPresence==='function'?async(id,next)=>{const latest=api.getSnapshot();if(!alive||latest?.scope!==scope)throw Error('聊天已切換，請重新開啟角色信息。');try{await api.setPresence(id,next,{scope,revision:latest.revision});lastRevision='';refresh();}catch(error){showError(error);throw error;}}:null});
       if(old){const groups=[...old.node.querySelectorAll('.csb-group')].map(g=>g.open);node.querySelectorAll('.csb-group').forEach((g,i)=>{if(groups[i]!==undefined)g.open=groups[i];});}
       cards.set(c.id,{node,signature});return node;});
@@ -261,7 +283,7 @@ export function openScanner(host,options={}){
   const limit=select([['1','最新 1 則'],['5','最近 5 則'],['20','最近 20 則'],['all','本聊天（最多最近 60,000 字元）']],String(options.limit??20));
   const merge=select([['fill','只新增角色、補空白欄位'],['changes','預覽明確變更，逐項勾選後更新']],options.merge??'fill');
   const target=select([['','全部角色'],...Object.values(initial.state.characters).map(c=>[c.id,c.name])],options.targetId??'');
-  const includeUser=checkbox(false),assessPresence=checkbox(options.assessPresence!==false),start=btn('開始掃描',runScan,'csb-primary'),cancel=btn('取消本次掃描',()=>{abort?.abort();host.cancelScan();feedback.textContent='已要求取消；已送出的模型請求可能仍計費，返回結果不會寫入。';}),apply=btn('套用勾選結果',commit,'csb-primary');
+  const includeUser=checkbox(false),assessPresence=checkbox(options.assessPresence!==false),start=btn('開始掃描',runScan,'csb-primary'),cancel=btn('取消本次掃描',()=>{abort?.abort();host.cancelScan();feedback.textContent='已取消等待；模型端若已收到請求仍可能計費，晚到的結果不會寫入。';}),apply=btn('套用勾選結果',commit,'csb-primary');
   apply.disabled=true;cancel.disabled=true;
   let dialog,proposal=null,editors=[],abort=null,alive=true,running=false;
   function message(text,error=false){feedback.textContent=text;feedback.classList.toggle('is-error',error);}

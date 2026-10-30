@@ -1,6 +1,6 @@
 import {ScanService} from './scan.js';
 import {clone,uid,newDatabase,defaultSettings} from './schema.js';
-import {validateSchema,validateState,applyUpdate,replay,anchorFor,makePrompt,makeBackup,validateBackup,parseCSB21} from './core.js';
+import {validateSchema,validateState,applyUpdate,replay,anchorFor,makePrompt,makeBackup,validateBackup,parseCSB21,isDeletedCharacter} from './core.js';
 export const KEY='csb_character_state_v1';
 
 export class StateController {
@@ -13,7 +13,7 @@ export class StateController {
     const c=this.context(),db=readOnly?(c.chatMetadata[KEY]??newDatabase(c.extensionSettings?.[KEY]?.template)):this.db(),settings=readOnly?(c.extensionSettings?.[KEY]??defaultSettings()):this.settings();
     if(!readOnly){if(this.ensureIds(c))this.pendingChats.add(c.chatMetadata);this.migrateInformation(c,db);}
     const entries=c.chat.map(m=>[m,m.mes,m.swipe_id??0,!!m.is_user,!!m.is_system,m.extra?.csb_uid,m.extra?.csb_order]);
-    const prior=this.cache,refs=[db,db.seed,db.schema,db.schema.fields.length,db.schema.groups.length,db.manual,db.manual.length,db.locks,db.presenceOverrides,JSON.stringify(db.presenceOverrides??{}),db.pinned,db.ignoredIds,settings.allowNew,settings.enabled,settings.inlineCards];
+    const prior=this.cache,refs=[db,db.seed,db.schema,db.schema.fields.length,db.schema.groups.length,db.manual,db.manual.length,db.locks,db.presenceOverrides,JSON.stringify(db.presenceOverrides??{}),db.pinned,db.ignoredIds,db.deletedCharacters,settings.allowNew,settings.enabled,settings.inlineCards];
     const sameRefs=prior&&refs.every((v,i)=>v===prior.refs[i])&&(!readOnly?prior.capture:true);
     const prefix=sameRefs&&prior.entries.length<=entries.length&&prior.entries.every((row,i)=>row.every((v,j)=>v===entries[i][j]));
     if(prefix&&prior.entries.length===entries.length){this.stats.cacheHits++;return {...prior.snapshot,settings};}
@@ -61,6 +61,44 @@ export class StateController {
     catch(error){if(db.presenceOverrides===next){if(before===undefined)delete db.presenceOverrides;else db.presenceOverrides=before;}this.invalidate();this.onChange();throw error;}
     finally{this.presenceSaving=false;}
   }
+  async setCurrentPresence(id,present){
+    if(typeof present!=='boolean')throw Error('目前在場狀態必須是 true 或 false');
+    if(this.presenceSaving)throw Error('正在保存角色資料，請稍後');
+    const c=this.context(),guard=this.contextGuard(c),{db,state}=this.getSnapshot();
+    if(!Object.hasOwn(state.characters,id))throw Error('找不到這個角色，請重新開啟角色資料');
+    const before={manual:db.manual,presenceOverrides:db.presenceOverrides};db.manual=[...db.manual];db.presenceOverrides={...(db.presenceOverrides??{})};delete db.presenceOverrides[id];
+    const changed=this.addManual({version:1,characters:[{id,present,reason:'使用者調整目前在場狀態'}]});
+    const staged={manual:db.manual,presenceOverrides:db.presenceOverrides};this.presenceSaving=true;
+    try{await this.persist(c,changed);guard();return present;}
+    catch(error){for(const key of Object.keys(before))if(db[key]===staged[key]){if(before[key]===undefined)delete db[key];else db[key]=before[key];}this.invalidate();this.onChange();throw error;}
+    finally{this.presenceSaving=false;}
+  }
+  async deleteCharacter(id){
+    if(this.presenceSaving)throw Error('正在保存角色資料，請稍後');
+    const c=this.context(),guard=this.contextGuard(c),{db,state,result}=this.getSnapshot(),character=state.characters[id];
+    if(!character)throw Error('找不到這個角色，請重新開啟角色資料');
+    const before={deletedCharacters:db.deletedCharacters,locks:db.locks,pinned:db.pinned,presenceOverrides:db.presenceOverrides};
+    db.deletedCharacters={...(db.deletedCharacters??{}),[id]:{character:clone(character),automaticPresence:result.unlockedState.characters[id]?.present??character.present,locks:clone(db.locks[id]??{}),pinned:db.pinned.includes(id),deletedAt:Date.now(),...(typeof db.presenceOverrides?.[id]==='boolean'?{presenceOverride:db.presenceOverrides[id]}:{})}};
+    db.locks={...db.locks};delete db.locks[id];db.pinned=db.pinned.filter(value=>value!==id);db.presenceOverrides={...(db.presenceOverrides??{})};delete db.presenceOverrides[id];
+    const staged=Object.fromEntries(Object.keys(before).map(key=>[key,db[key]]));this.presenceSaving=true;
+    try{await this.persist(c);guard();return true;}
+    catch(error){for(const key of Object.keys(before))if(db[key]===staged[key]){if(before[key]===undefined)delete db[key];else db[key]=before[key];}this.invalidate();this.onChange();throw error;}
+    finally{this.presenceSaving=false;}
+  }
+  async restoreCharacter(id){
+    if(this.presenceSaving)throw Error('正在保存角色資料，請稍後');
+    const c=this.context(),guard=this.contextGuard(c),{db,state}=this.getSnapshot(),entry=db.deletedCharacters?.[id];
+    if(!entry)throw Error('找不到這份已刪除角色資料');
+    if(state.characters[id])throw Error('角色 ID 已存在，無法還原');
+    const before={deletedCharacters:db.deletedCharacters,manual:db.manual,locks:db.locks,pinned:db.pinned,presenceOverrides:db.presenceOverrides};
+    db.deletedCharacters={...db.deletedCharacters};delete db.deletedCharacters[id];db.manual=[...db.manual];db.locks={...db.locks,[id]:clone(entry.locks??{})};db.pinned=db.pinned.filter(value=>value!==id);if(entry.pinned)db.pinned.push(id);
+    db.presenceOverrides={...(db.presenceOverrides??{})};if(typeof entry.presenceOverride==='boolean')db.presenceOverrides[id]=entry.presenceOverride;
+    const archived=entry.character,changed=this.addManual({version:1,characters:[{id,name:archived.name,aliases:archived.aliases,set:clone(archived.values),present:entry.automaticPresence??archived.present,reason:'使用者還原已刪除角色'}]});
+    const staged=Object.fromEntries(Object.keys(before).map(key=>[key,db[key]]));this.presenceSaving=true;
+    try{await this.persist(c,changed);guard();return true;}
+    catch(error){for(const key of Object.keys(before))if(db[key]===staged[key]){if(before[key]===undefined)delete db[key];else db[key]=before[key];}this.invalidate();this.onChange();throw error;}
+    finally{this.presenceSaving=false;}
+  }
   async saveCharacter(update,locks,pinned,isNew,presenceMode){
     if(this.presenceSaving)throw Error('正在保存角色資料，請稍後');
     if(presenceMode!==undefined)this.presenceMode(presenceMode);
@@ -68,6 +106,7 @@ export class StateController {
     // Editing an unrelated field must not convert the displayed scene state
     // into a durable presence event. New UI supplies a separate explicit mode.
     const edit={...update};if(presenceMode!==undefined)delete edit.present;
+    if(isNew&&isDeletedCharacter(edit,db.deletedCharacters))throw Error('這個角色已刪除，請從「已刪除角色」還原後編輯');
     const verified=applyUpdate(state,db.schema,{version:1,characters:[edit]},{manual:true});
     if(isNew&&Object.hasOwn(state.characters,edit.id))throw Error('角色 ID 已存在');
     for(const key of Object.keys(locks))if(!db.schema.fields.some(f=>f.id===key))throw Error('鎖定欄位不存在');
@@ -101,7 +140,7 @@ export class StateController {
   exportBackup(){const {db,state,result}=this.getSnapshot();return makeBackup(db,state,result.unlockedState);}
   validateImport(data){return validateBackup(data);}
   async importBackup(data){const valid=validateBackup(data),c=this.context();const changed=this.ensureIds(c),db=newDatabase(valid.schema);
-    db.seed=valid.state;db.locks=valid.locks;db.pinned=valid.pinned;db.presenceOverrides=valid.presenceOverrides;db.ignoredIds=c.chat.map(m=>m.extra.csb_uid);
+    db.seed=valid.state;db.locks=valid.locks;db.pinned=valid.pinned;db.presenceOverrides=valid.presenceOverrides;db.deletedCharacters=valid.deletedCharacters;db.ignoredIds=c.chat.map(m=>m.extra.csb_uid);
     c.chatMetadata[KEY]=db;await this.persist(c,changed);
   }
   async importLegacy(source){const c=this.context(),s=this.getSnapshot(),converted=parseCSB21(source,s.db.schema,s.state);

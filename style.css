@@ -108,3 +108,6 @@ html body > #bg_custom{z-index:-1!important;pointer-events:none!important}
 #chat .sttts-lint li{margin:3px 0}
 #chat .sttts-lint code{display:block;margin-top:2px;white-space:pre-wrap;word-break:break-all;font-size:.92em;opacity:.8;background:none;padding:0}
 #chat .sttts-lint p{margin:4px 0 0}
+
+/* Phone-only records remain in stored chat and the phone, not the story UI. */
+#chat .mes.tp-phone-only{display:none!important}

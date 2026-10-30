@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "checks": [
+    "phone current-state toggle is separate from fixed mode and immediately restores following-story behavior",
+    "deletion confirmation cancellation leaves the character and saved data intact",
+    "confirmed deletion removes phone and inline role cards while preserving unrelated roles",
+    "deleted identity stays removed after model reintroduction under a new ID and browser reload",
+    "manager restores archived fields and flags explicitly; phone UI shows the restored role",
+    "current controls and expanded deletion actions fit mobile phone layouts"
+  ],
+  "errors": [],
+  "limitations": "Actual phone iframe and CSB UI/runtime; SillyTavern host persistence/event bus are local fixtures. No paid model calls."
+}

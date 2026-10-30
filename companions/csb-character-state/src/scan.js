@@ -1,5 +1,5 @@
 import {clone,valueOf,uid} from './schema.js';
-import {parseJSON,extractUpdate,normalizeValue,applyUpdate,hashText} from './core.js';
+import {parseJSON,extractUpdate,normalizeValue,applyUpdate,hashText,isDeletedCharacter} from './core.js';
 import {characterName,resolveIdentity,nameKey} from './identity.js';
 
 export const SCAN_LIMIT=60000, BATCH_LIMIT=10000;
@@ -7,8 +7,14 @@ const unknown=v=>v===undefined||v===null||v===''||(typeof v==='string'&&/^(?:未
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const isObject=v=>v&&typeof v==='object'&&!Array.isArray(v);
 const publicText=value=>String(value??'').replace(/<(think|analysis|script|style|iframe)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi,'');
+/** Keep structured state intact for local parsing, while removing hidden phone
+ * records before any scan budget truncation can expose a JSON tail as prose. */
+function scanPublicText(value){
+  return publicText(value).replace(/<CSB_UPDATE>[\s\S]*?(?:<\/CSB_UPDATE>|$)|\[(CSB21_PANEL|CSB21_ROLE)\][\s\S]*?\[\/\1\]|<phone\b[^>]*>[\s\S]*?<\/phone\s*>|<phone\b[^>]*>[\s\S]*?(?=<CSB_UPDATE>|\[CSB21_(?:PANEL|ROLE)\]|$)|<phone\b[^>]*$/gi,block=>/^<phone\b/i.test(block)?'':block)
+    .replace(/(^|\n)[ \t]*(`{3,}|~{3,})(?:json)?[ \t]*\r?\n[\s]*?\2[ \t]*(?=\n|$)/g,'$1');
+}
 export function plainBody(value){
-  return publicText(value)
+  return scanPublicText(value)
     .replace(/<CSB_UPDATE>[\s\S]*?(?:<\/CSB_UPDATE>|$)/gi,'')
     .replace(/\[CSB21_PANEL\][\s\S]*?\[\/CSB21_PANEL\]/g,'')
     .replace(/<br\s*\/?\s*>|<\/(?:p|div|li|section)>/gi,'\n').replace(/<[^>]*>/g,'')
@@ -19,11 +25,17 @@ export function plainBody(value){
 export function collectSources(chat,{limit=20,includeUser=false,maxChars=SCAN_LIMIT,index}={}){
   const size=limit==='all'?Infinity:Number(limit);
   if(!(size>0)||!Number.isFinite(maxChars)||maxChars<1||maxChars>SCAN_LIMIT)throw Error('掃描範圍不合法');
-  let entries=chat.map((message,i)=>({message,index:i})).filter(x=>!x.message.is_system&&(includeUser||!x.message.is_user));
-  if(index!==undefined)entries=entries.filter(x=>x.index===index);else entries=entries.slice(-size);
+  let eligible=chat.map((message,i)=>({message,index:i})).filter(x=>!x.message.is_system&&!x.message.extra?.tavern_pocket_activity&&(includeUser||!x.message.is_user));
+  if(index!==undefined)eligible=eligible.filter(x=>x.index===index);
+  const entries=[];
+  // Hidden phone-only bubbles do not consume a "latest N narrative messages" slot.
+  for(const entry of eligible.reverse()){
+    const raw=String(entry.message.mes??''),publicRaw=scanPublicText(raw);
+    if(!publicRaw.trim()||!plainBody(publicRaw)&&!/<CSB_UPDATE>|\[CSB21_(?:PANEL|ROLE)\]/i.test(publicRaw))continue;
+    entries.push({...entry,raw,publicRaw});if(entries.length>=size)break;
+  }
   const total=entries.length;let used=0,truncated=false;const sources=[];
-  for(const {message,index:i} of entries.reverse()){
-    const raw=String(message.mes??''),publicRaw=publicText(raw);if(!publicRaw.trim())continue;
+  for(const {message,index:i,raw,publicRaw} of entries){
     const remaining=maxChars-used;if(remaining<=0){truncated=true;break;}
     const original=publicRaw.length>remaining?publicRaw.slice(-remaining):publicRaw;
     if(original.length<publicRaw.length)truncated=true;
@@ -41,15 +53,85 @@ export function splitSources(sources,max=BATCH_LIMIT){
   for(const source of chunks){if(batch.length&&n+source.text.length>max){batches.push(batch);batch=[];n=0;}batch.push(source);n+=source.text.length;}
   if(batch.length)batches.push(batch);return batches;
 }
+export const SCAN_TIMEOUT_MS=60000;
+export class ScanError extends Error{
+  constructor(code,message,{retryable=false}={}){super(message);this.name='ScanError';this.code=code;this.retryable=retryable;}
+}
+const scanRefused=()=>new ScanError('REFUSED','模型拒絕處理這次資料，或服務商的內容篩選已擋下回應；沒有寫入資料，也不會自動重試。可改用本機掃描或手動填表。');
+const refusalText=text=>/^(?:(?:抱歉|對不起|很抱歉|sorry|i(?:’|')?m sorry)[，,。.!\s]*(?:但|but)?\s*)?(?:我(?:無法|不能|不可以)|i(?: (?:cannot|can(?:’|')t|am unable to)|(?:’|')m unable to))[^\n]{0,120}(?:協助|提供|處理|生成|完成|help|assist|comply|process|provide|generate)/i.test(text.trim());
+/** Read known provider envelopes only; never stringify arbitrary model objects. */
+export function scanResponseText(value){
+  if(typeof value==='string')return value;
+  if(!isObject(value))throw new ScanError('EMPTY','AI 沒有回傳文字；請確認模型連線與回應額度。',{retryable:true});
+  const choice=value.choices?.[0],message=choice?.message;
+  if(value.refusal||message?.refusal||['content_filter','safety','blocked','refusal'].includes(String(choice?.finish_reason??value.finish_reason??value.stop_reason??'').toLowerCase())||value.promptFeedback?.blockReason)throw scanRefused();
+  if(value.error){
+    const error=isObject(value.error)?value.error:{message:String(value.error)};
+    if(/content[_ -]?filter|safety|blocked|policy|moderation/i.test(String(error.code??'')+' '+String(error.type??'')))throw scanRefused();
+    throw new ScanError('PROVIDER',`模型服務回報錯誤：${String(error.message??error.code??'未知錯誤').slice(0,300)}；沒有寫入資料。`,{retryable:[408,429,500,502,503,504].includes(Number(value.status??error.status))});
+  }
+  const content=message?.content??choice?.text??value.output_text??value.text??value.content??value.response;
+  if(typeof content==='string')return content;
+  if(Array.isArray(content)){
+    if(content.some(item=>item?.type==='refusal'||item?.refusal))throw scanRefused();
+    return content.filter(item=>item?.type==='text'||item?.type==='output_text').map(item=>typeof item.text==='string'?item.text:'').join('\n');
+  }
+  if(Array.isArray(value.output)){
+    const blocks=value.output.filter(item=>item?.type==='message').flatMap(item=>Array.isArray(item.content)?item.content:[]);
+    if(blocks.some(item=>item?.type==='refusal'||item?.refusal))throw scanRefused();
+    return blocks.filter(item=>item?.type==='output_text'||item?.type==='text').map(item=>typeof item.text==='string'?item.text:'').join('\n');
+  }
+  throw new ScanError('EMPTY','AI 回應沒有可讀取的文字欄位；請確認目前連線是否支援文字生成。',{retryable:true});
+}
+/** Locate one JSON object without accepting JavaScript, multiple answers or fenced instructions. */
+function singleObject(text){
+  const start=text.indexOf('{');if(start<0)return text;
+  let depth=0,quoted=false,escaped=false;
+  for(let i=start;i<text.length;i++){
+    const ch=text[i];if(quoted){if(escaped)escaped=false;else if(ch==='\\')escaped=true;else if(ch==='"')quoted=false;continue;}
+    if(ch==='"'){quoted=true;continue;}
+    if(ch==='{')depth++;else if(ch==='}'&&--depth===0){
+      if(/[{}]/.test(text.slice(0,start)+text.slice(i+1)))return text;
+      return text.slice(start,i+1);
+    }
+  }
+  return text;
+}
 export function parseScanResponse(value){
-  if(typeof value!=='string')throw Error('AI 沒有回傳文字，請檢查酒館模型連線');
-  let text=value.trim().replace(/<think\b[^>]*>[\s\S]*?<\/think\s*>/gi,'').trim();
+  let text=scanResponseText(value).trim().replace(/<(think|analysis)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi,'').trim();
+  if(!text)throw new ScanError('EMPTY','AI 回傳空白，或只回傳推理區而沒有填表結果；請檢查模型的輸出額度與連線。',{retryable:true});
+  if(text.length>2_000_000)throw new ScanError('FORMAT','AI 回應超過 2 MB，已停止解析；請縮小掃描範圍。');
+  if(refusalText(text))throw scanRefused();
   const wrapped=text.match(/^<CSB_SCAN>\s*([\s\S]*?)\s*<\/CSB_SCAN>$/i);if(wrapped)text=wrapped[1];
   text=text.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
-  let data;try{data=parseJSON(text);}catch(e){throw Error(`AI 填表結果不是有效 JSON；沒有寫入任何資料。${e.message}`);}
-  if(!isObject(data)||!Array.isArray(data.characters)||data.characters.length>100)throw Error('AI 填表需回傳 characters 陣列（每批最多 100 人），沒有寫入資料');
+  let data;try{data=parseJSON(singleObject(text));}catch(e){throw new ScanError('FORMAT',`AI 填表結果不是有效 JSON；沒有寫入任何資料。${e.message}`,{retryable:!/不允許的鍵名/.test(e.message)});}
+  if(isObject(data)&&(data.refusal||data.error&&/content[_ -]?filter|safety|policy|moderation|blocked/i.test(JSON.stringify(data.error))))throw scanRefused();
+  if(!isObject(data)||!Array.isArray(data.characters)||data.characters.length>100)throw new ScanError('FORMAT','AI 填表需回傳 characters 陣列（每批最多 100 人），沒有寫入資料',{retryable:true});
   return data.characters;
 }
+function requestError(error){
+  if(error instanceof ScanError)return error;
+  if(error?.name==='AbortError')return new ScanError('CANCELLED','模型請求已中止，沒有寫入資料。');
+  const message=String(error?.message??error??'未知錯誤'),status=Number(error?.status??error?.statusCode??error?.response?.status??message.match(/(?:status(?: code)?|HTTP)[ :]*(\d{3})/i)?.[1]);
+  if(/no message generated|empty response|no text returned/i.test(message))return new ScanError('EMPTY','AI 沒有回傳填表文字；請檢查目前模型的輸出額度與連線。',{retryable:true});
+  if(/content[_ -]?filter|safety|moderation|內容(?:審查|篩選)|内容(?:审查|筛选)/i.test(message))return scanRefused();
+  return new ScanError('TRANSPORT',`AI 掃描請求失敗${status?`（${status}）`:''}：${message.slice(0,300)}；沒有寫入資料。`,{retryable:[408,429,500,502,503,504].includes(status)||/network|failed to fetch|fetch failed|連線中斷|连接中断/i.test(message)});
+}
+/** A hung provider cannot keep the scanner UI locked. Late resolutions are ignored. */
+function waitForScan(generate,args,{job,signal,timeoutMs,check}){
+  return new Promise((resolve,reject)=>{
+    let finished=false,timer=null,poll=null;const controller=new AbortController();
+    const cleanup=()=>{clearTimeout(timer);clearInterval(poll);signal?.removeEventListener('abort',cancel);if(job.abort===cancel)job.abort=null;};
+    const finish=(fn,value,abort=false)=>{if(finished)return;finished=true;cleanup();if(abort)controller.abort();fn(value);};
+    const cancel=()=>finish(reject,new ScanError('CANCELLED','已取消掃描，結果不會寫入；已送出的模型請求可能仍計費'),true);
+    job.abort=cancel;signal?.addEventListener('abort',cancel,{once:true});
+    if(job.cancelled||signal?.aborted){cancel();return;}
+    timer=setTimeout(()=>finish(reject,new ScanError('TIMEOUT',`AI 掃描等待超過 ${Math.round(timeoutMs/1000)} 秒，已停止等待；沒有寫入資料。請檢查模型連線或縮小正文範圍。`),true),timeoutMs);
+    poll=setInterval(()=>{try{check();}catch(error){finish(reject,error,true);}},250);
+    try{Promise.resolve(generate({...args,trimNames:false,abortSignal:controller.signal,signal:controller.signal})).then(value=>finish(resolve,value),error=>finish(reject,requestError(error)));}catch(error){finish(reject,requestError(error));}
+  });
+}
+
 function cleanLine(line){return line.replace(/^\s*(?:[-*]\s+)?/,'').replace(/\*\*|__/g,'').trim();}
 function simpleValue(f,value){
   if(unknown(value))return null;
@@ -170,7 +252,9 @@ export function makeScanProposal(rows,snapshot,sources,{mode='local',merge='fill
   for(let i=0;i<rows.length;i++){
     const row=rows[i];
     try{
+      if(Object.hasOwn(db.deletedCharacters??{},row?.id)){diagnostics.push('候選角色 ID 已刪除；掃描不會將它改寫成另一位同名角色');continue;}
       const ident=resolveIdentity(row,known);
+      if(Object.hasOwn(db.deletedCharacters??{},ident.id)||(!state.characters[ident.id]&&isDeletedCharacter({...row,...ident},db.deletedCharacters))){diagnostics.push(`「${ident.name}」已刪除；掃描不會自動恢復，請先到已刪除角色清單還原`);continue;}
       if(targetId&&ident.id!==targetId)continue;
       if(!ident.existing&&settings.allowNew===false){diagnostics.push(`「${ident.name}」未新增：已關閉允許建立新角色`);continue;}
       const source=sources.find(s=>s.key===row._source);
@@ -244,25 +328,26 @@ export class ScanService{
   capture(options){
     const context=this.host.context(),snapshot=this.host.getSnapshot();
     const collected=collectSources(context.chat,options);
-    return {context,metadata:context.chatMetadata,chat:context.chat,snapshot,collected,length:context.chat.length,chatId:context.getCurrentChatId?.()??context.chatId,stamp:JSON.stringify([snapshot.state,snapshot.db.schema,snapshot.db.locks,snapshot.db.presenceOverrides])};
+    return {context,metadata:context.chatMetadata,chat:context.chat,snapshot,collected,length:context.chat.length,chatId:context.getCurrentChatId?.()??context.chatId,stamp:JSON.stringify([snapshot.state,snapshot.db.schema,snapshot.db.locks,snapshot.db.presenceOverrides,snapshot.db.deletedCharacters])};
   }
   assertCapture(cap,{state=false}={}){
     const c=this.host.context();
     if(this.disposed||c.chatMetadata!==cap.metadata||c.chat!==cap.chat||(c.getCurrentChatId?.()??c.chatId)!==cap.chatId||c.chat.length!==cap.length||cap.collected.sources.some(s=>c.chat[s.index]!==s.ref||String(s.ref.mes??'')!==s.raw||(s.ref.swipe_id??0)!==s.swipe))throw Error('聊天、正文或回覆分支已變更，已取消本次掃描；請重新掃描');
     if(this.host.adapter.isBusy?.())throw Error('正文正在生成，請待本輪完成再掃描');
-    if(state){const s=this.host.getSnapshot();if(JSON.stringify([s.state,s.db.schema,s.db.locks,s.db.presenceOverrides])!==cap.stamp)throw Error('角色資料或欄位已變更，未套用過時結果；請重新掃描');}
+    if(state){const s=this.host.getSnapshot();if(JSON.stringify([s.state,s.db.schema,s.db.locks,s.db.presenceOverrides,s.db.deletedCharacters])!==cap.stamp)throw Error('角色資料或欄位已變更，未套用過時結果；請重新掃描');}
   }
-  cancel(){if(this.job)this.job.cancelled=true;}
+  cancel(){if(this.job){this.job.cancelled=true;this.job.abort?.();}}
   dispose(){this.disposed=true;this.cancel();this.pending=null;}
   async run(options={}){
     if(this.pending?.committing)throw Error('正在保存掃描結果，請勿重複操作');
-    if(this.job)throw Error('已有一個掃描請求正在處理；取消後仍須等當前模型請求返回');
+    if(this.job)throw Error('已有一個掃描請求正在處理；請先取消目前掃描');
     if(this.host.adapter.isBusy?.())throw Error('正文正在生成，請待本輪完成再掃描');
     const mode=options.mode==='ai'?'ai':'local',cap=this.capture(options);
     if(options.index!==undefined){const latest=cap.context.chat.findLastIndex(m=>!m.is_user&&!m.is_system);if(options.index!==latest)options={...options,assessPresence:false};}
     const presenceSources=latestPresenceSources(cap.collected.sources);
     if(!cap.collected.sources.length)throw Error('選取範圍內沒有可掃描的正文');
-    const job={cancelled:false};this.job=job;let rows=[],diagnostics=[],aiSources=[];
+    const job={cancelled:false,abort:null};this.job=job;this.pending=null;let rows=[],diagnostics=[],aiSources=[];
+    const timeoutMs=Number.isFinite(options.timeoutMs)?Math.max(1,Math.min(120000,options.timeoutMs)):SCAN_TIMEOUT_MS,retries=options.retries===0?0:1;
     const check=()=>{if(job.cancelled||options.signal?.aborted)throw Error('已取消掃描，結果不會寫入；已送出的模型請求可能仍計費');this.assertCapture(cap);};
     try{
       if(mode==='local'){const local=scanLocal(cap.collected.sources,cap.snapshot.db.schema,{...options,knownState:cap.snapshot.state});rows=local.rows;diagnostics=local.diagnostics;}
@@ -272,8 +357,19 @@ export class ScanService{
         for(let i=0;i<batches.length;i++){
           check();const progress=`AI 正在分析第 ${i+1}/${batches.length} 批正文`;options.onProgress?.(progress);this.onStatus(progress);
           const prompt=buildScanPrompt(cap.snapshot,batches[i],{...options,presenceSources});
-          const result=await generate(prompt);check();
-          const parsed=parseScanResponse(result);rows.push(...parsed);aiSources.push(...batches[i]);
+          let parsed;
+          for(let attempt=0;attempt<=retries;attempt++){
+            check();
+            try{
+              const result=await waitForScan(generate,prompt,{job,signal:options.signal,timeoutMs,check});check();
+              parsed=parseScanResponse(result);break;
+            }catch(error){
+              check();const failure=requestError(error);
+              if(!failure.retryable||attempt===retries)throw failure;
+              const retry=`第 ${i+1}/${batches.length} 批${failure.code==='EMPTY'?'回應空白':failure.code==='FORMAT'?'格式不完整':'暫時連線失敗'}，重試 1 次`;diagnostics.push(retry);options.onProgress?.(retry);this.onStatus(retry);
+            }
+          }
+          rows.push(...parsed);aiSources.push(...batches[i]);
           // Yield between batches so mobile taps and cancellation are not blocked.
           await new Promise(resolve=>setTimeout(resolve,0));
         }
@@ -297,6 +393,7 @@ export class ScanService{
       const row=pending.proposal.rows.find(r=>r.key===chosen.key);if(!row)throw Error('掃描候選已不存在');
       const name=characterName(chosen.name??row.name,'確認姓名',{strict:true});
       const ident=resolveIdentity({...(row.existing?{id:row.id}:{}),name},state);
+      if(Object.hasOwn(db.deletedCharacters??{},ident.id)||(!state.characters[ident.id]&&isDeletedCharacter(ident,db.deletedCharacters)))throw Error('此角色已刪除，請先還原後再套用掃描');
       if(used.has(ident.id))throw Error('勾選結果包含同名／同一角色，請取消重複列');used.add(ident.id);
       if(!ident.existing&&settings.allowNew===false)throw Error('已關閉新增角色');
       const keys=new Set(chosen.fields??[]),set={};
@@ -330,7 +427,7 @@ export class ScanService{
   async automatic(index){
     if(this.job||this.disposed||this.host.adapter.isBusy?.())return;
     const c=this.host.context(),s=this.host.settings(),message=c.chat[index];
-    if(s.enabled===false||!message||message.is_user||message.is_system||s.autoScan==='off')return;
+    if(s.enabled===false||!message||message.is_user||message.is_system||message.extra?.tavern_pocket_activity||s.autoScan==='off'||!scanPublicText(message.mes).trim())return;
     const signature=`${message.swipe_id??0}:${String(message.mes??'')}`,seen=this.lastAuto.get(message);
     if(seen===signature)return;this.lastAuto.set(message,signature);
     try{

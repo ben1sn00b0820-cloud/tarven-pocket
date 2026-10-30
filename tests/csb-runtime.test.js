@@ -26,10 +26,10 @@ test('external API and legacy interceptor are never loaded over or disposed',asy
     assert.deepEqual(f.read(),{loaded:0,intercepted:0,disposed:0});assert.ok(f.globals[key]);
   }
 });
-test('a disabled standalone does not silently start a second bundled CSB',async()=>{
-  let loads=0;const c=context();c.extensionSettings.disabledExtensions=['third-party/csb-character-state'];
-  const r=createCharacterStateRuntime({context:()=>c,globals:{},load:async()=>{loads++;}});
-  assert.equal(await r.start(),null);assert.equal(loads,0);await assert.rejects(()=>r.open(),/尚未啟用/);
+test('disabling an old standalone does not disable the unified phone companion',async()=>{
+  let loads=0,owned=false;const c=context(),globals={};c.extensionSettings.disabledExtensions=['third-party/csb-character-state'];
+  const native={apiVersion:1};const r=createCharacterStateRuntime({context:()=>c,globals,load:async()=>{loads++;return {initialize(){owned=true;globals.CSBCharacterState=native;return native;},ownsRuntime:()=>owned};}});
+  assert.equal(await r.start(),native);assert.equal(loads,1);assert.equal(r.owns(),true);
 });
 test('external instance appearing during import remains owned by its original plugin',async()=>{
   const globals={},external={apiVersion:1};let dispose=0;

@@ -18,8 +18,9 @@ const profilePreview = state => [...Object.entries(basicProfile(state)).filter((
 
 export function memoryMentionCandidates(state) {
   if (!str(state?.persona)) return [];
+  const profile=profilePreview(state);
   const out = [
-    {kind:'profile',id:'all',title:'我的資訊',typeLabel:'我的資訊',preview:profilePreview(state)||'尚未填寫個人資料',searchText:'我 吾身錄 吾身录 我的信息 我的資訊 我的资料 個人資料 '+str(state.persona)+' '+profilePreview(state),detail:profilePreview(state)},
+    {kind:'profile',id:'all',title:'我的資訊',typeLabel:'我的資訊',preview:profile||'尚未填寫個人資料',searchText:'我 吾身錄 吾身录 我的信息 我的資訊 我的资料 個人資料 '+str(state.persona)+' '+profile,detail:profile},
     {kind:'items',id:'all',title:'我的物品',typeLabel:'物品清單',preview:'已記錄 '+list(state.items).length+' 件物品；插入清單摘要',searchText:'我 我的物品 道具 裝備',detail:'插入目前持有物品的摘要。需要完整描述時，請選取單件物品。'},
     {kind:'abilities',id:'all',title:'我的能力',typeLabel:'能力清單',preview:'已記錄 '+list(state.abilities).length+' 項能力；插入清單摘要',searchText:'我 我的能力 技能 異能',detail:'插入目前能力的摘要。需要完整效果時，請選取個別能力。'},
   ];
@@ -34,21 +35,36 @@ export function memoryMentionCandidates(state) {
   return out.map(row=>({...row,key:candidateKey(row.kind,row.id),category:categoryOf(row.kind),persona:str(state.persona)}));
 }
 
-export function searchMemoryMentions(state, query='', {category='all',limit=MEMORY_MENTION_LIMITS.results}={}) {
+/** Build once per data revision, never once per keystroke. It is a detached
+ * search snapshot: callers explicitly replace it after saved data changes. */
+export function createMemoryMentionIndex(state) {
+  return Object.freeze(memoryMentionCandidates(state).map((row,index)=>{
+    const title=row.title.toLocaleLowerCase(),haystack=(row.title+' '+row.typeLabel+' '+row.searchText).toLocaleLowerCase();
+    return Object.freeze({row:Object.freeze(row),index,title,aliasTitle:searchText(title),haystack,alias:searchText(haystack)});
+  }));
+}
+
+export function searchMemoryMentionIndex(index, query='', {category='all',limit=MEMORY_MENTION_LIMITS.results}={}) {
   let q=str(query).trim().replace(/^[@＠]/,'').toLocaleLowerCase();
   let selected=category;
   if (selected==='all' && /^(我的)?能力[:：\s]/u.test(q)) {selected='abilities';q=q.replace(/^(我的)?能力[:：\s]*/u,'');}
   if (selected==='all' && /^(我的)?物品[:：\s]/u.test(q)) {selected='items';q=q.replace(/^(我的)?物品[:：\s]*/u,'');}
-  const tokens=q.split(/\s+/u).filter(Boolean).map(value=>({value,alias:searchText(value)})), rows=memoryMentionCandidates(state), aliasQuery=searchText(q);
-  return rows.filter(row=>{
-    if(selected!=='all'&&row.category!==selected)return false;
-    const haystack=(row.title+' '+row.typeLabel+' '+row.searchText).toLocaleLowerCase(), alias=searchText(haystack);
-    return tokens.every(token=>haystack.includes(token.value)||alias.includes(token.alias));
-  }).map((row,index)=>{
-    const title=row.title.toLocaleLowerCase(), alias=searchText(title);
-    return {row,index,score:!q?0:title===q||alias===aliasQuery?100:title.startsWith(q)||alias.startsWith(aliasQuery)?60:title.includes(q)||alias.includes(aliasQuery)?30:0};
-  })
-    .sort((a,b)=>b.score-a.score||a.index-b.index).slice(0,Math.max(1,Math.min(100,limit))).map(x=>x.row);
+  const tokens=q.split(/\s+/u).filter(Boolean).map(value=>({value,alias:searchText(value)})),aliasQuery=searchText(q),matches=[];
+  const boundedLimit=Math.max(1,Math.min(100,Number.isFinite(limit)?Math.floor(limit):MEMORY_MENTION_LIMITS.results));
+  for(const entry of index) {
+    const {row,title,aliasTitle,haystack,alias}=entry;
+    if(selected!=='all'&&row.category!==selected)continue;
+    if(!tokens.every(token=>haystack.includes(token.value)||alias.includes(token.alias)))continue;
+    matches.push({entry,score:!q?0:title===q||aliasTitle===aliasQuery?100:title.startsWith(q)||aliasTitle.startsWith(aliasQuery)?60:title.includes(q)||aliasTitle.includes(aliasQuery)?30:0});
+    // Empty-query browsing keeps source order and need not scan the whole inventory.
+    if(!q&&matches.length>=boundedLimit)break;
+  }
+  if(q)matches.sort((a,b)=>b.score-a.score||a.entry.index-b.entry.index);
+  return matches.slice(0,boundedLimit).map(x=>x.entry.row);
+}
+
+export function searchMemoryMentions(state, query='', options={}) {
+  return searchMemoryMentionIndex(createMemoryMentionIndex(state),query,options);
 }
 
 function compactId(value) {

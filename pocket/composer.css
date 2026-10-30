@@ -31,3 +31,34 @@
 .tp-memory-reference-abilities{background:rgba(141,118,198,.1);border-color:rgba(141,118,198,.3)}.tp-memory-reference-abilities .tp-memory-reference-icon{background:rgba(141,118,198,.14)}
 @media(max-width:520px){.tp-memory-heading{padding:12px}.tp-memory-picker{border-radius:17px}.tp-memory-results{max-height:230px}.tp-memory-footer kbd{display:none}.tp-memory-detail{max-height:82px}.tp-memory-button{width:33px;min-width:33px;height:33px;margin:2px}}
 @media(prefers-reduced-motion:reduce){.tp-memory-button{transition:none}}
+
+/* v0.14: predictable host-theme isolation and a compact caret menu. */
+.tp-memory-picker{isolation:isolate;contain:layout style;min-width:0;min-height:0;overflow:hidden;background:var(--SmartThemeBlurTintColor,#18242d);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.tp-memory-picker :is(button,input){max-width:100%;letter-spacing:normal;text-transform:none;box-sizing:border-box}
+.tp-memory-heading small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-memory-search-wrap{min-height:40px;max-width:calc(100% - 24px)}
+.tp-memory-picker #tp-memory-search{font-size:16px!important;line-height:1.35!important;min-height:38px}
+.tp-memory-results{min-height:44px;flex:0 1 auto;scrollbar-gutter:stable;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.tp-memory-option{touch-action:pan-y;min-width:0;line-height:1.4!important;white-space:normal!important}
+.tp-memory-option-copy{overflow:hidden}.tp-memory-option-copy strong{line-height:1.4!important}.tp-memory-option-meta{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-memory-option:focus-visible,.tp-memory-tabs button:focus-visible,.tp-memory-heading button:focus-visible{outline:2px solid #87d5c2;outline-offset:-3px}
+.tp-memory-footer{min-width:0}.tp-memory-footer>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-memory-picker[data-mode=inline] .tp-memory-tabs,.tp-memory-picker[data-mode=inline] .tp-memory-search-wrap{display:none}
+.tp-memory-picker[data-mode=inline] .tp-memory-heading{padding:8px 12px;gap:8px}
+.tp-memory-picker[data-mode=inline] .tp-memory-heading-icon{width:28px;height:28px;border-radius:9px;font-size:16px}
+.tp-memory-picker[data-mode=inline] .tp-memory-heading strong{font-size:13px}
+.tp-memory-picker[data-mode=inline] .tp-memory-heading small{display:none}
+.tp-memory-picker[data-mode=inline] .tp-memory-results{max-height:none;padding-top:4px}
+.tp-memory-picker[data-mode=inline] .tp-memory-option{min-height:48px;padding:7px 8px}
+.tp-memory-picker[data-mode=inline] .tp-memory-option-copy small{-webkit-line-clamp:1}
+.tp-memory-picker[data-mode=inline] .tp-memory-detail{display:none}
+.tp-memory-picker[data-compact=true] .tp-memory-detail,.tp-memory-picker[data-compact=true] .tp-memory-footer{display:none}
+.tp-memory-picker[data-compact=true] .tp-memory-heading{padding:7px 10px}
+.tp-memory-picker[data-compact=true] .tp-memory-heading small{display:none}
+.tp-memory-picker[data-compact=true] .tp-memory-tabs{padding-top:5px}
+.tp-memory-picker[data-compact=true] .tp-memory-tabs button{padding:5px 3px}
+.tp-memory-picker[data-compact=true] .tp-memory-search-wrap{margin-top:6px;margin-bottom:5px}
+.tp-memory-picker[data-tiny=true] .tp-memory-heading,.tp-memory-picker[data-tiny=true] .tp-memory-tabs{display:none}
+.tp-memory-picker[aria-busy=true] .tp-memory-results:empty::before{content:'正在讀取資料…';display:block;padding:15px;opacity:.7}
+@media(pointer:coarse){.tp-memory-picker .tp-memory-option{min-height:52px}.tp-memory-heading [data-tp-memory-close]{min-width:36px;min-height:36px}.tp-memory-footer kbd{display:none}}
+@media(prefers-reduced-transparency:reduce){.tp-memory-picker{backdrop-filter:none;-webkit-backdrop-filter:none;background:#18242d}}

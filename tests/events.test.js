@@ -158,23 +158,20 @@ test('versioned worldbook contains exact injected prompt and all examples parse'
   assert.ok(events>=20);
   assert.deepEqual(preset('worldbook-tavern-pocket.json'),book);
 });
-test('versioned display regex beautifies safe user commands without hiding JSON or status', () => {
+test('versioned display regex hides only completed structured phone and CSB data, preserving status and prose', () => {
   const script=preset(`TavernPocket_Regex_v${PHONE_VERSION}.json`);
-  assert.equal(script.markdownOnly,true);
-  assert.equal(script.promptOnly,false);
-  assert.deepEqual(script.placement,[1,2]);
-  assert.equal(script.disabled,false);
-  assert.ok(script.scriptName.includes(PHONE_VERSION));
+  assert.equal(script.markdownOnly,true);assert.equal(script.promptOnly,false);
+  assert.deepEqual(script.placement,[1,2]);assert.equal(script.disabled,false);
+  assert.ok(script.scriptName.includes(PHONE_VERSION));assert.equal(script.replaceString,'');
   const parts=/^\/(.*)\/([gimsuy]*)$/.exec(script.findRegex);
   const regex=new RegExp(parts[1],parts[2]);
-  const text='她打開手機。<tts>保留語音</tts><img>保留照片</img>[CSB21_PANEL]保留狀態[/CSB21_PANEL]'+encodePhoneEvents(base,actor)+'<phone>{unfinished';
-  assert.equal(text.replace(regex,script.replaceString),text);
-  assert.match('微信傳給阿澤：「吃飯沒？」'.replace(regex,script.replaceString),/tp-story-fallback/);
-  const forum='論壇發文：「今晚散步」';assert.match(forum.replace(regex,script.replaceString),/tp-story-fallback/);
-  const money='微信紅包給阿澤：20「好運」'.replace(regex,script.replaceString);assert.match(money,/tp-story-fallback/);assert.match(money,/20好運/);
-  assert.doesNotMatch(script.replaceString,/<div|<section|<article/);
-  const unsafe='微信傳給阿澤：「<img src=x onerror=alert(1)>」';
-  assert.equal(unsafe.replace(regex,script.replaceString),unsafe);
+  const story='她打開手機。<tts>保留語音</tts><img>保留照片</img>[CSB21_PANEL]保留狀態[/CSB21_PANEL]';
+  const update='<CSB_UPDATE>{"version":1,"characters":[]}</CSB_UPDATE>';
+  assert.equal((story+encodePhoneEvents(base,actor)+update+'她走出店門。').replace(regex,script.replaceString),story+'她走出店門。');
+  const unfinished=story+'<phone>{unfinished';assert.equal(unfinished.replace(regex,''),unfinished);
+  const malformed='<phone>{not finished\n她走出店門。'+encodePhoneEvents(base,actor);
+  assert.equal(malformed.replace(regex,''),'<phone>{not finished\n她走出店門。');
+  const natural='她討論「微信傳給阿澤：「吃飯沒？」」這個格式。';assert.equal(natural.replace(regex,''),natural);
   assert.deepEqual(preset('regex-hide-phone.json'),script);
 });
 test('native photos carry actual safe URLs and keep descriptive photos compatible', () => {

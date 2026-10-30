@@ -59,3 +59,13 @@
 .csb-scan-presence.is-disabled{cursor:default;opacity:.75}
 .csb-scan-presence .csb-muted{margin:0;font-size:11px}
 @media(max-width:360px){.csb .csb-presence-head select{width:95px;font-size:10px}.csb-presence-head{max-width:100px}.csb-presence-error{max-width:100px}.csb-person strong{overflow-wrap:anywhere}}
+
+/* Immediate state changes and role deletion remain reachable on narrow screens. */
+.csb .csb-current-presence{min-height:34px;min-width:95px;font-size:11px;white-space:nowrap}
+.csb .csb-danger{color:#ffbcbc;border-color:#df8d8d55;background:#63313733}
+.csb .csb-danger:hover{background:#63313777}
+.csb-card-actions,.csb-editor-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.csb-deleted-roster{display:grid;gap:8px;margin:10px 0}
+.csb-deleted-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--csb-line);border-radius:9px}
+.csb-deleted-row>span{min-width:0;overflow-wrap:anywhere}
+.csb-deleted-row>button{flex-shrink:0}

@@ -12,7 +12,7 @@ export function characterStateScope(c) {
 }
 
 /** Read-only public contract. Mutations stay in the existing guarded editor. */
-export function createCharacterStateBridge({context, snapshot, openEditor, openManager, openScanner, mountView, setInlineCards, setPresence, target = globalThis, onError = () => {}}) {
+export function createCharacterStateBridge({context, snapshot, openEditor, openManager, openScanner, mountView, setInlineCards, setPresence, setCurrentPresence:changeCurrentPresence, deleteCharacter, restoreCharacter, target = globalThis, onError = () => {}}) {
   let alive = true, signature;
   const listeners = new Set(), mounts = new Set();
   const stale = () => Object.assign(Error('角色狀態或對話已變動，請重新開啟角色資料。'), {code:'STALE'});
@@ -24,7 +24,7 @@ export function createCharacterStateBridge({context, snapshot, openEditor, openM
     const now = context();
     if (!alive || characterStateScope(now) !== scope || now.chatMetadata !== c.chatMetadata || now.chat !== c.chat) throw stale();
     return clone({scope, revision:current.revision??0, enabled:current.settings?.enabled !== false, inlineCards:current.settings?.inlineCards !== false,
-      schema:current.db.schema, state:current.state, locks:current.db.locks ?? {}, pinned:current.db.pinned ?? [], presenceOverrides:current.db.presenceOverrides ?? {}});
+      schema:current.db.schema, state:current.state, locks:current.db.locks ?? {}, pinned:current.db.pinned ?? [], presenceOverrides:current.db.presenceOverrides ?? {}, deletedCharacters:current.db.deletedCharacters ?? {}});
   }
   function edit(id, {scope:expectedScope} = {}) {
     const c = context(), current = getSnapshot();
@@ -81,6 +81,20 @@ export function createCharacterStateBridge({context, snapshot, openEditor, openM
     notify();return value;
   }
   function mount(container,options={}){const current=getSnapshot();if(!current||(options.scope!==undefined&&current.scope!==options.scope))throw stale();if(typeof mountView!=='function')throw Error('目前環境未提供內嵌角色信息');const view=mountView(container,api,options);const wrapped={refresh:()=>view.refresh(),dispose(){view.dispose();mounts.delete(wrapped);}};mounts.add(wrapped);return wrapped;}
-  const api = Object.freeze({apiVersion:BRIDGE_VERSION, getSnapshot, getRevision, openEditor:edit, openManager:manage, openScanner:scan, subscribe, mount, setInlineCards:setInline,setPresence:setCurrentPresence});
+  async function mutateCharacter(action,id,value,options={}){
+    const c=context(),current=getSnapshot();
+    if(!current||(options.scope!==undefined&&current.scope!==options.scope)||(options.revision!==undefined&&current.revision!==options.revision))throw stale();
+    if(!current.enabled)throw Error('角色信息已停用，請先啟用');
+    const collection=action===restoreCharacter?current.deletedCharacters:current.state.characters;
+    if(typeof id!=='string'||!Object.hasOwn(collection,id))throw Error('找不到這個角色，請重新讀取角色資料');
+    if(typeof action!=='function')throw Error('目前版本未提供這個角色操作，請更新插件');
+    const result=await action(id,value);
+    if(!alive||context()?.chatMetadata!==c.chatMetadata||context()?.chat!==c.chat||characterStateScope(context())!==current.scope)throw stale();
+    notify();return result;
+  }
+  const api = Object.freeze({apiVersion:BRIDGE_VERSION,runtimeVersion:'1.4.0',getSnapshot,getRevision,openEditor:edit,openManager:manage,openScanner:scan,subscribe,mount,setInlineCards:setInline,setPresence:setCurrentPresence,
+    setCurrentPresence(id,present,options={}){if(typeof present!=='boolean')throw TypeError('目前在場必須是布林值');return mutateCharacter(changeCurrentPresence,id,present,options);},
+    deleteCharacter:(id,options={})=>mutateCharacter(deleteCharacter,id,undefined,options),
+    restoreCharacter:(id,options={})=>mutateCharacter(restoreCharacter,id,undefined,options)});
   return {api, notify, dispose() {alive=false;for(const view of [...mounts])view.dispose();mounts.clear();listeners.clear();signature=undefined;}};
 }

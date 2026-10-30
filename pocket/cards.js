@@ -102,3 +102,59 @@ export function renderPhoneCards(value, options = {}) {
   for (const edit of edits.sort((a,b)=>b.start-a.start)) output=output.slice(0,edit.start)+edit.html+output.slice(edit.end);
   return output;
 }
+
+/** Display projection for the integrated phone. Raw chat text is never changed:
+ * source-sync still reads the original operations, and all native app records
+ * stay in the phone. Status payloads are protected from accidental stripping.
+ */
+export function stripPhoneOperations(value, options = {}) {
+  const source = String(value ?? '');
+  if (options.activity === true) return '';
+  if (!source || !/<phone>|千里傳音|千里传音|微信|浮光錄|浮光录|Instagram|IG|論道臺|論道台|论道台|论坛|論壇/i.test(source)) return source;
+  const protectedSpans = [...source.matchAll(/<CSB_UPDATE>[\s\S]*?(?:<\/CSB_UPDATE>|$)|\[CSB21_(?:PANEL|ROLE)\][\s\S]*?\[\/CSB21_(?:PANEL|ROLE)\]/g)]
+    .map(match => ({start:match.index,end:match.index+match[0].length}));
+  const overlaps = (a, b) => a.start < b.end && a.end > b.start;
+  const edits = [];
+  for (const match of source.matchAll(/<phone>[\s\S]*?<\/phone>/g)) {
+    const span = {start:match.index,end:match.index+match[0].length};
+    if (!protectedSpans.some(p => overlaps(span,p))) edits.push(span);
+  }
+  // While tokens are arriving, hide the unfinished protocol tail. Never let a
+  // missing closing phone tag consume a following status payload.
+  if (options.streaming === true) {
+    const at = source.lastIndexOf('<phone>');
+    if (at >= 0 && !edits.some(p => at >= p.start && at < p.end) && !protectedSpans.some(p => at >= p.start && at < p.end)) {
+      const boundary = protectedSpans.find(p => p.start > at)?.start ?? source.length;
+      edits.push({start:at,end:boundary});
+    }
+  }
+  // The normal parser supplies authenticated source ranges, so quoted examples,
+  // hypothetical actions and unrelated prose are never treated as operations.
+  if (source.length <= PHONE_LIMITS.message) {
+    const natural = options.isUser === false ? parseRolePhoneCommands(source,options) : parseUserPhoneCommands(source,options);
+    for (const match of natural.matches) if (!edits.some(p => overlaps(match,p))) {
+      let end = match.end;
+      // A standalone command between sentences must not leave a duplicate stop.
+      if ((!source.slice(0,match.start).trim() || /[\n。，,；;]$/.test(source.slice(0,match.start))) && /^[。，,；;]/.test(source.slice(end))) end++;
+      edits.push({start:match.start,end});
+    }
+  }
+  if (!edits.length) return source;
+  let output = source;
+  for (const edit of edits.sort((a,b) => b.start-a.start)) output = output.slice(0,edit.start) + output.slice(edit.end);
+  // Models sometimes surround a protocol-only payload with a JSON code fence.
+  output = output.replace(/(^|\n)[ \t]*(`{3,}|~{3,})(?:json)?[ \t]*\r?\n[\s]*?\2[ \t]*(?=\n|$)/g, '$1');
+  return /^[\s。，、；：,.!?！？:;]*$/.test(output) ? '' : output;
+}
+
+/** Whole-message hiding is only for plugin receipts or operation-only bubbles.
+ * A reply containing prose, drawings or either status format stays visible.
+ */
+export function isPhoneOnlyMessage(message, options = {}) {
+  if (!message || message.is_system) return false;
+  if (message.extra?.tavern_pocket_activity) return true;
+  const raw = String(message.mes ?? '');
+  if (!raw.trim()) return false;
+  const display = stripPhoneOperations(raw,{...options,isUser:!!message.is_user});
+  return display !== raw && !display.trim();
+}

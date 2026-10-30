@@ -18,6 +18,7 @@ import {createPersonalMemory} from './personal-memory.js';
 import {createNarrativeMemory} from './narrative-memory.js';
 import {memoryMentionContext} from './mentions.js';
 import {createStoryClock} from './story-time.js';
+import {installPocketPresets} from './presets.js';
 import {SHOP_PRESET_LIMITS,normalizeShopPresets,listShopPresets,saveShopPreset,selectShopPreset,deleteShopPreset,importShopPresets,exportShopPresets} from './shop-presets.js';
 
 const KEY='tavern_pocket_v3', clone=v=>structuredClone(v), uid=()=>crypto.randomUUID();
@@ -28,7 +29,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
  const emit=()=>{if(alive)backend.emit('pocket',{});};
  const storyClock=createStoryClock({context,onChange:emit,assertCurrent:check});
  const contacts=createContactBridge({context,backend,notice,openStateEditor,publishStatus:createStatusPublisher({context,notice})});
- const activity=createActivityBridge({context,backend,notice,getMirrorPolicy:()=>({forum:config().mirrorForum!==false,shop:config().mirrorShop!==false})});
+ const activity=createActivityBridge({context,backend,notice,getMirrorPolicy:()=>({enabled:false})});
  const memory=createPersonalMemory({context,backend,notice});
  const narrativeMemory=createNarrativeMemory({context,acquire:acquireNarrative,notice});
  const forumSource=createForumSource({context,backend});
@@ -36,7 +37,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
  const photos=createPhotoBridge({context,backend,contacts,imagePresets,notice,autoEnabled:()=>config().autoWeChatPhotos!==false});
  const shopService=createShopService({backend,taskPrompt,check,edit,getPresets:()=>config().shopPresets});
  const photoUnsubscribe=backend.subscribe?.(event=>{if(event.type==='chat'&&!photoSyncs&&photoScope&&photoScope===sourceScope(context()))photos.autoReceive().catch(e=>notice(e.message));});
- function config(){const c=context(),old=c.extensionSettings.tavern_pocket_v1||{};const saved=c.extensionSettings[KEY]??={profileId:old.modelProfileId||'',inject:old.injectPrompt!==false};for(const key of ['autoWeChatPhotos','mirrorForum','mirrorShop'])if(typeof saved[key]!=='boolean')saved[key]=true;if(!Number.isInteger(saved.worldbookBudget))saved.worldbookBudget=48000;return saved;}
+ function config(){const c=context(),old=c.extensionSettings.tavern_pocket_v1||{};const saved=c.extensionSettings[KEY]??={profileId:old.modelProfileId||'',inject:old.injectPrompt!==false};if(typeof saved.autoWeChatPhotos!=='boolean')saved.autoWeChatPhotos=true;saved.mirrorForum=false;saved.mirrorShop=false;if(!Number.isInteger(saved.worldbookBudget))saved.worldbookBudget=48000;return saved;}
  function check(c,scope=sourceScope(c)){if(!alive||!scope||sourceScope(context())!==scope||context().chatMetadata!==c.chatMetadata)throw Error('對話已切換，本次操作未套用。');}
  function data(c=context()){
   if(!sourceScope(c))return empty();
@@ -103,14 +104,8 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
   await edit(c,d=>{d.events.push(...saved);d.events=d.events.slice(-1500);});
   if(action!=='diary.generate')await activity.record(saved);
  }
- async function installPresets(c){
-  const [regex,book]=await Promise.all([`TavernPocket_Regex_v${PHONE_VERSION}.json`,`TavernPocket_Worldbook_v${PHONE_VERSION}.json`].map(async name=>{const r=await fetch(new URL('../presets/'+name,import.meta.url));if(!r.ok)throw Error(`配套檔案缺失，請重新安裝 v${PHONE_VERSION}。`);return r.json();}));check(c);
-  const save=c.saveWorldInfo;if(typeof save!=='function')throw Error('此酒館未提供世界書寫入 API，請使用安裝器輸出的 JSON 手動匯入。');
-  await save(`傳音玉符協定 v${PHONE_VERSION}`,book,true);check(c);
-  const arr=c.extensionSettings.regex??=[];const old='9b30c203-7f7c-4d94-98f7-bd3b4e87d71f';
-  const filtered=arr.filter(r=>r.id!==regex.id&&r.id!==old);filtered.push(regex);c.extensionSettings.regex=filtered;c.saveSettingsDebounced();
-  notice(`已更新世界書與顯示正則至 v${PHONE_VERSION}。世界書已儲存；內建協定開啟時不用重複綁定。重新整理可更新 Regex 清單。`);
- }
+ async function installPresets(c){check(c);const result=await installPocketPresets(c,{notice,assertCurrent:()=>check(c)});check(c);return result;}
+
  async function action(name,p={},c=context(),scope=sourceScope(c)){
   check(c,scope);busy=true;emit();
   try{
@@ -136,7 +131,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
     const budget=p.worldbookBudget??config().worldbookBudget,pins=p.worldbookPins??data(c).worldbookPins??[];
     if(!Number.isInteger(budget)||budget<2000||budget>2000000)throw Error('世界書上下文預算須為 2000–2000000 字元的整數；請配合所用模型的上下文容量。');
     if(!Array.isArray(pins)||pins.some(x=>!x||typeof x.book!=='string'||typeof x.entryId!=='string'))throw Error('世界書選取條目格式錯誤。');
-    await edit(c,d=>{d.worldbooks=clone(books);d.worldbookPins=clone(pins.filter(x=>books.includes(x.book)));});Object.assign(config(),{worldbookBudget:budget,profileId:id,inject:p.inject!==false,autoWeChatPhotos:p.autoWeChatPhotos??config().autoWeChatPhotos,sharePrivateDiary:p.sharePrivateDiary===true,mirrorForum:p.mirrorForum??config().mirrorForum,mirrorShop:p.mirrorShop??config().mirrorShop});c.saveSettingsDebounced();
+    await edit(c,d=>{d.worldbooks=clone(books);d.worldbookPins=clone(pins.filter(x=>books.includes(x.book)));});Object.assign(config(),{worldbookBudget:budget,profileId:id,inject:p.inject!==false,autoWeChatPhotos:p.autoWeChatPhotos??config().autoWeChatPhotos,sharePrivateDiary:p.sharePrivateDiary===true,mirrorForum:false,mirrorShop:false});c.saveSettingsDebounced();
    }else if(['ig.generate','ig.story.generate','ig.reply','diary.generate'].includes(name))await modelEvents(c,name,p);
    else if(name==='shop.generate'){const result=await shopService.generate(c,p);await archiveCatalogue(c,result.items);}
    else if(name==='shop.save'){await shopService.save(c,p);await archiveCatalogue(c,data(c).catalogue);}

@@ -1,18 +1,18 @@
 {
-  "version": "0.10.0",
+  "version": "0.14.0",
   "checks": [
     "bundled CSB initializes once alongside the actual phone host",
     "phone profiles preserve custom types, 0/false/null, body facts and exclude hidden fields",
     "public snapshot is detached from persisted character state",
     "real phone detail sheet renders arbitrary bar range, custom fields and safely escaped text",
-    "one narrative message retains phone event card and CSB status card while hiding machine update JSON",
+    "mixed narrative preserves prose and CSB status card while hiding phone operations and machine JSON; the phone still receives one message and raw source remains intact",
     "phone editor opens native CSB editor; save updates source manual journal without adding legacy chat snapshots",
     "WeChat model request receives latest CSB custom values and omits disabled fields",
-    "swipe replays current branch; prior manual anchor and stale phone editor revision do not carry over",
-    "deleting the update reverts the phone projection to surviving state",
+    "swipe replays branch scene time while durable character information survives and stale phone editor revisions are rejected",
+    "deleting the update reverts story scene time while preserving the saved character information",
     "switching to a different chat does not expose the previous chat CSB values",
     "disabled CSB contributes neither profile projection nor generation instructions",
-    "external CSB 1.0.0 skips bundled runtime and repeated direct reformatting restores phone cards without altering raw messages or native status cards",
+    "external CSB 1.0.0 keeps its status card and prose after repeated reformatting, while phone operations stay hidden and raw messages remain intact",
     "legacy CSB metadata fallback replays the newest update without mutating its source journal"
   ],
   "errors": [],

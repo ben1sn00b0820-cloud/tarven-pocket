@@ -64,6 +64,7 @@ test('reference prompt remains available when phone protocol is disabled and pol
   assert(!plan.some(p=>p.key==='sttts.entry.pocket'));
   const state=await f.api.pocketAction('settings.save',{worldbooks:['Cafe'],inject:false});
   assert.equal(state.settings.mirrorForum,false);assert.equal(state.settings.mirrorShop,false);
+  const quiet=await f.api.pocketAction('settings.save',{worldbooks:[],mirrorForum:true,mirrorShop:true});assert.equal(quiet.settings.mirrorForum,false);assert.equal(quiet.settings.mirrorShop,false);
  }finally{f.host.dispose();}
 });
 
@@ -254,7 +255,7 @@ test('Instagram posts, toggled likes, comments and directed DMs persist in chat 
   state=await f.api.pocketAction('ig.like',{id});assert.deepEqual(state.instagram.posts[0].likes,[]);
   state=await f.api.pocketAction('ig.comment',{id,text:'Nice afternoon'});assert.equal(state.instagram.posts[0].comments[0].text,'Nice afternoon');
   state=await f.api.pocketAction('ig.dm',{to:'Alice',text:'Meet me here'});assert.deepEqual(state.instagram.dms.map(({from,to,text})=>({from,to,text})),[{from:'User',to:'Alice',text:'Meet me here'}]);
-  assert.equal(f.c.chatMetadata[KEY].events.length,5);assert.equal(f.c.chat.filter(m=>m.extra?.tavern_pocket_activity).length,1);assert.equal(f.c.chat.at(-1).extra.tavern_pocket_activity.ids.length,5);
+  assert.equal(f.c.chatMetadata[KEY].events.length,5);assert.equal(f.c.chat.filter(m=>m.extra?.tavern_pocket_activity).length,0);assert.equal(f.c.chatMetadata[KEY].activity.journal.length,5);assert(f.c.chatMetadata[KEY].activity.journal.every(row=>row.delivery==='memory'));
   f.host.dispose();const restored=createPocketHost({context:()=>f.c,backend:f.backend});
   try{assert.deepEqual((await restored.api().pocketState()).instagram,state.instagram);}finally{restored.dispose();}
  }finally{f.host.dispose();}
@@ -353,10 +354,11 @@ test('preset installer updates old regex in place, preserves other scripts and s
  try{
   const oldId='9b30c203-7f7c-4d94-98f7-bd3b4e87d71f';
   f.settings.regex=[{id:oldId,scriptName:'Old Tavern Pocket'},{id:'unrelated',scriptName:'User custom script',findRegex:'/unchanged/'}];
+  f.c.loadWorldInfo=async()=>worldbookSaves.at(-1)?.[1]??null;
   f.c.saveWorldInfo=async(...args)=>{worldbookSaves.push(args);};
   globalThis.fetch=async url=>({ok:true,json:async()=>JSON.parse(await readFile(url,'utf8'))});
   await f.api.pocketAction('presets.install');
-  assert.equal(worldbookSaves.length,1);assert.equal(worldbookSaves[0][0],`傳音玉符協定 v${PHONE_VERSION}`);assert.equal(worldbookSaves[0][2],true);
+  assert.equal(worldbookSaves.length,1);assert.equal(worldbookSaves[0][0],'傳音玉符 · CSB 配套協定');assert.equal(worldbookSaves[0][2],true);
   assert.match(JSON.stringify(worldbookSaves[0][1]),/group_message/);
   assert.equal(f.settings.regex.length,2);assert.equal(f.settings.regex.find(r=>r.id==='unrelated').findRegex,'/unchanged/');
   const installed=f.settings.regex.find(r=>r.id===oldId);assert(installed.scriptName.includes(`v${PHONE_VERSION}`));assert.equal(installed.markdownOnly,true);assert.equal(installed.promptOnly,false);

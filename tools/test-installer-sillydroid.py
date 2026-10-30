@@ -64,6 +64,7 @@ class Fixture:
         self.config = self.root / 'config.yaml'
         self.config.write_text('port: 8000\ndataRoot: ./decoy-data\n')
         (self.target / 'previous.txt').write_text('keep old extension backup\n')
+        (self.target / 'manifest.json').write_text('{"display_name":"傳音玉符","version":"0.0.0","generate_interceptor":"stIphonieInterceptor"}')
         self.chat = self.persistent / 'data/default-user/chats/untouched.jsonl'
         self.chat.parent.mkdir(parents=True)
         self.chat.write_text('chat sentinel\n')
@@ -88,7 +89,7 @@ class Fixture:
         for name, encoded in bundle.items():
             assert (folder / name).read_bytes() == base64.b64decode(encoded), name
         actual = {str(item.relative_to(folder)) for item in folder.rglob('*') if item.is_file()}
-        assert actual == set(bundle), actual.symmetric_difference(bundle)
+        assert actual == set(bundle) | {'previous.txt'}, actual.symmetric_difference(set(bundle) | {'previous.txt'})
 
     def verify_stable(self, stable):
         assert self.third_party.is_symlink()
@@ -135,7 +136,7 @@ with tempfile.TemporaryDirectory(prefix='pocket-sillydroid-test-') as temp:
     fixture.verify_stable(stable)
     all_backups = list(backups.glob('previous-*/tavern-pocket'))
     assert len(all_backups) == 2
-    prior_payload = [folder for folder in all_backups if not (folder / 'previous.txt').exists()]
+    prior_payload = [folder for folder in all_backups if json.loads((folder / 'manifest.json').read_text())['version'] == version]
     assert len(prior_payload) == 1
     fixture.verify_payload(prior_payload[0])
     checks.append('repeat install backs up complete previous version under persistent data root')
@@ -157,7 +158,7 @@ with tempfile.TemporaryDirectory(prefix='pocket-sillydroid-test-') as temp:
     duplicate = fixture.persistent / 'data/default-user/extensions/ST-iPhonie'
     duplicate.mkdir(parents=True)
     (duplicate / 'manifest.json').write_text('{"display_name":"ST-iPhonie","generate_interceptor":"stIphonieInterceptor"}')
-    fixture.reject_unchanged('另一份 ST-iPhonie')
+    fixture.reject_unchanged('個人版插件')
     checks.append('personal ST-iPhonie is detected in runtime data root despite different config dataRoot')
 
     fixture = Fixture(base / 'symlinked-personal-iphonie')
@@ -166,7 +167,7 @@ with tempfile.TemporaryDirectory(prefix='pocket-sillydroid-test-') as temp:
     duplicate.mkdir(parents=True)
     (duplicate / 'manifest.json').write_text('{"display_name":"ST-iPhonie","generate_interceptor":"stIphonieInterceptor"}')
     (fixture.persistent / 'data/linked-user').symlink_to(linked_user, target_is_directory=True)
-    fixture.reject_unchanged('另一份 ST-iPhonie')
+    fixture.reject_unchanged('個人版插件')
     checks.append('personal ST-iPhonie in a symlinked user directory refuses without changes')
 
     fixture = Fixture(base / 'personal-pocket')

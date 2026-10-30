@@ -27,6 +27,7 @@ let browser,page;const checks=[],errors=[];
 try{
  browser=await playwright.chromium.launch({headless:true,executablePath:process.env.TP_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--use-gl=angle','--use-angle=swiftshader']});
  page=await browser.newPage({viewport:{width:1280,height:1000},deviceScaleFactor:1,hasTouch:true});page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/api/worldinfo/get',async route=>{const name=route.request().postDataJSON()?.name,book=await page.evaluate(name=>window.qa?.books?.[name]??null,name);await route.fulfill({status:book?200:404,contentType:'application/json',body:JSON.stringify(book||{})});});
  await page.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);
  await page.locator('#sttts-floating .orb').waitFor();
  await page.waitForFunction(()=>!!globalThis.CSBCharacterState?.getSnapshot);
@@ -95,9 +96,11 @@ try{
  });
  await waitProfile(r=>r?.csb?.values?.spirit===50);
  await page.locator(`.mes[mesid="${mixedIndex}"] .csb-message-card`).waitFor();
- await page.locator(`.mes[mesid="${mixedIndex}"] [data-tp-card="csb-mixed-phone"]`).waitFor();
+ await api(()=>window.qaApi.pocketAction('sync',{}));
+ const mixedPhone=await api(async()=>{const a=window.qaApi;return(await Promise.all((await a.listThreads()).map(t=>a.getThread(t.id)))).flatMap(t=>t.messages).filter(m=>m.source?.id==='csb-mixed-phone');});assert.equal(mixedPhone.length,1);assert.equal(mixedPhone[0].text,'我剛練習完，等你一起喝茶。');
+ assert.equal(await page.locator(`.mes[mesid="${mixedIndex}"] [data-tp-card="csb-mixed-phone"]`).count(),0);assert((await page.locator(`.mes[mesid="${mixedIndex}"] .mes_text`).textContent()).includes('她放下書，拿起手機。'));assert(!(await page.locator(`.mes[mesid="${mixedIndex}"] .mes_text`).textContent()).includes('我剛練習完，等你一起喝茶。'));assert((await page.evaluate(index=>qa.context.chat[index].mes,mixedIndex)).includes('csb-mixed-phone'));
  assert(!(await page.locator(`.mes[mesid="${mixedIndex}"] .mes_text`).textContent()).includes('<CSB_UPDATE>'));
- checks.push('one narrative message retains phone event card and CSB status card while hiding machine update JSON');
+ checks.push('mixed narrative preserves prose and CSB status card while hiding phone operations and machine JSON; the phone still receives one message and raw source remains intact');
  await f().locator('[data-action="status-directory"]').click();
  await f().locator('[data-status-name="林知夏"]').click();
  await f().locator('[data-action="status-edit"]').click();
@@ -146,6 +149,7 @@ try{
  const externalPage=await browser.newPage({viewport:{width:1280,height:1000},deviceScaleFactor:1});page=externalPage;
  externalPage.setDefaultTimeout(12000);externalPage.on('pageerror',e=>errors.push(e.message));
  await externalPage.addInitScript(()=>{globalThis.csbCharacterStateIntercept=function(){};});
+ await externalPage.route('**/api/worldinfo/get',async route=>{const name=route.request().postDataJSON()?.name,book=await externalPage.evaluate(name=>window.qa?.books?.[name]??null,name);await route.fulfill({status:book?200:404,contentType:'application/json',body:JSON.stringify(book||{})});});
  await externalPage.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);
  await externalPage.locator('#sttts-floating .orb').waitFor();
  assert.equal(await externalPage.locator('#csb-launcher').count(),0);
@@ -167,21 +171,23 @@ try{
    box.innerHTML=c.messageFormatting(cleaned,m.name,m.is_system,m.is_user,index,{},false);box.dataset.csbCleaned='true';
    if(!message.querySelector('.csb-message-card')){const status=document.createElement('div');status.className='csb-message-card';status.textContent='原版 CSB 狀態卡';box.after(status);}
   },legacyIndex);
-  await externalPage.locator(`.mes[mesid="${legacyIndex}"] [data-tp-card="external-csb-phone"]`).waitFor();
+  await externalPage.waitForFunction(index=>{const text=document.querySelector(`.mes[mesid="${index}"] .mes_text`)?.textContent||'';return text.includes('她收好水壺。')&&!text.includes('external-csb-phone')&&!text.includes('休息好了，出發吧。');},legacyIndex);
+  assert.equal(await externalPage.locator(`.mes[mesid="${legacyIndex}"] [data-tp-card="external-csb-phone"]`).count(),0);
  }
  assert.equal(await externalPage.locator(`.mes[mesid="${legacyIndex}"] .csb-message-card`).count(),1);
  assert.equal(await externalPage.evaluate(index=>qa.context.chat[index].mes===window.csbLegacyRaw,legacyIndex),true);
  assert(!(await externalPage.locator(`.mes[mesid="${legacyIndex}"] .mes_text`).textContent()).includes('<CSB_UPDATE>'));
- checks.push('external CSB 1.0.0 skips bundled runtime and repeated direct reformatting restores phone cards without altering raw messages or native status cards');
+ checks.push('external CSB 1.0.0 keeps its status card and prose after repeated reformatting, while phone operations stay hidden and raw messages remain intact');
  await externalPage.locator('#sttts-floating .orb').click();
  await externalPage.locator('#sttts-panel[open]').waitFor();
  await externalPage.waitForFunction(()=>document.querySelector('#sttts-panel iframe')?.contentWindow?.document?.querySelector('[data-app="instagram"]'));
  const externalFrame=externalPage.frames().find(frame=>frame.url().endsWith('/ui/index.html'));
  const fallback=await externalFrame.evaluate(async()=>{
   const c=parent.qa.context,before=JSON.stringify(c.chatMetadata.csb_character_state_v1),api=parent.__stIphoniePanelBridge.connect(window);
-  const profile=await api.pocketContactProfile('林知夏');return {energy:profile.csb?.values.energy,unchanged:before===JSON.stringify(c.chatMetadata.csb_character_state_v1)};
+  await api.pocketAction('sync',{});const phoneMessages=(await Promise.all((await api.listThreads()).map(t=>api.getThread(t.id)))).flatMap(t=>t.messages).filter(m=>m.source?.id==='external-csb-phone');
+  const profile=await api.pocketContactProfile('林知夏');return {energy:profile.csb?.values.energy,unchanged:before===JSON.stringify(c.chatMetadata.csb_character_state_v1),phoneMessages};
  });
- assert.equal(fallback.energy,80);assert.equal(fallback.unchanged,true);
+ assert.equal(fallback.energy,80);assert.equal(fallback.unchanged,true);assert.equal(fallback.phoneMessages.length,1);assert.equal(fallback.phoneMessages[0].text,'休息好了，出發吧。');
  checks.push('legacy CSB metadata fallback replays the newest update without mutating its source journal');
  await externalPage.close();
  assert.deepEqual(errors,[]);

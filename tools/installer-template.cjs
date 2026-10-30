@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// 傳音玉符 — offline Termux / SillyDroid installer, revision 2.
+// 傳音玉符 — offline Termux / SillyDroid installer, revision 3.
 // Version and matching presets come from the bundled manifest.
 // Usage: node 傳音玉符_Install.cjs [SillyTavern-directory]
 // No downloads, account changes, package upgrades, server restarts or model calls.
@@ -116,23 +116,29 @@ function main(){
   if(!supported)fail('你的酒館版本是 '+version+'，這個插件包的支援門檻是 1.19.0。未安裝、未更改酒館版本；請把這個畫面回傳給我，確認相容方案。');
   const layout=installLayout(root);
   const {parent,storage,dataRoot}=layout;
-  // Both forks retain the upstream runtime namespace. Do not load two copies.
-  const folders=[parent];
-  if(exists(dataRoot))for(const u of fs.readdirSync(dataRoot,{withFileTypes:true}))if(u.isDirectory()||u.isSymbolicLink())folders.push(path.join(dataRoot,u.name,'extensions'));
-  for(const folder of folders)if(exists(folder))for(const dir of fs.readdirSync(folder,{withFileTypes:true})){
+  // Upgrade the single installed runtime in its existing folder. GitHub installs
+  // use the repository's name (`tarven-pocket`), which is intentionally different
+  // from the original offline default (`tavern-pocket`). Never create a second copy.
+  const globalPhones=[],personalPhones=[],unidentified=[];
+  const folders=[{folder:parent,personal:false}];
+  if(exists(dataRoot))for(const user of fs.readdirSync(dataRoot,{withFileTypes:true}))if(user.isDirectory()||user.isSymbolicLink())folders.push({folder:path.join(dataRoot,user.name,'extensions'),personal:true});
+  for(const {folder,personal} of folders)if(exists(folder))for(const dir of fs.readdirSync(folder,{withFileTypes:true})){
     if(!dir.isDirectory()&&!dir.isSymbolicLink())continue;
-    if(folder===folders[0]&&dir.name==='tavern-pocket')continue;
     const location=path.join(folder,dir.name),mf=path.join(location,'manifest.json');
-    if(!exists(mf))continue;
-    let other;try{other=JSON.parse(fs.readFileSync(mf,'utf8'));}catch{continue;}
-    if(other.generate_interceptor==='stIphonieInterceptor'||/ST-iPhonie|iPhonie.*私用版/i.test(other.display_name||''))fail('找到另一份 ST-iPhonie：'+location+'\n兩份插件不能同時載入。請先在酒館停用並移除原版擴充（先用原版匯出手機備份），再執行安裝；本次未變更任何插件。');
+    let other;try{other=JSON.parse(fs.readFileSync(mf,'utf8'));}catch{}
+    const sameRuntime=other?.generate_interceptor==='stIphonieInterceptor';
+    const namedPhone=/ST-iPhonie|iPhonie.*私用版/i.test(other?.display_name||'')||['tavern-pocket','tarven-pocket'].includes(dir.name);
+    if(!sameRuntime&&!namedPhone)continue;
+    if(personal)personalPhones.push(location);
+    else if(sameRuntime)globalPhones.push(location);
+    else unidentified.push(location);
   }
-  if(exists(dataRoot))for(const user of fs.readdirSync(dataRoot,{withFileTypes:true})){
-    if(!user.isDirectory()&&!user.isSymbolicLink())continue;
-    const copy=path.join(dataRoot,user.name,'extensions','tavern-pocket');
-    if(exists(copy))fail('找到個人版插件：'+copy+'\n已中止全域安裝，避免重複載入。請把此畫面回傳給我。');
-  }
-  const target=safeUnder(parent,'tavern-pocket');
+  // Offline execution cannot select the signed-in SillyTavern account reliably.
+  // Refuse personal installations before writing instead of adding a global copy.
+  if(personalPhones.length)fail('找到個人版插件：'+personalPhones.join('、')+'\n離線安裝器無法確認目前登入帳號，已中止，避免新增全域副本。請在原帳號的擴充管理中更新這一份插件；本次未變更任何檔案。');
+  if(globalPhones.length>1)fail('找到另一份 ST-iPhonie／傳音玉符：'+globalPhones.join('、')+'\n有多份相同手機執行環境，無法安全選擇更新目標；請先保留要使用的一份，本次未變更任何檔案。');
+  if(unidentified.length)fail('找到無法識別版本的手機資料夾：'+unidentified.join('、')+'\n缺少正確的 manifest.json 或執行環境標記；已中止，沒有覆蓋或新增插件。');
+  const target=safeUnder(parent,globalPhones.length?path.basename(globalPhones[0]):'tavern-pocket');
   if(exists(target)&&!fs.lstatSync(target).isDirectory())fail('目的位置不是資料夾：'+target);
   const backupRoot=safeUnder(storage,'tavern-pocket-backups');
   const lock=safeUnder(storage,'.tavern-pocket-install.lock');
@@ -141,16 +147,20 @@ function main(){
     try{descriptor=fs.openSync(lock,'wx');}catch(e){if(e.code==='EEXIST')fail('發現安裝鎖，可能已有安裝程序在執行；請回傳畫面，勿重複安裝。');throw e;}
     fs.writeSync(descriptor,String(process.pid));
     stage=fs.mkdtempSync(path.join(storage,'.tavern-pocket-stage-'));
+    // Build the replacement beside the live copy. Preserve Git metadata, custom
+    // files and symbolic links without following them; bundled paths are checked
+    // separately before replacing any file. A staging failure leaves target intact.
+    if(exists(target))fs.cpSync(target,stage,{recursive:true,dereference:false,verbatimSymlinks:true});
     for(const [relative,encoded] of Object.entries(bundle)){
       const destination=safeUnder(stage,relative);const bytes=Buffer.from(encoded,'base64');
-      fs.mkdirSync(path.dirname(destination),{recursive:true});fs.writeFileSync(destination,bytes,{flag:'wx'});
+      fs.mkdirSync(path.dirname(destination),{recursive:true});fs.writeFileSync(destination,bytes,{flag:'w'});
       if(!fs.readFileSync(destination).equals(bytes))fail('寫入校驗失敗：'+relative);
     }
     fs.mkdirSync(parent,{recursive:true});
     if(exists(target)){
       fs.mkdirSync(backupRoot,{recursive:true});
       const slot=fs.mkdtempSync(path.join(backupRoot,'previous-'));
-      backup=path.join(slot,'tavern-pocket');fs.renameSync(target,backup);
+      backup=path.join(slot,path.basename(target));fs.renameSync(target,backup);
     }
     try{fs.renameSync(stage,target);stage=null;installed=true;}
     catch(e){if(backup&&!exists(target)){fs.renameSync(backup,target);backup=null;}throw e;}
@@ -164,14 +174,14 @@ function main(){
   const regex=exportPreset(exportFolder,regexName,Buffer.from(bundle[`presets/${regexName}`],'base64'));
   const world=exportPreset(exportFolder,worldName,Buffer.from(bundle[`presets/${worldName}`],'base64'));
   console.log('\n✓ '+(manifest.display_name||'傳音玉符')+' v'+release+' 檔案已安裝');
-  console.log('安裝器：r2（Termux / SillyDroid）\n執行環境：'+layout.host+'\n酒館版本：'+version+'\n安裝位置：'+target);
+  console.log('安裝器：r3（Termux / SillyDroid）\n執行環境：'+layout.host+'\n酒館版本：'+version+'\n安裝位置：'+target);
   if(backup)console.log('原版本備份：'+backup);
   console.log('\n下一步：用原本方式重新啟動酒館，重新整理瀏覽器，單擊懸浮球，或在對話輸入 /phone。');
-  if(layout.host==='SillyDroid')console.log('SillyDroid：請使用 App 原本的酒館啟動／停止控制重啟，再重新載入酒館頁面。此離線安裝包不使用 Git 更新；後續以新版安裝器更新。');
-  console.log('傳音玉符內「玉符接入 → 安裝／更新配套規則」可一鍵更新配套；也可手動匯入下列新檔。');
-  console.log('正則：到「擴充功能 → Regex」匯入 '+(regex||path.join(target,'presets',regexName))+'，搭配插件將完整傳音玉符事件顯示為正文卡片，原始訊息仍保留。');
-  console.log('世界書為選配：'+(world||path.join(target,'presets',worldName))+'；插件已預設注入傳音玉符協定，不必重複啟用。');
+  if(layout.host==='SillyDroid')console.log('SillyDroid：請使用 App 原本的酒館啟動／停止控制重啟，再重新載入酒館頁面。既有 Git 資料與自訂檔案會保留；沒有 Git 的離線安裝仍使用新版安裝器更新。');
+  console.log('重新載入後，插件會自動匯入內建世界書與正則；「玉符接入 → 安裝／更新配套規則」可重新安裝。若自動匯入失敗，可手動匯入下列配套。');
+  console.log('正則：到「擴充功能 → Regex」匯入 '+(regex||path.join(target,'presets',regexName))+'；手機操作只顯示在手機內，正文隱藏操作區塊，原始同步資料仍保留。');
+  console.log('配套世界書：'+(world||path.join(target,'presets',worldName))+'；包含手機與 CSB 協定，插件會提供規則，不必重複綁定。');
   console.log('千里傳音在底部綠色圖示；角色信息／浮光錄／修行札記／萬寶閣／玉符接入在首頁。');
-  console.log('舊聊天與既有設定保留。靈石袋沿用原有帳面數值，可在「千里傳音 → 我 → 靈石袋」查看與設定。');
+  console.log('原有狀態及 CSB 狀態欄統一內建，舊聊天與既有設定保留。靈石袋沿用原有帳面數值，可在「千里傳音 → 我 → 靈石袋」查看與設定。');
 }
 try{main();}catch(e){console.error('\n安裝未完成：'+e.message);process.exitCode=1;}

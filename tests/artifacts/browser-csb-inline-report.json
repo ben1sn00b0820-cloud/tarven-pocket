@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "checks": [
+    "empty database shows one honest latest-assistant status panel without inventing characters",
+    "ordinary narrative without CSB_UPDATE retains source text and appends one status card",
+    "silent host DOM replacement restores CSB while retaining foreign status node and handlers",
+    "replacing the entire mes_text node recovers exactly one inline card without a host event",
+    "machine block removal is local: raw message, unrelated markup and attached handlers survive",
+    "inline off/on removes and restores cards once without changing original status or stored values",
+    "full CSB disable/enable restores and rehides only the original machine fragment",
+    "active streaming is untouched; final silent redraw restores card even without GENERATION_ENDED",
+    "invalid auxiliary state clears its prompt and never aborts or rejects the story generation",
+    "dispose/reinitialize releases observers and lifecycle ownership; stable DOM causes no save/render loop",
+    "a current standalone loaded before the phone shares one runtime, launcher, stylesheet and inline card"
+  ],
+  "errors": [],
+  "limitations": "Actual phone, iframe and companion code; SillyTavern event bus/model calls mocked."
+}

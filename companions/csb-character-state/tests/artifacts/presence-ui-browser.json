@@ -1,0 +1,17 @@
+{
+  "fixture": "actual CSB runtime and UI; local SillyTavern host fixture",
+  "passed": 9,
+  "checks": [
+    "current manager has visible three-way controls; historical story cards remain read-only",
+    "fixed absent survives a new present roster and persists through reload",
+    "editing unrelated character fields leaves presence following the story",
+    "document-local character information controls update the same persisted state",
+    "local scan previews and applies presence-only change in fill mode with exact evidence",
+    "presence scan can be disabled without changing current status",
+    "fixed status is displayed as protected in a conflicting scan result",
+    "unknown AI presence remains reviewable and cannot silently mark a known character absent",
+    "scanner and visible presence controls stay within narrow mobile viewport"
+  ],
+  "pageErrors": [],
+  "externalRequests": []
+}

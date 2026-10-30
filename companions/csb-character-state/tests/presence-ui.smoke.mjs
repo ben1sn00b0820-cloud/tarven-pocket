@@ -1,5 +1,5 @@
 /** Actual CSB runtime + UI in Chromium; SillyTavern and model responses are local fixtures.
- * Run: CSB_CHROMIUM=/tmp/moxu-chromium node tests/presence-ui.smoke.mjs
+ * Run: CSB_CHROMIUM=/path/to/chrome node tests/presence-ui.smoke.mjs
  * No external services, synthesis, or paid model calls are used. */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -21,7 +21,7 @@ const server=createServer(async(req,res)=>{try{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser,page;const checks=[],errors=[],external=[];
 try{
- browser=await playwright.chromium.launch({headless:true,executablePath:process.env.CSB_CHROMIUM||'/tmp/moxu-chromium',args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--use-gl=angle','--use-angle=swiftshader']});
+ browser=await playwright.chromium.launch({headless:true,executablePath:process.env.CSB_CHROMIUM||process.env.TP_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--use-gl=angle','--use-angle=swiftshader']});
  page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});page.setDefaultTimeout(10000);
  page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>{if(!request.url().startsWith('http://127.0.0.1:'))external.push(request.url());});
  const check=async(name,fn)=>{await fn();checks.push(name);console.log('PASS',name);};

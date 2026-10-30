@@ -81,6 +81,9 @@ export function createActivityBridge({context, backend, notice = () => {}, getMi
   const pendingMutations = new Set(), originals = new Map();
   const canMirror = event => {
     const policy = getMirrorPolicy() || {};
+    // The integrated phone runs in background-only mode. Keep its journal and
+    // model context, but never create empty narrative messages for app actions.
+    if (policy.enabled === false) return false;
     if (event.app === 'forum') return policy.forum !== false && ['post', 'comment'].includes(event.action);
     if (event.app === 'shop') return policy.shop !== false && event.action === 'purchase' && event.state === 'purchased';
     return true;

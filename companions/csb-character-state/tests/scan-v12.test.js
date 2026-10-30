@@ -157,9 +157,9 @@ test('AI cancellation discards late result and serializes concurrent calls',asyn
   await assert.rejects(h.host.scan({mode:'ai'}),/已有一個/);release(JSON.stringify({characters:[aiRow()]}));await assert.rejects(run,/已取消/);
   assert.equal(Object.keys(h.host.getSnapshot().state.characters).length,0);
 });
-test('AI failure leaves existing state untouched and does not auto retry',async()=>{
+test('AI format failure leaves state untouched after one bounded retry',async()=>{
   let n=0;const h=harness(async()=>{n++;return 'not json';});known(h);h.add(story);const before=JSON.stringify(h.host.getSnapshot().state);
-  await assert.rejects(h.host.scan({mode:'ai'}),/不是有效 JSON/);assert.equal(JSON.stringify(h.host.getSnapshot().state),before);assert.equal(n,1);
+  await assert.rejects(h.host.scan({mode:'ai'}),/不是有效 JSON/);assert.equal(JSON.stringify(h.host.getSnapshot().state),before);assert.equal(n,2);
 });
 test('AI scan uses current custom schema, not a hard-coded set of fields',async()=>{
   const h=harness(async args=>{const task=JSON.parse(args.prompt);assert.ok(task.fields.some(f=>f.id==='realm'));return JSON.stringify({characters:[{name:'雲璃',set:{realm:'煉氣七層'},evidence:{name:{source:'m0.0',quote:'雲璃，煉氣七層'},realm:{source:'m0.0',quote:'雲璃，煉氣七層'}}}]});});
