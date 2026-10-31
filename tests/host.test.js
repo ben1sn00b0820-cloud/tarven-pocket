@@ -363,6 +363,7 @@ test('preset installer updates old regex in place, preserves other scripts and s
   assert.equal(f.settings.regex.length,2);assert.equal(f.settings.regex.find(r=>r.id==='unrelated').findRegex,'/unchanged/');
   const installed=f.settings.regex.find(r=>r.id===oldId);assert(installed.scriptName.includes(`v${PHONE_VERSION}`));assert.equal(installed.markdownOnly,true);assert.equal(installed.promptOnly,false);
   await f.api.pocketAction('presets.install');assert.equal(f.settings.regex.filter(r=>r.id===oldId).length,1);
+  const presetState=(await f.api.pocketState()).presets;assert.equal(presetState.status,'installed');assert.equal(presetState.regexInstalled,true);assert.equal(presetState.version,PHONE_VERSION);assert.equal(presetState.downloads.worldbook.name,`TavernPocket_Worldbook_v${PHONE_VERSION}.json`);assert.equal(presetState.downloads.regex.name,`TavernPocket_Regex_v${PHONE_VERSION}.json`);assert(presetState.downloads.regex.url.endsWith(presetState.downloads.regex.name));
  }finally{globalThis.fetch=originalFetch;f.host.dispose();}
 });
 

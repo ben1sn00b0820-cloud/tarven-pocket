@@ -41,7 +41,7 @@ try{
   page=await browser.newPage({viewport:{width:1280,height:1000}});page.setDefaultTimeout(8000);
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);
-  await page.waitForFunction(()=>globalThis.CSBCharacterStateRuntime?.version==='1.4.0');
+  await page.waitForFunction(()=>globalThis.CSBCharacterStateRuntime?.version==='1.5.0');
   const card=index=>page.locator(`.mes[mesid="${index}"] .csb-message-card`);
   await card(0).waitFor();
   assert.equal(await card(0).count(),1);
@@ -149,7 +149,7 @@ try{
 
   const oldPage=page;page=await browser.newPage({viewport:{width:1280,height:1000}});page.setDefaultTimeout(8000);page.on('pageerror',error=>errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html?external=1`);
-  await page.waitForFunction(()=>globalThis.CSBCharacterStateRuntime?.version==='1.4.0');
+  await page.waitForFunction(()=>globalThis.CSBCharacterStateRuntime?.version==='1.5.0');
   await page.locator('#sttts-floating .orb').waitFor();
   await page.locator('.csb-message-card').waitFor();
   assert.equal(await page.locator('#csb-launcher').count(),1);

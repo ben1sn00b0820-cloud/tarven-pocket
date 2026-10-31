@@ -93,7 +93,7 @@ export class StateController {
     const before={deletedCharacters:db.deletedCharacters,manual:db.manual,locks:db.locks,pinned:db.pinned,presenceOverrides:db.presenceOverrides};
     db.deletedCharacters={...db.deletedCharacters};delete db.deletedCharacters[id];db.manual=[...db.manual];db.locks={...db.locks,[id]:clone(entry.locks??{})};db.pinned=db.pinned.filter(value=>value!==id);if(entry.pinned)db.pinned.push(id);
     db.presenceOverrides={...(db.presenceOverrides??{})};if(typeof entry.presenceOverride==='boolean')db.presenceOverrides[id]=entry.presenceOverride;
-    const archived=entry.character,changed=this.addManual({version:1,characters:[{id,name:archived.name,aliases:archived.aliases,set:clone(archived.values),present:entry.automaticPresence??archived.present,reason:'使用者還原已刪除角色'}]});
+    const archived=entry.character,changed=this.addManual({version:1,characters:[{id,name:archived.name,aliases:archived.aliases,...(archived.template!==undefined?{template:archived.template}:{}),set:clone(archived.values),present:entry.automaticPresence??archived.present,reason:'使用者還原已刪除角色'}]});
     const staged=Object.fromEntries(Object.keys(before).map(key=>[key,db[key]]));this.presenceSaving=true;
     try{await this.persist(c,changed);guard();return true;}
     catch(error){for(const key of Object.keys(before))if(db[key]===staged[key]){if(before[key]===undefined)delete db[key];else db[key]=before[key];}this.invalidate();this.onChange();throw error;}
@@ -177,7 +177,7 @@ export class StateController {
     const merged=clone(this.db().schema);
     for(const g of valid.schema.groups)if(!merged.groups.some(x=>x.id===g.id))merged.groups.push(g);
     for(const f of valid.schema.fields){const old=merged.fields.find(x=>x.id===f.id);if(old&&old.type!==f.type)throw Error('MVU 模板與本地欄位類型衝突');if(!old)merged.fields.push(f);}
-    const payload={version:1,scene:valid.state.scene,present:Object.values(valid.state.characters).filter(c=>c.present).map(c=>c.id),characters:Object.values(valid.state.characters).map(c=>({id:c.id,name:c.name,aliases:c.aliases,set:Object.fromEntries(Object.entries(c.values).filter(([key])=>!merged.fields.find(f=>f.id===key)?.hidden)),reason:'從 MVU 讀回'}))};
+    const payload={version:1,scene:valid.state.scene,present:Object.values(valid.state.characters).filter(c=>c.present).map(c=>c.id),characters:Object.values(valid.state.characters).map(c=>({id:c.id,name:c.name,aliases:c.aliases,...(c.template!==undefined?{template:c.template}:{}),set:Object.fromEntries(Object.entries(c.values).filter(([key])=>!merged.fields.find(f=>f.id===key)?.hidden)),reason:'從 MVU 讀回'}))};
     applyUpdate(this.getSnapshot().state,merged,payload,{manual:true});this.db().schema=validateSchema(merged);this.db().presenceOverrides={...valid.presenceOverrides,...(this.db().presenceOverrides??{})};const changed=this.addManual(payload);await this.persist(c,changed);this.mvuMessage='已讀回角色資料（本地鎖定優先）';
   }
 }

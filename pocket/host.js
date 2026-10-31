@@ -18,7 +18,7 @@ import {createPersonalMemory} from './personal-memory.js';
 import {createNarrativeMemory} from './narrative-memory.js';
 import {memoryMentionContext} from './mentions.js';
 import {createStoryClock} from './story-time.js';
-import {installPocketPresets} from './presets.js';
+import {installPocketPresets,getPocketPresetStatus,pocketPresetDownloads} from './presets.js';
 import {SHOP_PRESET_LIMITS,normalizeShopPresets,listShopPresets,saveShopPreset,selectShopPreset,deleteShopPreset,importShopPresets,exportShopPresets} from './shop-presets.js';
 
 const KEY='tavern_pocket_v3', clone=v=>structuredClone(v), uid=()=>crypto.randomUUID();
@@ -88,7 +88,7 @@ export function createPocketHost({context,backend,notice=()=>{},openStateEditor,
   guard();return result;
  };
  function shopPresetState(){const saved=normalizeShopPresets(config().shopPresets);return {presets:listShopPresets(saved),selectedId:saved.selectedId,limits:SHOP_PRESET_LIMITS};}
- async function state(){const c=context(),options=getConnectionOptions(c);return {scope:sourceScope(c),userName:c.name1||'我',characterName:c.name2||'角色',storyTime:storyClock.current(),shopPresets:shopPresetState(),...project(c),catalogue:clone(data(c).catalogue),catalogueSource:clone(data(c).catalogueSource||null),settings:{...clone(config()),worldbooks:clone(data(c).worldbooks),worldbookPins:clone(data(c).worldbookPins||[])},connections:options.modelProfiles,worldbooks:options.worldbookNames,sync:{...source.status(),errors:[...source.status().errors,...narrativeMemory.status().errors],memory:narrativeMemory.status(),statusRoles:contacts.profiles().filter(p=>p.body?.length||p.source?.version).length,busy},version:PHONE_VERSION};}
+ async function state(){const c=context(),options=getConnectionOptions(c);return {presets:{...getPocketPresetStatus(c),downloads:pocketPresetDownloads()},scope:sourceScope(c),userName:c.name1||'我',characterName:c.name2||'角色',storyTime:storyClock.current(),shopPresets:shopPresetState(),...project(c),catalogue:clone(data(c).catalogue),catalogueSource:clone(data(c).catalogueSource||null),settings:{...clone(config()),worldbooks:clone(data(c).worldbooks),worldbookPins:clone(data(c).worldbookPins||[])},connections:options.modelProfiles,worldbooks:options.worldbookNames,sync:{...source.status(),errors:[...source.status().errors,...narrativeMemory.status().errors],memory:narrativeMemory.status(),statusRoles:contacts.profiles().filter(p=>p.body?.length||p.source?.version).length,busy},version:PHONE_VERSION};}
  function taskPrompt(c,task,{app}={}){const char=c.characters?.[c.characterId];return `${app==='shop'?'你正在產生虛構商品目錄。只完成本次商城任務，不扮演角色發言，不續寫故事；角色與世界書只作為背景資料。':'你正在虛構手機中扮演角色。'}使用者是 ${c.name1}，目前角色是 ${c.name2}。\n[角色背景]\n${JSON.stringify({name:char?.name,description:char?.description||char?.data?.description,personality:char?.personality||char?.data?.personality,scenario:char?.scenario||char?.data?.scenario}).slice(0,12000)}\n[任務]\n所有面向使用者的商品名稱與說明、貼文、日記、聊天回覆使用繁體中文；繪圖英文標籤與 JSON 欄位名稱保持原格式。\n${task}`;}
 
  async function modelEvents(c,action,payload){

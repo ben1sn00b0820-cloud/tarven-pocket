@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-31",
+  "phoneVersion": "0.15.0",
+  "csbVersion": "1.5.0",
+  "sourceBaseCommit": "9fb5b343ae0f971594feeb7fe39f3a4b46c8a27f",
+  "unit": {
+    "phone": {
+      "tests": 557,
+      "pass": 557,
+      "fail": 0
+    },
+    "csb": {
+      "tests": 230,
+      "pass": 230,
+      "fail": 0
+    }
+  },
+  "browser": {
+    "browser-csb-inline-report.json": {
+      "passed": 11,
+      "errors": []
+    },
+    "browser-csb-report.json": {
+      "passed": 13,
+      "errors": []
+    },
+    "browser-role-controls-report.json": {
+      "passed": 6,
+      "errors": []
+    },
+    "browser-report.json": {
+      "passed": 80,
+      "errors": []
+    }
+  },
+  "additionalBrowser": {
+    "mentions": {
+      "passed": 6
+    },
+    "presence": {
+      "passed": 9
+    },
+    "newUI": {
+      "passed": 8
+    }
+  },
+  "installer": {
+    "standard": 11,
+    "sillydroid": 11
+  },
+  "limitations": [
+    "Actual Chromium and plugin UI; SillyTavern host APIs and model services are mocked.",
+    "No user-device or live paid-provider test.",
+    "Provider requests may continue after scan timeout or cancellation when the host does not support abort."
+  ]
+}

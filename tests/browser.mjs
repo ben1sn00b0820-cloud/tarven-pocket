@@ -13,6 +13,7 @@ const require=createRequire(import.meta.url);
 let playwright;try{playwright=require('playwright');}catch{playwright=require(path.join(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||'','playwright'));}
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'), prefix='/scripts/extensions/third-party/tavern-pocket';
 const version=JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'utf8')).version;
+const bundledBook=JSON.parse(await fs.readFile(path.join(root,'presets',`TavernPocket_Worldbook_v${PHONE_VERSION}.json`),'utf8'));
 const out=path.join(root,'tests/artifacts');await fs.mkdir(out,{recursive:true});
 // Optional local QA captures; regression runs produce only their JSON report.
 const capture=async(target,name)=>{if(process.env.TP_BROWSER_SCREENSHOTS==='1')await target.screenshot({path:path.join(out,name),animations:'disabled'});};
@@ -40,10 +41,10 @@ try{
   if(request.url().endsWith('/ai/generate-image')){naiCalls.push(JSON.parse(request.postData()||'{}'));return route.fulfill({status:200,headers,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=','base64')});}
   return route.fulfill({status:404,headers,body:'unexpected mocked NovelAI endpoint'});
  });
- await page.route('**/api/worldinfo/get',async route=>{const name=route.request().postDataJSON()?.name,book=await page.evaluate(name=>window.qa?.books?.[name]??null,name);await route.fulfill({status:book?200:404,contentType:'application/json',body:JSON.stringify(book||{})});});
+ await page.route('**/api/worldinfo/get',async route=>{const name=route.request().postDataJSON()?.name,book=await page.evaluate(name=>window.qa?.books?.[name]??null,name);await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(book||{entries:{}})});});
  await page.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);
  await page.waitForFunction(version=>window.qa?.context.extensionSettings.tavern_pocket_presets?.version===version,PHONE_VERSION);
- assert.equal(await page.evaluate(()=>Object.keys(window.qa.books['傳音玉符 · CSB 配套協定'].entries).length),15);
+ assert.deepEqual(await page.evaluate(()=>window.qa.books['傳音玉符 · CSB 配套協定'].entries),bundledBook.entries);
  checks.push('startup automatically imports the bundled worldbook and display regex after verifying the saved server copy');
  await page.locator('#sttts-floating .orb').waitFor();
  await page.locator('#sttts-floating .orb').click();

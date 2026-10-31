@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "checks": [
+    "manager cards remain readable and fit 390px mobile and desktop widths",
+    "role template switch filters fields and preserves inactive values and locks",
+    "schema gender default does not assign a sex or reveal gender-only fields for an unknown role",
+    "template category editor creates a female-only field without changing common/male fields",
+    "custom AI scan preset stores host route, editable instructions, and response limit",
+    "scan preset export and import round trip retains selection without duplicate IDs",
+    "AI scanner calls actual host preset route, previews evidence, and leaves narrative/draft intact",
+    "custom scan preset can be deleted and builtin remains selected on reopening"
+  ],
+  "errors": [],
+  "fixture": "Actual Chromium, standalone CSB UI, mocked SillyTavern APIs/model"
+}

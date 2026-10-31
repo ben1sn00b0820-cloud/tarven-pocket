@@ -100,6 +100,7 @@ try{
  await check('presence scan can be disabled without changing current status',async()=>{
   await raw('姓名：雲璃\n目前在場：否');
   await page.evaluate(()=>CSBCharacterState.openScanner({mode:'local',limit:1,merge:'fill'}));
+  await scanner().locator('.csb-scan-options > summary').click();
   await scanner().getByLabel('判定目前在場／離場',{exact:true}).uncheck();
   await scanner().getByRole('button',{name:'開始掃描',exact:true}).click();
   await scanner().getByText(/沒有可採用的新資料/).waitFor();

@@ -245,3 +245,17 @@ test('oversized custom schema retains bounded identity and typed fields with exp
   assert.ok(JSON.stringify(facts).length <= 32000);
   assert.equal(f.bridge.profile('林澈').csb.values.history_9.length, 12000, 'UI/source keeps the entire data');
 });
+
+test('phone contact cards and model context use the role template while preserving saved inactive fields',()=>{
+ const f=fixture();f.db.schema.fields.push(field('female_detail','女性資料','body','text',{appliesTo:'female'}),field('male_detail','男性資料','body','text',{appliesTo:'male'}));
+ const character=f.db.seed.characters.c_lin;character.values.gender='女性';character.values.female_detail='VISIBLE_TEMPLATE_DATA';character.values.male_detail='ARCHIVED_TEMPLATE_DATA';f.db.locks.c_lin={male_detail:'ARCHIVED_TEMPLATE_DATA'};
+ let profile=f.bridge.profile('林澈');assert.equal(profile.csb.effectiveTemplate,'female');assert.equal(profile.csb.values.female_detail,'VISIBLE_TEMPLATE_DATA');assert.equal(profile.csb.values.male_detail,undefined);
+ assert.ok(!profile.csb.fields.some(field=>field.id==='male_detail'));assert.ok(!profile.body.some(row=>row.name==='男性資料'));assert.ok(!profile.csb.locked.includes('male_detail'));
+ assert.doesNotMatch(f.bridge.promptFor(['林澈']),/ARCHIVED_TEMPLATE_DATA/);assert.equal(character.values.male_detail,'ARCHIVED_TEMPLATE_DATA');assert.equal(f.db.locks.c_lin.male_detail,'ARCHIVED_TEMPLATE_DATA');
+ character.template='male';profile=f.bridge.profile('林澈');assert.equal(profile.csb.template,'male');assert.equal(profile.csb.effectiveTemplate,'male');assert.equal(profile.csb.values.male_detail,'ARCHIVED_TEMPLATE_DATA');assert.equal(profile.csb.values.female_detail,undefined);
+ assert.match(f.bridge.promptFor(['林澈']),/ARCHIVED_TEMPLATE_DATA/);assert.doesNotMatch(f.bridge.promptFor(['林澈']),/VISIBLE_TEMPLATE_DATA/);
+});
+test('phone projection keeps unknown gender common despite a non-null schema gender default',()=>{
+ const f=fixture();f.db.schema.fields.find(field=>field.id==='gender').default='女性';f.db.schema.fields.push(field('female_detail','女性資料','body','text',{appliesTo:'female',default:'不應顯示'}));
+ const profile=f.bridge.profile('林澈');assert.equal(profile.csb.effectiveTemplate,'common');assert.equal(profile.csb.values.gender,null);assert.equal(profile.csb.values.female_detail,undefined);assert.doesNotMatch(f.bridge.promptFor(['林澈']),/不應顯示/);
+});

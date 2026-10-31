@@ -182,6 +182,16 @@ export function pocketsettingsApp(ctx) {
     const errors = rows(sync.errors).map(e => typeof e === 'string' ? e : e?.message || '').filter(Boolean);
     return `<div class="pocket-sync-status ${error || errors.length ? 'has-error' : ''}"><strong>${error || errors.length ? '同步有項目需要檢查' : date ? '手機與劇情已同步' : '手機訊息同步'}</strong><p>${typeof sync.status === 'string' ? esc(sync.status) : '角色在正文使用手機時，事件會自動進入相應 App。'}</p>${count != null ? `<small>已處理 ${esc(count)} 則事件${date ? ' · ' + esc(stamp(date)) : ''}</small>` : date ? `<small>最近同步 ${esc(stamp(date))}</small>` : ''}<p class="hint">已讀取 ${Number(sync.statusRoles)||0} 位角色信息。可從桌面「角色信息」查閱、編輯與設定正文顯示；點千里傳音聯絡人頭像也能開啟人物資料。舊版 CSB v2.1 資料仍可讀取。</p>${error ? `<p class="pocket-error">${esc(error)}</p>` : ''}${errors.length ? `<details><summary>查看詳細訊息（${errors.length}）</summary>${errors.map(e => `<p class="pocket-error">${esc(e)}</p>`).join('')}</details>` : ''}</div>`;
   }
+  function presetStatus() {
+    const saved = state.presets || {}, downloads = saved.downloads || {};
+    const status = saved.message || '尚未確認配套安裝狀態，可按下方按鈕檢查並重新匯入。';
+    const links = [['worldbook','下載世界書 JSON'],['regex','下載正則 JSON']].flatMap(([key,label]) => {
+      const file = downloads[key];
+      if (!file?.url || !file?.name) return [];
+      return [`<a class="menu_button" href="${esc(file.url)}" download="${esc(file.name)}">${label}</a>`];
+    }).join('');
+    return `<div class="pocket-sync-status ${saved.status === 'error' ? 'has-error' : ''}" role="status"><strong>${['installed','current'].includes(saved.status) ? '配套已匯入' : '配套安裝狀態'}</strong><p>${esc(status)}</p>${saved.refreshRequired ? '<p class="hint">請重新整理酒館，讓正則介面載入新規則。</p>' : ''}</div><div class="pocket-preset-toolbar">${btn('presets-install', '檢查並重新匯入配套', 'secondary')}${links}</div><p class="hint">手動匯入：世界書 JSON 放進酒館「世界書」；正則 JSON 放進「擴充功能 → 正則 → 匯入」。兩份檔案分開匯入。</p>`;
+  }
   function books() {
     const available = rows(state.worldbooks).map(bookName).filter(Boolean), all = pluralNames([...available, ...draft.worldbooks]);
     const visible = name => name.toLocaleLowerCase().includes(filter.toLocaleLowerCase());
@@ -202,7 +212,7 @@ export function pocketsettingsApp(ctx) {
       <div class="pocket-settings-card">${books()}</div>
       <div class="pocket-settings-card"><h2>千里傳音照片 · NovelAI</h2><label class="pocket-toggle"><span><strong>角色傳圖時自動生成</strong><small>使用你在引擎裡設定的 NovelAI 金鑰與圖片參數，完成後直接送進千里傳音。會依 NovelAI 帳戶方案消耗額度。</small></span><input type="checkbox" class="switch" data-field="autoWeChatPhotos" ${draft.autoWeChatPhotos ? 'checked' : ''}></label><p class="hint">只處理新收到的角色照片描述。已生成圖片、現成圖片網址及安裝前的舊訊息不會重複生成。</p><div class="pocket-preset-toolbar">${btn('open-novelai', '設定 NovelAI 金鑰', 'secondary')}${btn('open-image-settings', '生圖預設與千里傳音模型', 'primary')}</div><p class="hint">長按千里傳音圖片，可修改畫師串、正負面提示詞並重新生成。</p></div>
       <div class="pocket-settings-card"><h2>正文與手機互通</h2><label class="pocket-toggle"><span><strong>向角色提供手機事件規則</strong><small>讓正文讀取目前手機內容，並在角色使用手機時輸出可同步的訊息。</small></span><input type="checkbox" class="switch" data-field="inject" ${draft.inject ? 'checked' : ''}></label><p class="hint">開啟後會向正文提供手機規則、近期聊天、貼文、限動與交易摘要。手機操作不再貼入正文；正文中的手機事件仍會進入相應軟體。角色日記會作為背景；你的私人日記則依下方設定決定是否提供。內建規則與配套世界書擇一啟用即可。</p><p class="hint">正文輸入框旁的「我・物品・能力」按鈕可搜尋並帶入目前個人資料、持有物品與能力；選取不會自動送出訊息。</p><p class="hint">傳訊、轉帳、貼文與購買收據只在手機內顯示。既有資料和長期記憶保留；原有劇情狀態與 CSB 角色信息不受影響。</p><label class="pocket-toggle"><span><strong>允許正文與手機模型讀取我的私人日記</strong><small>預設關閉。開啟後，已儲存的私人日記會加入正文與手機文字生成的背景。</small></span><input type="checkbox" class="switch" data-field="sharePrivateDiary" ${draft.sharePrivateDiary ? 'checked' : ''}></label>${syncStatus()}${Number.isFinite(state.sync?.legacyBalance) ? `<p class="hint">舊版此對話可用餘額 ${money(state.sync.legacyBalance)}；新版共用靈石袋未自動合併，可在千里傳音靈石袋修改。</p>` : ''}<div class="actions">${btn('pocket-sync', icon('refresh') + '重新同步正文訊息', 'secondary')}</div></div>
-      <div class="pocket-settings-card"><h2>世界書與正則 · v${PHONE_VERSION}</h2><p class="hint">插件首次啟用或升級會內建匯入完整手機與 CSB 配套。正則只隱藏機器協定；原有狀態欄與故事文字保留。配套世界書用同一名稱更新，保留你另加的條目；內建規則已提供協定，不必重複綁定。</p>${btn('presets-install', '重新匯入／更新配套', 'secondary')}</div>
+      <div class="pocket-settings-card"><h2>世界書與正則 · v${PHONE_VERSION}</h2><p class="hint">插件首次啟用或升級會內建匯入完整手機與 CSB 配套。正則只隱藏機器協定；原有狀態欄與故事文字保留。配套世界書用同一名稱更新，保留你另加的條目；內建規則已提供協定，不必重複綁定。</p>${presetStatus()}</div>
       <div class="pocket-settings-save">${btn('settings-save', '儲存玉符接入設定', 'primary')}<small>模型與世界書設定儲存後生效</small></div>`);
   }
   v.refresh = render;

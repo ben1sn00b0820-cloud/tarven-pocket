@@ -27,7 +27,7 @@ let browser,page;const checks=[],errors=[];
 try{
  browser=await playwright.chromium.launch({headless:true,executablePath:process.env.TP_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--use-gl=angle','--use-angle=swiftshader']});
  page=await browser.newPage({viewport:{width:1280,height:1000},deviceScaleFactor:1,hasTouch:true});page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));
- await page.route('**/api/worldinfo/get',async route=>{const name=route.request().postDataJSON()?.name,book=await page.evaluate(name=>window.qa?.books?.[name]??null,name);await route.fulfill({status:book?200:404,contentType:'application/json',body:JSON.stringify(book||{})});});
+ await page.route('**/api/worldinfo/get',async route=>{const name=route.request().postDataJSON()?.name,book=await page.evaluate(name=>window.qa?.books?.[name]??null,name);await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(book||{entries:{}})});});
  await page.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);
  await page.locator('#sttts-floating .orb').waitFor();
  await page.waitForFunction(()=>!!globalThis.CSBCharacterState?.getSnapshot);
@@ -149,7 +149,7 @@ try{
  const externalPage=await browser.newPage({viewport:{width:1280,height:1000},deviceScaleFactor:1});page=externalPage;
  externalPage.setDefaultTimeout(12000);externalPage.on('pageerror',e=>errors.push(e.message));
  await externalPage.addInitScript(()=>{globalThis.csbCharacterStateIntercept=function(){};});
- await externalPage.route('**/api/worldinfo/get',async route=>{const name=route.request().postDataJSON()?.name,book=await externalPage.evaluate(name=>window.qa?.books?.[name]??null,name);await route.fulfill({status:book?200:404,contentType:'application/json',body:JSON.stringify(book||{})});});
+ await externalPage.route('**/api/worldinfo/get',async route=>{const name=route.request().postDataJSON()?.name,book=await externalPage.evaluate(name=>window.qa?.books?.[name]??null,name);await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(book||{entries:{}})});});
  await externalPage.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);
  await externalPage.locator('#sttts-floating .orb').waitFor();
  assert.equal(await externalPage.locator('#csb-launcher').count(),0);

@@ -1,10 +1,27 @@
 export const VERSION = 1;
 export const TYPES = {text:'短文字',longtext:'長文字',number:'數字',bar:'進度條',select:'單選',multiselect:'多選',boolean:'是／否'};
 export const POLICIES = {dynamic:'隨劇情更新',static:'初始化後固定',manual:'僅手動修改'};
+export const TEMPLATE_OPTIONS = {auto:'依性別自動套用',common:'通用模板',female:'女性模板',male:'男性模板'};
+export const FIELD_TEMPLATE_OPTIONS = {common:'通用欄位',female:'女性專用',male:'男性專用'};
 export const clone = value => JSON.parse(JSON.stringify(value));
 export const uid = (prefix='f') => `${prefix}_${globalThis.crypto?.randomUUID?.().replaceAll('-','') || (Date.now().toString(36)+Math.random().toString(36).slice(2))}`;
 export function field(id,label,group,type='text',options={}) {
-  return {id,label,group,type,unit:'',default:null,policy:'dynamic',hidden:false,hideEmpty:false,color:'#c7ab73',icon:'',min:0,max:100,maxDelta:null,display:'value',direction:'neutral',options:[],thresholds:[],description:'',...options};
+  return {id,label,group,type,unit:'',default:null,policy:'dynamic',appliesTo:'common',hidden:false,hideEmpty:false,color:'#c7ab73',icon:'',min:0,max:100,maxDelta:null,display:'value',direction:'neutral',options:[],thresholds:[],description:'',...options};
+}
+/** A template is a display/update scope, never a guess based on a name or body. */
+export function characterTemplate(character) {
+  if(['common','female','male'].includes(character?.template))return character.template;
+  const gender=typeof character?.values?.gender==='string'?character.values.gender.normalize('NFKC').trim().toLocaleLowerCase():'';
+  if(/^(?:女|女性|女人|female|woman)$/.test(gender))return 'female';
+  if(/^(?:男|男性|男人|male|man)$/.test(gender))return 'male';
+  return 'common';
+}
+export function fieldAppliesTo(field,character) {
+  const scope=field?.appliesTo??'common';
+  return scope==='common'||scope===characterTemplate(character);
+}
+export function fieldsForCharacter(schema,character,{includeHidden=false}={}) {
+  return schema.fields.filter(f=>(includeHidden||!f.hidden)&&fieldAppliesTo(f,character));
 }
 export function defaultSchema() {
   const fields = [
@@ -44,4 +61,6 @@ export function defaultSchema() {
 export function defaultSettings() {return {enabled:true,autoUpdate:true,autoScan:'local',autoAIApply:false,allowNew:true,showAbsent:false,inlineCards:true,mvuSync:false,promptBudget:42000,template:defaultSchema()};}
 export function emptyState() {return {characters:{},scene:{time:'',location:''}};}
 export function newDatabase(template=defaultSchema()) {return {version:VERSION,informationVersion:1,nextOrder:1,schema:clone(template),seed:emptyState(),manual:[],processed:{},locks:{},presenceOverrides:{},pinned:[],enabled:true};}
-export function valueOf(character,field) {return Object.hasOwn(character.values,field.id) ? character.values[field.id] : field.default;}
+// Gender chooses a template, so a schema default must never become a recorded
+// character fact or block initialization under the static-field policy.
+export function valueOf(character,field) {return Object.hasOwn(character.values,field.id) ? character.values[field.id] : field.id==='gender'?null:field.default;}

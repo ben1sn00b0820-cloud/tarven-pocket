@@ -20,7 +20,7 @@ export function createCharacterStateRuntime({context, notice = () => {}, formatM
     if(!alive)return false;
     if(!api()&&typeof globals.csbCharacterStateIntercept!=='function'&&!document?.getElementById?.('csb-launcher'))return true;
     const lifecycle=globals.CSBCharacterStateRuntime;
-    if(lifecycle?.version==='1.4.0'&&typeof lifecycle.setMessageFormatter==='function'){
+    if(lifecycle?.version==='1.5.0'&&typeof lifecycle.setMessageFormatter==='function'){
       lifecycle.setMessageFormatter(formatMessage||null);ensureStyle();return false;
     }
     if(lifecycle&&typeof lifecycle.dispose==='function'){

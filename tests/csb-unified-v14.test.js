@@ -8,7 +8,7 @@ test('known standalone is disposed before bundled controller starts; metadata su
  const c=fixture(),metadata=c.chatMetadata,globals={CSBCharacterState:{apiVersion:1}},order=[];
  const node={src:'https://host/scripts/extensions/third-party/csb-character-state/index.js'};
  const doc={querySelectorAll:()=>[node],getElementById:()=>null,createElement:()=>({remove(){}}),head:{append(){}}};
- const next={apiVersion:1,runtimeVersion:'1.4.0'};
+ const next={apiVersion:1,runtimeVersion:'1.5.0'};
  const runtime=createCharacterStateRuntime({context:()=>c,globals,document:doc,loadExternal:async url=>{assert.equal(url,node.src);return {ownsRuntime:()=>true,dispose(){order.push('old-dispose');delete globals.CSBCharacterState;}};},load:async()=>({initialize(){order.push('new-start');globals.CSBCharacterState=next;return next;},ownsRuntime:()=>true,setMessageFormatter(){}})});
  assert.equal(await runtime.start(),next);assert.deepEqual(order,['old-dispose','new-start']);assert.equal(c.chatMetadata,metadata);
  assert.deepEqual(c.extensionSettings.disabledExtensions,['third-party/csb-character-state']);

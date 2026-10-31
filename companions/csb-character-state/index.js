@@ -62,7 +62,7 @@ function readPublicSnapshot(){
 function mount(){
   if(document.getElementById('csb-launcher'))return;
   const target=document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings');if(!target)return;
-  target.append(el('div',{id:'csb-launcher',class:'csb csb-launcher'},el('button',{type:'button',class:'csb-btn csb-primary',onclick:launchManager},'◈ 角色信息'),el('small',{class:'csb-muted'},'角色記憶 · 共用欄位 · MVU 同步')));
+  target.append(el('div',{id:'csb-launcher',class:'csb csb-launcher'},el('button',{type:'button',class:'csb-btn csb-primary',onclick:launchManager},'◈ 角色信息'),el('small',{class:'csb-muted'},'角色記憶 · 男女模板 · AI 填表預設')));
 }
 function detailPath(d){if(d.dataset.char)return `character:${d.dataset.char}`;if(d.classList.contains('csb-panel'))return 'panel';return `${d.closest('.csb-character')?.dataset.char??''}:${d.querySelector(':scope > summary')?.textContent}`;}
 function openedPaths(root){return new Set([...root.querySelectorAll('details[open]')].map(detailPath));}
@@ -184,7 +184,7 @@ export function initialize(){
   started=true;epoch++;generation=createGenerationGuard({context,document,readHostState:readHostGeneration});loadHostGeneration();controller=new StateController({context,getMvu:()=>globalThis.Mvu,isBusy});
   bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,openScanner:showScanner,mountView:mountInformation,setInlineCards:enabled=>guardedController().setInlineCards(enabled),setPresence:(id,mode)=>guardedController().setPresence(id,mode),setCurrentPresence:(id,present)=>guardedController().setCurrentPresence(id,present),deleteCharacter:id=>guardedController().deleteCharacter(id),restoreCharacter:id=>guardedController().restoreCharacter(id),onError:report});
   globalThis.CSBCharacterState=bridge.api;globalThis.csbCharacterStateIntercept=intercept;
-  lifecycle=Object.freeze({version:'1.4.0',dispose,initialize,setMessageFormatter,intercept});globalThis.CSBCharacterStateRuntime=lifecycle;
+  lifecycle=Object.freeze({version:'1.5.0',dispose,initialize,setMessageFormatter,intercept});globalThis.CSBCharacterStateRuntime=lifecycle;
   if(typeof globalThis.MutationObserver==='function'){observer=new MutationObserver(chatMutated);observeChat();}
   controller.scanner.onStatus=message=>{
     if(!started||/^AI 正在分析|^第 \d+\/\d+ 批.*重試/.test(message))return;

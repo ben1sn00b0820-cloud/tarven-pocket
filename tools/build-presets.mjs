@@ -53,6 +53,12 @@ book.entries['13'] = {...structuredClone(book.entries['1']), uid: 13, displayInd
 book.entries['14'] = {...structuredClone(book.entries['1']), uid: 14, displayIndex: 14, order: 114,
   key: ['AI 掃描', 'AI扫描', '掃描正文', '資料抽取'], comment: `傳音玉符 v${PHONE_VERSION} CSB 掃描資料原則`,
   content: '掃描只抽取已提供的正文事實，與角色扮演續寫分開。保留既有角色 ID 與已知資料，不為補欄位編造事件、不把遠端訊息當在場。依當次掃描任務要求回傳資料結構，不回傳故事正文、HTML 或額外評論。沒有可更新的事實時用有效空結果。服務拒絕、連線失敗或資料不完整不能被當成成功更新，也不能清空既有資料。'};
+book.entries['15'] = {...structuredClone(book.entries['1']), uid: 15, displayIndex: 15, order: 115,
+  key: ['女性模板', '男性模板', '通用模板', '角色模板', 'appliesTo'], comment: `傳音玉符 v${PHONE_VERSION} 男女角色模板`,
+  content: '角色欄位有通用、女性、男性三種適用範圍。通用欄位供所有角色使用，女性／男性專用欄位只供符合目前角色模板的角色使用。實際欄位 ID、型別與說明以本次插件提供的模板為準，禁止自行建立未定義欄位。自動選擇只依角色明確已知的性別，不從姓名、外觀、性格或職業推測；性別未知時只使用通用欄位。使用者可以手動指定模板，其選擇優先。切換模板只改變適用及顯示欄位，不刪除原本保存的資料；已停用或不適用欄位不得由模型繼續更新。'};
+book.entries['16'] = {...structuredClone(book.entries['1']), uid: 16, displayIndex: 16, order: 116,
+  key: ['掃描預設', '扫描预设', 'AI 填表', '酒館預設', '自訂掃描'], comment: `傳音玉符 v${PHONE_VERSION} AI 填表預設`,
+  content: 'AI 填表的掃描預設由使用者新增、編輯、選用或匯入，保存的是抽取任務說明。使用者可選擇沿用酒館目前提示預設的安靜生成流程，或使用獨立資料抽取流程；兩者都只交付掃描結果，不續寫故事、不替使用者發送訊息，也不將結果貼進正文。沿用酒館預設時仍以本次掃描指定的正文、來源引用與欄位清單核對可採用的資料，不從其他背景或預設示例新增無來源的角色事實。結構、來源依據、既有鎖定及手動設定始終有效。模型沒有返回有效資料時顯示診斷，不能假稱已填表。'};
 for (const entry of Object.values(book.entries)) entry.extensions = {...entry.extensions, tavern_pocket: {owner: PRESET_OWNER, key: String(entry.uid), version: PHONE_VERSION}};
 book.extensions = {...book.extensions, tavern_pocket: {owner: PRESET_OWNER, version: PHONE_VERSION}};
 
@@ -68,6 +74,7 @@ regex.markdownOnly = true;
 regex.promptOnly = false;
 regex.disabled = false;
 regex.runOnEdit = true;
+regex.extensions = {...regex.extensions, tavern_pocket: {owner: PRESET_OWNER, version: PHONE_VERSION}};
 for (const [names, value] of [
   [[`TavernPocket_Worldbook_v${PHONE_VERSION}.json`, 'worldbook-tavern-pocket.json'], book],
   [[`TavernPocket_Regex_v${PHONE_VERSION}.json`, 'regex-hide-phone.json'], regex],

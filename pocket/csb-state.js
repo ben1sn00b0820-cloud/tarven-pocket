@@ -1,4 +1,5 @@
 import {replay, validateSchema, validateState} from '../companions/csb-character-state/src/core.js';
+import {characterTemplate,fieldAppliesTo,fieldsForCharacter,valueOf} from '../companions/csb-character-state/src/schema.js';
 import {sourceScope} from './source-sync.js';
 
 export const CSB_STATE_KEY = 'csb_character_state_v1';
@@ -55,20 +56,20 @@ export function indexCharacterState(snapshot, {editable = false} = {}) {
       lookup.get(candidate).set(character.id, character);
     }
   }
-  const fields = snapshot?.schema.fields.filter(field => !field.hidden) || [];
-  const groups = snapshot?.schema.groups.filter(group => fields.some(field => field.group === group.id)) || [];
   function resolve(name) {
     const matches = lookup.get(normalizeName(name));
     if (!matches?.size) return null;
     if (matches.size !== 1) return {ambiguous: true, candidates: [...matches.keys()]};
     const character = [...matches.values()][0];
-    const values = Object.fromEntries(fields.map(field => [field.id, clone(Object.hasOwn(character.values, field.id) ? character.values[field.id] : field.default)]));
+    const fields=fieldsForCharacter(snapshot.schema,character),groups=snapshot.schema.groups.filter(group=>fields.some(field=>field.group===group.id));
+    const values = Object.fromEntries(fields.map(field => [field.id, clone(valueOf(character,field))]));
     const source = {kind: 'csb', scope: snapshot.scope, characterId: character.id, version: '1.0.1'};
     return {
       name, fields: Object.fromEntries(fields.filter(field => COMPAT_FIELDS.has(field.id)).map(field => [field.id, displayValue(values[field.id], field)])),
       body: fields.filter(field => field.group === 'body').map(field => ({name: field.label, value: displayValue(values[field.id], field) ?? ''})),
       time: snapshot.state.scene.time || '', source, sources: [clone(source)], card: {},
       csb: {id: character.id, name: character.name, scope: snapshot.scope, groups: clone(groups), fields: clone(fields), values,
+        template:character.template??'auto',effectiveTemplate:characterTemplate(character),
         aliases: clone(character.aliases || []), present: !!character.present, editable,
         locked: fields.filter(field => Object.hasOwn(snapshot.locks?.[character.id] || {}, field.id)).map(field => field.id),
         pinned: (snapshot.pinned || []).includes(character.id)},
@@ -80,8 +81,8 @@ export function indexCharacterState(snapshot, {editable = false} = {}) {
 /** Typed field facts include labels/ranges and exclude disabled schema entries. */
 export function characterStatePrompt(csb) {
   if (!csb) return undefined;
-  return {id: csb.id, name: csb.name, aliases: csb.aliases, present: csb.present,
-    fields: csb.fields.filter(field => !field.hidden).map(field => ({id: field.id, label: field.label,
+  return {id: csb.id, name: csb.name, aliases: csb.aliases, present: csb.present,template:characterTemplate(csb),
+    fields: csb.fields.filter(field => !field.hidden&&fieldAppliesTo(field,csb)).map(field => ({id: field.id, label: field.label,
       group: csb.groups.find(group => group.id === field.group)?.label || field.group,
       type: field.type, value: csb.values[field.id], ...(field.unit ? {unit: field.unit} : {}),
       ...(['number', 'bar'].includes(field.type) ? {min: field.min, max: field.max} : {})}))};

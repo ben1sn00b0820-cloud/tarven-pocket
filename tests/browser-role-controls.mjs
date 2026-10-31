@@ -45,7 +45,7 @@ try{
  const manager=()=>page.getByRole('dialog',{name:'角色信息',exact:true});
  async function openPhone(){await page.locator('#sttts-floating .orb').click();await page.locator('#sttts-panel[open]').waitFor();await page.waitForFunction(()=>document.querySelector('#sttts-panel iframe')?.contentWindow?.document?.querySelector('[data-app="characterinfo"]'));const f=frame();const button=f.locator('.app-icon[data-app="characterinfo"]');await button.evaluate(node=>node.closest('.home-page')?.scrollIntoView({behavior:'instant',block:'nearest',inline:'start'}));await button.click();await f.locator('.view[data-app="characterinfo"]').waitFor({state:'visible'});await f.locator('[data-current-presence="c_xia"]').waitFor();return f;}
  const check=async(name,fn)=>{await fn();checks.push(name);console.log('PASS',name);};
- await page.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);await page.waitForFunction(()=>globalThis.CSBCharacterStateRuntime?.version==='1.4.0');
+ await page.goto(`http://127.0.0.1:${server.address().port}/tests/mock-host.html`);await page.waitForFunction(()=>globalThis.CSBCharacterStateRuntime?.version==='1.5.0');
  await page.evaluate(async()=>{const {newDatabase,defaultSettings}=await import('/scripts/extensions/third-party/tavern-pocket/companions/csb-character-state/src/schema.js');const db=newDatabase();db.seed.characters={c_xia:{id:'c_xia',name:'林知夏',aliases:['知夏'],present:true,values:{energy:42,mood:'平靜'}},c_lu:{id:'c_lu',name:'陸澤',aliases:[],present:false,values:{identity:'友人'}}};db.locks.c_xia={energy:42};db.pinned=['c_xia'];qa.context.chatMetadata.csb_character_state_v1=db;qa.context.extensionSettings.csb_character_state_v1={...defaultSettings(),autoScan:'off'};await qa.emit('CHAT_CHANGED');await qa.context.saveMetadata();await qa.context.saveSettingsDebounced();});
  let f=await openPhone();const info=()=>f.locator('.csb-information-app');
  await check('phone current-state toggle is separate from fixed mode and immediately restores following-story behavior',async()=>{
@@ -65,7 +65,7 @@ try{
  });
  await check('deleted identity stays removed after model reintroduction under a new ID and browser reload',async()=>{
   await page.evaluate(()=>qa.incomingRaw('信中提到知夏。<CSB_UPDATE>'+JSON.stringify({version:1,characters:[{id:'c_new_xia',name:'知夏',set:{mood:'等待'},reason:'舊資料'}],present:['c_new_xia']})+'</CSB_UPDATE>'));
-  assert.deepEqual(Object.keys((await snapshot()).state.characters),['c_lu']);await page.reload();await page.waitForFunction(()=>globalThis.CSBCharacterStateRuntime?.version==='1.4.0');assert.deepEqual(Object.keys((await snapshot()).state.characters),['c_lu']);assert.equal((await snapshot()).deletedCharacters.c_xia.character.name,'林知夏');
+  assert.deepEqual(Object.keys((await snapshot()).state.characters),['c_lu']);await page.reload();await page.waitForFunction(()=>globalThis.CSBCharacterStateRuntime?.version==='1.5.0');assert.deepEqual(Object.keys((await snapshot()).state.characters),['c_lu']);assert.equal((await snapshot()).deletedCharacters.c_xia.character.name,'林知夏');
  });
  await check('manager restores archived fields and flags explicitly; phone UI shows the restored role',async()=>{
   await page.evaluate(()=>CSBCharacterState.openManager());await manager().getByText('已刪除角色（1）',{exact:true}).click();await manager().getByRole('button',{name:'還原角色',exact:true}).click();await page.waitForFunction(()=>!!CSBCharacterState.getSnapshot()?.state.characters.c_xia);
