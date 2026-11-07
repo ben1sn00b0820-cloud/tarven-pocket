@@ -92,7 +92,7 @@ export function createCharacterStateBridge({context, snapshot, openEditor, openM
     if(!alive||context()?.chatMetadata!==c.chatMetadata||context()?.chat!==c.chat||characterStateScope(context())!==current.scope)throw stale();
     notify();return result;
   }
-  const api = Object.freeze({apiVersion:BRIDGE_VERSION,runtimeVersion:'1.5.0',getSnapshot,getRevision,openEditor:edit,openManager:manage,openScanner:scan,subscribe,mount,setInlineCards:setInline,setPresence:setCurrentPresence,
+  const api = Object.freeze({apiVersion:BRIDGE_VERSION,runtimeVersion:'1.6.0',getSnapshot,getRevision,openEditor:edit,openManager:manage,openScanner:scan,subscribe,mount,setInlineCards:setInline,setPresence:setCurrentPresence,
     setCurrentPresence(id,present,options={}){if(typeof present!=='boolean')throw TypeError('目前在場必須是布林值');return mutateCharacter(changeCurrentPresence,id,present,options);},
     deleteCharacter:(id,options={})=>mutateCharacter(deleteCharacter,id,undefined,options),
     restoreCharacter:(id,options={})=>mutateCharacter(restoreCharacter,id,undefined,options)});

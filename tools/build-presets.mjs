@@ -59,6 +59,8 @@ book.entries['15'] = {...structuredClone(book.entries['1']), uid: 15, displayInd
 book.entries['16'] = {...structuredClone(book.entries['1']), uid: 16, displayIndex: 16, order: 116,
   key: ['掃描預設', '扫描预设', 'AI 填表', '酒館預設', '自訂掃描'], comment: `傳音玉符 v${PHONE_VERSION} AI 填表預設`,
   content: 'AI 填表的掃描預設由使用者新增、編輯、選用或匯入，保存的是抽取任務說明。使用者可選擇沿用酒館目前提示預設的安靜生成流程，或使用獨立資料抽取流程；兩者都只交付掃描結果，不續寫故事、不替使用者發送訊息，也不將結果貼進正文。沿用酒館預設時仍以本次掃描指定的正文、來源引用與欄位清單核對可採用的資料，不從其他背景或預設示例新增無來源的角色事實。結構、來源依據、既有鎖定及手動設定始終有效。模型沒有返回有效資料時顯示診斷，不能假稱已填表。'};
+const worldRules='【三模式協定】世界與貨幣依插件本輪「世界模式」設定。現代用元；古風用文銅錢、兩銀子、兩金子（1 兩金子＝10 兩銀子，1 兩銀子＝1000 文銅錢）；修仙用下品、中品、極品靈石（1 中品＝100 下品，1 極品＝1000 中品）。amount／price 用目前模式基本單位的整數。以下修仙名稱與靈石範例只示範結構，須換成當前模式；不可跨模式套用匯率。未提供模式時才沿用修仙。';
+for(const entry of Object.values(book.entries)) entry.content=worldRules+'\n'+entry.content.replaceAll(SPIRIT_CURRENCY_RULE,'貨幣規則依三模式協定及插件本輪設定。');
 for (const entry of Object.values(book.entries)) entry.extensions = {...entry.extensions, tavern_pocket: {owner: PRESET_OWNER, key: String(entry.uid), version: PHONE_VERSION}};
 book.extensions = {...book.extensions, tavern_pocket: {owner: PRESET_OWNER, version: PHONE_VERSION}};
 

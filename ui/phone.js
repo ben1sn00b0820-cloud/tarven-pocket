@@ -1,3 +1,5 @@
+import {worldText} from '../core/world.js';
+import {setWorldMode} from '../core/world.js';
 import '../core/compat.js';
 import {connectBackend} from './backend-client.js';
 import {glyph, icon, spark} from './icons.js';
@@ -54,6 +56,8 @@ export function storyClockView(story = {}) {
 
 export function createPhoneApp({window: win, api, mount = win.document.getElementById('root')}) {
   const doc = win.document;
+  let displayedWorld=api.getState().general.worldMode;
+  setWorldMode(displayedWorld);doc.title=worldText('傳音玉符');
   const controller = new win.AbortController(), signal = controller.signal;
   const views = new Map(), assets = new Map();
   const media = win.matchMedia('(prefers-color-scheme: dark)'), motion = win.matchMedia('(prefers-reduced-motion: reduce)');
@@ -67,7 +71,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
   });
   const refreshView = (name, kind = 'refresh', event = {}) => refreshQueue.request(name, {kind, event});
 
-  mount.innerHTML = `
+  mount.innerHTML = worldText`
     <div class="stage">
       <div class="stage-bar" title="按住這裡拖動手機，雙擊放回原處"><span>傳音玉符</span><div class="stage-actions"><button class="size-button" data-system="size" aria-label="換手機大小" hidden></button><button class="info" data-system="help" aria-label="手機介面說明">i</button><button class="close" data-system="close" aria-label="返回酒館">${icon('close')}</button></div></div>
       <div class="device">
@@ -686,7 +690,7 @@ export function createPhoneApp({window: win, api, mount = win.document.getElemen
 
   const unsubscribe = api.subscribe(event => {
     if (disposed) return;
-    if (event.type === 'settings') { theme(); renderWidgets(); wallMotion(); run(refreshAvatars); }
+    if (event.type === 'settings') { const nextWorld=api.getState().general.worldMode;setWorldMode(nextWorld);if(nextWorld!==displayedWorld){displayedWorld=nextWorld;renderHome();for(const name of views.keys())refreshView(name);doc.title=worldText('傳音玉符');} theme(); renderWidgets(); wallMotion(); run(refreshAvatars); }
     if (event.type === 'phone') run(() => appearance(event.preferences));
     if (event.type === 'library') {
       const key = ({photos: 'gallery', notes: 'notes'})[event.collection];

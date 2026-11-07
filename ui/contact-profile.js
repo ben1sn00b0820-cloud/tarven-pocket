@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {esc, btn} from './common.js';
 import {STATUS_FIELDS, STATUS_METERS} from '../pocket/status.js';
 
@@ -20,7 +21,7 @@ export async function deleteContactWithConfirmation(ctx, contact) {
   deleting.add(ctx);
   try {
     const account = ctx.api.getState?.()?.scope;
-    if (!await ctx.confirm(`刪除「${name}」？`, '會從千里傳音聯絡簿與私聊列表移除，正文同步也不會自動加回。原聊天記錄、角色信息與世界書會保留；可在「已刪除聯絡人」恢復。')) return false;
+    if (!await ctx.confirm(`刪除「${name}」？`, worldText('會從千里傳音聯絡簿與私聊列表移除，正文同步也不會自動加回。原聊天記錄、角色信息與世界書會保留；可在「已刪除聯絡人」恢復。'))) return false;
     if (ctx.api.getState?.()?.scope !== account) throw Error('帳戶已切換，請重新開啟聯絡簿。');
     await ctx.api.deleteContact(target);
     ctx.notify?.(`已刪除「${name}」，可在已刪除聯絡人中恢復。`);
@@ -61,7 +62,7 @@ function csbDetailsHTML(record) {
 }
 
 export function contactDetailsHTML(record) {
-  if (!record) return '<section class="tp-contact-section"><h3>劇情狀態</h3><p class="hint">尚未讀到這位角色的狀態列。新的正文狀態與千里傳音事件會自動同步到這裡。</p></section>';
+  if (!record) return worldText('<section class="tp-contact-section"><h3>劇情狀態</h3><p class="hint">尚未讀到這位角色的狀態列。新的正文狀態與千里傳音事件會自動同步到這裡。</p></section>');
   if (record.csbAmbiguous) return '<section class="tp-contact-section"><h3>角色名稱需要確認</h3><p class="hint">狀態工坊有多位角色使用這個名字或別名，手機無法確認對應角色。請在角色信息調整名稱或別名後再開啟。</p></section>';
   if (record.csb) return csbDetailsHTML(record);
   const fields = record.fields || {}, card = {...record.card, ...fields}, body = Array.isArray(record.body) ? record.body : [];
@@ -168,7 +169,7 @@ export async function openStatusDirectory(ctx) {
   try {
     const records = await ctx.api.pocketContactProfiles();
     if (!d.live) return d;
-    d.body.innerHTML = (typeof ctx.api.pocketOpenStateManager === 'function' ? `<div class="actions">${btn('status-manager', '開啟角色信息', 'secondary')}</div>` : '') + (records.length ? `<div class="group">${records.map(record => btn('status-open', `<span><strong>${esc(record.name)}</strong><small>${esc(record.csbAmbiguous ? '名稱或別名重複，請先確認角色' : record.fields?.mood || record.fields?.identity || (record.csb ? '查看狀態工坊的角色資料' : '檢視或修改狀態'))}</small></span>`, 'list-row', `data-status-name="${esc(record.name)}"`)).join('')}</div>` : '<p class="hint">目前對話尚無角色資料。可在角色信息新增角色，或讓正文狀態欄與千里傳音事件同步到這裡。</p>');
+    d.body.innerHTML = (typeof ctx.api.pocketOpenStateManager === 'function' ? `<div class="actions">${btn('status-manager', '開啟角色信息', 'secondary')}</div>` : '') + (records.length ? `<div class="group">${records.map(record => btn('status-open', `<span><strong>${esc(record.name)}</strong><small>${esc(record.csbAmbiguous ? '名稱或別名重複，請先確認角色' : record.fields?.mood || record.fields?.identity || (record.csb ? '查看狀態工坊的角色資料' : '檢視或修改狀態'))}</small></span>`, 'list-row', `data-status-name="${esc(record.name)}"`)).join('')}</div>` : worldText('<p class="hint">目前對話尚無角色資料。可在角色信息新增角色，或讓正文狀態欄與千里傳音事件同步到這裡。</p>'));
     d.body.addEventListener('click', async e => {
       const b = e.target.closest('[data-status-name]'); if (b) { openContactStatus(ctx, b.dataset.statusName); return; }
       if (!e.target.closest('[data-action="status-manager"]')) return;

@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 /** User-authored, persona-scoped facts. No model response can mutate this store. */
 export const PERSONAL_MEMORY_KEY = 'tavern_pocket_memory_v1';
 export const PERSONAL_MEMORY_LIMITS = Object.freeze({assets: 500, customFields: 100, journal: 10000, context: 16000});
@@ -222,7 +223,7 @@ export function createPersonalMemory({context, backend, notice = () => {}}) {
       for (const [index, asset] of inventory.entries()) {
         const owned = typeof asset.memoryOwner === 'string' && asset.memoryOwner === ticket.persona;
         if (!owned && (asset.memoryOwner || !legacyAllowed)) continue;
-        if (acquisition(data, asset, {orderId: asset.orderId, id: `legacy-wallet:${asset.id || index}:${asset.at || 0}:${index}`, source: owned ? '萬寶商城購買紀錄' : '舊版萬寶商城購買紀錄'})) changed = true;
+        if (acquisition(data, asset, {orderId: asset.orderId, id: `legacy-wallet:${asset.id || index}:${asset.at || 0}:${index}`, source: owned ? worldText('萬寶商城購買紀錄') : worldText('舊版萬寶商城購買紀錄')})) changed = true;
       }
       if (firstImport) { if (!root.walletMigrationOwner) root.walletMigrationOwner = ticket.persona; data.migration.walletImported = true; }
       return changed;

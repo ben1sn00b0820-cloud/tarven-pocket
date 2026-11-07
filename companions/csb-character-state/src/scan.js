@@ -362,7 +362,7 @@ export class ScanService{
     try{
       if(mode==='local'){const local=scanLocal(cap.collected.sources,cap.snapshot.db.schema,{...options,knownState:cap.snapshot.state});rows=local.rows;diagnostics=local.diagnostics;}
       else{
-        scanPreset=resolveScanPreset(cap.snapshot.settings,options.presetId);
+        scanPreset={...resolveScanPreset(cap.snapshot.settings,options.presetId),model:this.host.adapter.scanModel?.()?.selected||'tavern'};
         const generate=args=>generateWithScanPreset(this.host,args,scanPreset);
         const batches=splitSources(cap.collected.sources);if(!batches.length)throw Error('此範圍只有狀態碼或空白，沒有可供 AI 閱讀的正文');
         for(let i=0;i<batches.length;i++){

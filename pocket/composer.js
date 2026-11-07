@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {createMemoryMentionIndex,searchMemoryMentionIndex,createMemoryMention} from './mentions.js';
 const controllers=new WeakMap();
 
@@ -84,7 +85,7 @@ export function createMemoryComposer({getState,document:doc=globalThis.document,
   function preview() {
     const row=rows[selected],node=row?nodes.get(row.key):null;
     if(previewNode!==node){previewNode?.setAttribute('aria-selected','false');node?.setAttribute('aria-selected','true');previewNode=node;}
-    detailTitle.textContent=row?.title||'';detailText.textContent=row?String(row.detail||row.preview).slice(0,2600):'可在傳音玉符「我」中新增或修改資料。';
+    detailTitle.textContent=row?.title||'';detailText.textContent=row?String(row.detail||row.preview).slice(0,2600):worldText('可在傳音玉符「我」中新增或修改資料。');
     if(!node){search.removeAttribute('aria-activedescendant');if(mode==='inline')field?.removeAttribute('aria-activedescendant');return;}
     search.setAttribute('aria-activedescendant',node.id);if(mode==='inline')field?.setAttribute('aria-activedescendant',node.id);
   }
@@ -110,7 +111,7 @@ export function createMemoryComposer({getState,document:doc=globalThis.document,
     rows.forEach((row,i)=>{const node=option(row,i);if(results.children[i]!==node)results.insertBefore(node,results.children[i]||null);});
     // Retain only visible nodes; inventory size cannot grow a hidden DOM cache.
     for(const [key,node]of nodes)if(!keep.has(key)){if(previewNode===node)previewNode=null;nodes.delete(key);}
-    if(!rows.length){const empty=doc.createElement('div');empty.className='tp-memory-empty';empty.textContent='找不到符合的資料。可換個關鍵字，或在玉符「我」中新增。';results.append(empty);}
+    if(!rows.length){const empty=doc.createElement('div');empty.className='tp-memory-empty';empty.textContent=worldText('找不到符合的資料。可換個關鍵字，或在玉符「我」中新增。');results.append(empty);}
     preview();queuePosition();
   }
   function queueDraw(){if(alive&&shown&&!drawFrame)drawFrame=frame(draw);}

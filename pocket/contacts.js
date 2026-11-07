@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {collectCharacterProfiles, extractCharacterCard, serializeStatusProfile} from './status.js';
 import {collectSourceEvents, sourceScope} from './source-sync.js';
 import {readCharacterState, indexCharacterState, characterStatePrompt, CSB_STATE_KEY} from './csb-state.js';
@@ -238,7 +239,7 @@ export function createContactBridge({context, backend, notice = () => {}, publis
           continue;
         }
         if (knownContacts.has(name)) continue;
-        if (knownContacts.size >= MAX_CONTACTS) throw Error('千里傳音聯絡人已達 200 人，請先整理聯絡人。');
+        if (knownContacts.size >= MAX_CONTACTS) throw Error(worldText('千里傳音聯絡人已達 200 人，請先整理聯絡人。'));
         const card = extractCharacterCard(c, name);
         backend.saveContact({name, persona: String(card?.text || '').slice(0, 4000)});
         knownContacts.add(name);

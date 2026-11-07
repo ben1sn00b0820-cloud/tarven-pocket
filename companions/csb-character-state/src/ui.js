@@ -288,7 +288,7 @@ export function mountInformation(container,api,{scope:expectedScope}={}){
 /** Review before commit. TextContent/DOM nodes only; no model HTML is executed. */
 export function openScanner(host,options={}){
   const initial=host.getSnapshot(),body=el('div',{class:'csb-scan-body csb-form'}),feedback=el('p',{class:'csb-feedback',role:'status','aria-live':'polite'}),results=el('div',{class:'csb-scan-results'});
-  const mode=select([['local','本機掃描（免額度）'],['ai','AI 讀正文填表（使用目前模型額度）']],options.mode??'local');
+  const mode=select([['local','本機掃描（免額度）'],['ai','AI 讀正文填表（使用所選模型額度）']],options.mode??'local');
   const limit=select([['1','最新 1 則'],['5','最近 5 則'],['20','最近 20 則'],['all','本聊天（最多最近 60,000 字元）']],String(options.limit??20));
   const merge=select([['fill','只新增角色、補空白欄位'],['changes','預覽明確變更，逐項勾選後更新']],options.merge??'fill');
   const target=select([['','全部角色'],...Object.values(initial.state.characters).map(c=>[c.id,c.name])],options.targetId??'');
@@ -296,16 +296,20 @@ export function openScanner(host,options={}){
   apply.disabled=true;cancel.disabled=true;
   let dialog,proposal=null,editors=[],abort=null,alive=true,running=false,presetBusy=false;
   function message(text,error=false){feedback.textContent=text;feedback.classList.toggle('is-error',error);}
+  const modelState=host.adapter.scanModel?.(),model=select((modelState?.options||[{id:'tavern',name:'沿用酒館目前模型'}]).map(p=>[p.id,p.name]),modelState?.selected||'tavern');
+  model.setAttribute('aria-label','角色 AI 填表模型');
+  model.addEventListener('change',()=>presetAction(async()=>{await host.adapter.saveScanModel?.(model.value);},'已儲存角色 AI 填表模型'));
   const preset=select([],''),presetNote=note(''),presetBox=el('section',{class:'csb-preset-box'}),presetActions=[];
-  function updateBusy(){for(const control of [mode,limit,merge,target,includeUser,assessPresence,preset,...presetActions])control.disabled=running||presetBusy;start.disabled=running||presetBusy;cancel.disabled=!running;}
+  function updateBusy(){for(const control of [mode,limit,merge,target,includeUser,assessPresence,preset,model,...presetActions])control.disabled=running||presetBusy;start.disabled=running||presetBusy;cancel.disabled=!running;}
   function refreshPresets(){
     const settings=host.getSnapshot().settings??{},selected=resolveScanPreset(settings);
+    if(host.adapter.scanModel)model.value=host.adapter.scanModel().selected;
     preset.replaceChildren(...getScanPresets(settings).map(p=>el('option',{value:p.id},p.name)));
     preset.value=selected.id;showPreset();
   }
   function showPreset(){
     const selected=resolveScanPreset(host.getSnapshot().settings??{},preset.value);
-    presetNote.textContent=selected.route==='host'?'使用酒館目前的提示預設與模型設定。角色卡、世界書與歷史可能一起送出；填表僅採用所選正文中的依據。':'獨立抽取：只送出本次正文、角色欄位與掃描指示；不套用酒館完整提示預設。';
+    presetNote.textContent=model.value!=='tavern'?'使用所選模型處理正文；自訂介面使用本次掃描提示，酒館連線依生成路徑選擇是否套用預設。':selected.route==='host'?'使用酒館目前的提示預設與模型設定。角色卡、世界書與歷史可能一起送出；填表僅採用所選正文中的依據。':'獨立抽取：只送出本次正文、角色欄位與掃描指示；不套用酒館完整提示預設。';
     presetBox.hidden=mode.value!=='ai';
   }
   async function presetAction(fn,success){
@@ -326,7 +330,7 @@ export function openScanner(host,options={}){
     const selected=resolveScanPreset(host.getSnapshot().settings??{},preset.value);if(selected.builtin){message('內建預設會保留；可按「新增」建立自己的版本。');return;}
     if(confirm(`刪除掃描預設「${selected.name}」？`))presetAction(()=>deleteScanPreset(host,selected.id),'掃描預設已刪除。');
   }),btn('匯入',()=>presetAction(async()=>{const text=await readFile('.json');if(text!==null){const result=await importScanPresets(host,parseJSON(text));message(`已匯入 ${result.imported} 份掃描預設。`);}})),btn('匯出',()=>downloadJson('CSB_Scan_Presets.json',exportScanPresets(host.getSnapshot().settings??{}))));
-  presetBox.append(el('div',{class:'csb-section-kicker'},'AI 掃描預設'),control('掃描預設',preset),presetNote,el('div',{class:'csb-preset-actions'},...presetActions));refreshPresets();
+  presetBox.append(control('AI 填表模型',model,'可選酒館連線設定或小手機「接入設定 → 文字模型」已儲存的自訂介面；預設與模型分開選擇。自訂介面只使用本次掃描提示，酒館連線可套用該連線預設。'),el('div',{class:'csb-section-kicker'},'AI 掃描預設'),control('掃描預設',preset),presetNote,el('div',{class:'csb-preset-actions'},...presetActions));refreshPresets();
   function renderProposal(p){
     proposal=p;editors=[];results.replaceChildren();apply.disabled=!p?.rows.length;
     if(!p)return;

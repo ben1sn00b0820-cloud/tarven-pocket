@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {createView, esc, btn, field, input, select, textArea, toggle, heading, help, groupTitle, plate} from './common.js';
 
 const TIERS = {0: '未訂閱', 1: 'Tablet', 2: 'Scroll', 3: 'Opus'};
@@ -31,7 +32,7 @@ export function enginesApp(ctx) {
     const attrs = tag === 'button' ? `data-action="engine" data-engine="${id}" aria-label="${name}，${front ? '點一下開啟' : '點一下抽到最前面'}"` : `data-engine="${id}"`;
     const dots = comfy ? '' : `•••• •••• •••• ${api.keyHint?.(id) || '••••'}`;
     const number = comfy ? d.comfy.url.replace(/^https?:\/\//, '') : llm ? (custom ? (saved ? dots : '未繫結金鑰 · 點卡片去填寫') : '用酒館當前連線的模型') : saved ? dots : '未繫結金鑰 · 點卡片去填寫';
-    return `<${tag} class="bank-card${tag === 'div' ? ' detail-card' : ''}" ${attrs}>${spark()}
+    return worldText`<${tag} class="bank-card${tag === 'div' ? ' detail-card' : ''}" ${attrs}>${spark()}
       <span class="card-top"><span class="card-name">${name}</span><span class="card-kind">${IMAGE.includes(id) ? 'IMAGE' : 'TEXT'}${icon('nfc')}</span></span>
       <span class="card-chip"></span>
       <span class="card-number${number.startsWith('•') || comfy ? '' : ' none'}${comfy ? ' address' : ''}">${number}</span>

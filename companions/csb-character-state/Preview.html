@@ -265,7 +265,7 @@
 @media(max-width:480px){.csb-dialog-head h2{font-size:18px;letter-spacing:.01em;}}
 
 body{margin:0;background:#0c1220;color:#edf0fa;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif}body:before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 12% 10%,#504a7825,transparent 55%),radial-gradient(ellipse at 90% 75%,#a0865420,transparent 45%);pointer-events:none}.preview-wrap{max-width:1180px;margin:auto;padding:38px 38px 70px;position:relative}.preview-top{display:flex;justify-content:space-between;align-items:center;padding-bottom:23px;border-bottom:1px solid #a7b7da20}.preview-brand{font-size:14px;letter-spacing:.15em;color:#d8c291}.preview-tag{color:#95a1b9;font-size:11px}.preview-layout{display:grid;grid-template-columns:330px minmax(0,1fr);gap:60px;margin-top:52px;align-items:start}.preview-intro{position:sticky;top:40px}.preview-intro h1{font-size:40px;font-weight:500;line-height:1.5;letter-spacing:.03em;margin:14px 0 22px}.preview-intro h1 span{color:#d7bb83}.preview-intro p{color:#a1aec7;font-size:14px;line-height:1.9;max-width:300px}.preview-buttons{display:flex;flex-wrap:wrap;gap:9px;margin:27px 0 35px}.preview-notes{border-top:1px solid #a7b7da20;padding-top:22px;font-size:12px;color:#a9b5cd;line-height:2}.preview-notes strong{font-weight:500;color:#dcd2ed}.preview-demo{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.preview-counter{font-size:11px;color:#7d8da8;margin-bottom:8px;letter-spacing:.04em}.preview-footer{font-size:11px;color:#70809b;margin-top:18px;line-height:1.8}#preview-stage{min-width:0}#preview-stage>.csb-panel{margin:0}.preview-buttons .csb-btn{padding:12px 18px}.preview-tag:before{content:'●';color:#c8b384;margin-right:8px;font-size:8px}@media(max-width:850px){.preview-layout{grid-template-columns:minmax(0,1fr);gap:25px;margin-top:28px}.preview-intro{position:static}.preview-intro h1{font-size:31px;margin:10px 0}.preview-intro p{max-width:none;font-size:13px}.preview-notes{display:none}.preview-buttons{margin:18px 0 8px}.preview-wrap{max-width:650px;padding:23px 18px 45px}.preview-top{padding-bottom:17px}.preview-tag{font-size:10px}.preview-brand{font-size:12px}.preview-footer{margin-top:14px}}@media(max-width:360px){.preview-wrap{padding-left:10px;padding-right:10px}.preview-intro h1{font-size:28px}.preview-top{gap:8px}.preview-tag{font-size:9px}}
-</style></head><body><main class="preview-wrap csb"><header class="preview-top"><div class="preview-brand">◈ &nbsp; 角色信息</div><div class="preview-tag">互動預覽 · v1.5.0</div></header><div class="preview-layout"><aside class="preview-intro"><small class="csb-eyebrow">CHARACTERS. REMEMBERED.</small><h1>每一個角色，<br>都有<span>延續的故事。</span></h1><p>欄位由你定義，資料各自保存。角色暫時離場，記憶也不會離開。</p><div class="preview-buttons"><button class="csb-btn csb-primary" id="open-manager">開啟角色工坊</button><button class="csb-btn" id="open-fields">自訂欄位</button></div><div class="preview-notes"><strong>01 &nbsp; 通用與男女模板</strong><br>共用資料保留，男女欄位各自設定。<br><br><strong>02 &nbsp; 各自獨立的角色資料</strong><br>當前狀態與重要經歷，隨劇情延續。<br><br><strong>03 &nbsp; 自動生成狀態卡片</strong><br>展開姓名，查看每一項細節。</div></aside><section><div class="preview-counter" id="demo-count"></div><div class="preview-demo"><button class="csb-btn csb-small" id="simulate-rest">☕ 模擬休息</button><button class="csb-btn csb-small" id="simulate-leave">↗ 離場／重返</button><button class="csb-btn csb-small" id="reset-preview">重設預覽</button></div><div id="preview-stage"></div><p class="preview-footer">此頁使用示例角色與本機瀏覽器儲存，可實際編輯與匯出。模擬按鈕不會呼叫模型；安裝插件後才會接上酒館劇情。</p></section></div></main><script>const VERSION = 1;
+</style></head><body><main class="preview-wrap csb"><header class="preview-top"><div class="preview-brand">◈ &nbsp; 角色信息</div><div class="preview-tag">互動預覽 · v1.6.0</div></header><div class="preview-layout"><aside class="preview-intro"><small class="csb-eyebrow">CHARACTERS. REMEMBERED.</small><h1>每一個角色，<br>都有<span>延續的故事。</span></h1><p>欄位由你定義，資料各自保存。角色暫時離場，記憶也不會離開。</p><div class="preview-buttons"><button class="csb-btn csb-primary" id="open-manager">開啟角色工坊</button><button class="csb-btn" id="open-fields">自訂欄位</button></div><div class="preview-notes"><strong>01 &nbsp; 通用與男女模板</strong><br>共用資料保留，男女欄位各自設定。<br><br><strong>02 &nbsp; 各自獨立的角色資料</strong><br>當前狀態與重要經歷，隨劇情延續。<br><br><strong>03 &nbsp; 自動生成狀態卡片</strong><br>展開姓名，查看每一項細節。</div></aside><section><div class="preview-counter" id="demo-count"></div><div class="preview-demo"><button class="csb-btn csb-small" id="simulate-rest">☕ 模擬休息</button><button class="csb-btn csb-small" id="simulate-leave">↗ 離場／重返</button><button class="csb-btn csb-small" id="reset-preview">重設預覽</button></div><div id="preview-stage"></div><p class="preview-footer">此頁使用示例角色與本機瀏覽器儲存，可實際編輯與匯出。模擬按鈕不會呼叫模型；安裝插件後才會接上酒館劇情。</p></section></div></main><script>const VERSION = 1;
 const TYPES = {text:'短文字',longtext:'長文字',number:'數字',bar:'進度條',select:'單選',multiselect:'多選',boolean:'是／否'};
 const POLICIES = {dynamic:'隨劇情更新',static:'初始化後固定',manual:'僅手動修改'};
 const TEMPLATE_OPTIONS = {auto:'依性別自動套用',common:'通用模板',female:'女性模板',male:'男性模板'};
@@ -832,6 +832,10 @@ async function importScanPresets(host,input){
 const scanPresetHostRequests=new WeakSet();
 async function generateWithScanPreset(host,args,preset){
   const context=host.context();
+  if(preset.model&&preset.model!=='tavern'){
+    if(typeof host.adapter.generateScanModel!=='function')throw Error('自選模型尚未接入，請由小手機開啟角色資訊');
+    return host.adapter.generateScanModel(context,args,preset);
+  }
   if(preset.route==='host'){
     const generate=host.adapter.generateScanHost??context.generateQuietPrompt;
     if(typeof generate!=='function')throw Error('此酒館未提供 generateQuietPrompt，無法沿用完整提示預設；請更新酒館或明確選擇「標準抽取」。');
@@ -1215,7 +1219,7 @@ class ScanService{
     try{
       if(mode==='local'){const local=scanLocal(cap.collected.sources,cap.snapshot.db.schema,{...options,knownState:cap.snapshot.state});rows=local.rows;diagnostics=local.diagnostics;}
       else{
-        scanPreset=resolveScanPreset(cap.snapshot.settings,options.presetId);
+        scanPreset={...resolveScanPreset(cap.snapshot.settings,options.presetId),model:this.host.adapter.scanModel?.()?.selected||'tavern'};
         const generate=args=>generateWithScanPreset(this.host,args,scanPreset);
         const batches=splitSources(cap.collected.sources);if(!batches.length)throw Error('此範圍只有狀態碼或空白，沒有可供 AI 閱讀的正文');
         for(let i=0;i<batches.length;i++){
@@ -1780,7 +1784,7 @@ function mountInformation(container,api,{scope:expectedScope}={}){
 /** Review before commit. TextContent/DOM nodes only; no model HTML is executed. */
 function openScanner(host,options={}){
   const initial=host.getSnapshot(),body=el('div',{class:'csb-scan-body csb-form'}),feedback=el('p',{class:'csb-feedback',role:'status','aria-live':'polite'}),results=el('div',{class:'csb-scan-results'});
-  const mode=select([['local','本機掃描（免額度）'],['ai','AI 讀正文填表（使用目前模型額度）']],options.mode??'local');
+  const mode=select([['local','本機掃描（免額度）'],['ai','AI 讀正文填表（使用所選模型額度）']],options.mode??'local');
   const limit=select([['1','最新 1 則'],['5','最近 5 則'],['20','最近 20 則'],['all','本聊天（最多最近 60,000 字元）']],String(options.limit??20));
   const merge=select([['fill','只新增角色、補空白欄位'],['changes','預覽明確變更，逐項勾選後更新']],options.merge??'fill');
   const target=select([['','全部角色'],...Object.values(initial.state.characters).map(c=>[c.id,c.name])],options.targetId??'');
@@ -1788,16 +1792,20 @@ function openScanner(host,options={}){
   apply.disabled=true;cancel.disabled=true;
   let dialog,proposal=null,editors=[],abort=null,alive=true,running=false,presetBusy=false;
   function message(text,error=false){feedback.textContent=text;feedback.classList.toggle('is-error',error);}
+  const modelState=host.adapter.scanModel?.(),model=select((modelState?.options||[{id:'tavern',name:'沿用酒館目前模型'}]).map(p=>[p.id,p.name]),modelState?.selected||'tavern');
+  model.setAttribute('aria-label','角色 AI 填表模型');
+  model.addEventListener('change',()=>presetAction(async()=>{await host.adapter.saveScanModel?.(model.value);},'已儲存角色 AI 填表模型'));
   const preset=select([],''),presetNote=note(''),presetBox=el('section',{class:'csb-preset-box'}),presetActions=[];
-  function updateBusy(){for(const control of [mode,limit,merge,target,includeUser,assessPresence,preset,...presetActions])control.disabled=running||presetBusy;start.disabled=running||presetBusy;cancel.disabled=!running;}
+  function updateBusy(){for(const control of [mode,limit,merge,target,includeUser,assessPresence,preset,model,...presetActions])control.disabled=running||presetBusy;start.disabled=running||presetBusy;cancel.disabled=!running;}
   function refreshPresets(){
     const settings=host.getSnapshot().settings??{},selected=resolveScanPreset(settings);
+    if(host.adapter.scanModel)model.value=host.adapter.scanModel().selected;
     preset.replaceChildren(...getScanPresets(settings).map(p=>el('option',{value:p.id},p.name)));
     preset.value=selected.id;showPreset();
   }
   function showPreset(){
     const selected=resolveScanPreset(host.getSnapshot().settings??{},preset.value);
-    presetNote.textContent=selected.route==='host'?'使用酒館目前的提示預設與模型設定。角色卡、世界書與歷史可能一起送出；填表僅採用所選正文中的依據。':'獨立抽取：只送出本次正文、角色欄位與掃描指示；不套用酒館完整提示預設。';
+    presetNote.textContent=model.value!=='tavern'?'使用所選模型處理正文；自訂介面使用本次掃描提示，酒館連線依生成路徑選擇是否套用預設。':selected.route==='host'?'使用酒館目前的提示預設與模型設定。角色卡、世界書與歷史可能一起送出；填表僅採用所選正文中的依據。':'獨立抽取：只送出本次正文、角色欄位與掃描指示；不套用酒館完整提示預設。';
     presetBox.hidden=mode.value!=='ai';
   }
   async function presetAction(fn,success){
@@ -1818,7 +1826,7 @@ function openScanner(host,options={}){
     const selected=resolveScanPreset(host.getSnapshot().settings??{},preset.value);if(selected.builtin){message('內建預設會保留；可按「新增」建立自己的版本。');return;}
     if(confirm(`刪除掃描預設「${selected.name}」？`))presetAction(()=>deleteScanPreset(host,selected.id),'掃描預設已刪除。');
   }),btn('匯入',()=>presetAction(async()=>{const text=await readFile('.json');if(text!==null){const result=await importScanPresets(host,parseJSON(text));message(`已匯入 ${result.imported} 份掃描預設。`);}})),btn('匯出',()=>downloadJson('CSB_Scan_Presets.json',exportScanPresets(host.getSnapshot().settings??{}))));
-  presetBox.append(el('div',{class:'csb-section-kicker'},'AI 掃描預設'),control('掃描預設',preset),presetNote,el('div',{class:'csb-preset-actions'},...presetActions));refreshPresets();
+  presetBox.append(control('AI 填表模型',model,'可選酒館連線設定或小手機「接入設定 → 文字模型」已儲存的自訂介面；預設與模型分開選擇。自訂介面只使用本次掃描提示，酒館連線可套用該連線預設。'),el('div',{class:'csb-section-kicker'},'AI 掃描預設'),control('掃描預設',preset),presetNote,el('div',{class:'csb-preset-actions'},...presetActions));refreshPresets();
   function renderProposal(p){
     proposal=p;editors=[];results.replaceChildren();apply.disabled=!p?.rows.length;
     if(!p)return;

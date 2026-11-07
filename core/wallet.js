@@ -1,3 +1,4 @@
+import {worldText} from './world.js';
 // 靈石袋 and 萬寶閣 share one persistent fictional balance (not split by character card): red packets and
 // transfers the user takes go in, the ones the user sends and what is bought in the shop come out. The shop sells
 // decorations (better looking than the free ones, bought once) and gifts to send to a character; the user can add
@@ -15,21 +16,21 @@ export const PREMIUM = Object.freeze({
   frame: Object.freeze({crown: ['皇冠', 188], wings: ['天使之翼', 268], neon: ['霓虹环', 128], bunny: ['兔耳蝴蝶结', 99], butterfly: ['蝴蝶', 158]}),
   background: Object.freeze({aurora: ['极光夜', 198], sunset: ['晚霞', 128], ocean: ['海浪', 158], meteor: ['流星雨', 228], garden: ['花园', 138]})
 });
-export const DECOR_KINDS = Object.freeze({bubble: '傳音氣泡', frame: '玉符掛飾', background: '傳音背景'});
+export const DECOR_KINDS = Object.freeze({get bubble(){return worldText('傳音氣泡');}, get frame(){return worldText('玉符掛飾');}, get background(){return worldText('傳音背景');}});
 export const decorKey = (kind, key) => kind + ':' + key;
 export const premiumOf = (kind, key) => PREMIUM[kind]?.[key] || null;
 
 /** Gifts the shop always has. */
 export const SHOP_GIFTS = Object.freeze([
-  {id: 'letter', name: '傳情箋', emoji: '💌', price: 5},
-  {id: 'milktea', name: '靈茶', emoji: '🧋', price: 18},
-  {id: 'coffee', name: '凝露飲', emoji: '☕', price: 25},
+  {id: 'letter', get name(){return worldText('傳情箋');}, emoji: '💌', price: 5},
+  {id: 'milktea', get name(){return worldText('靈茶');}, emoji: '🧋', price: 18},
+  {id: 'coffee', get name(){return worldText('凝露飲');}, emoji: '☕', price: 25},
   {id: 'cake', name: '桂花糕', emoji: '🍰', price: 38},
   {id: 'flowers', name: '花束', emoji: '💐', price: 52},
-  {id: 'plush', name: '靈獸布偶', emoji: '🧸', price: 88},
-  {id: 'perfume', name: '凝香露', emoji: '🌸', price: 299},
-  {id: 'necklace', name: '玉墜', emoji: '📿', price: 520},
-  {id: 'game', name: '玲瓏棋盤', emoji: '🎮', price: 999},
+  {id: 'plush', get name(){return worldText('靈獸布偶');}, emoji: '🧸', price: 88},
+  {id: 'perfume', get name(){return worldText('凝香露');}, emoji: '🌸', price: 299},
+  {id: 'necklace', get name(){return worldText('玉墜');}, emoji: '📿', price: 520},
+  {id: 'game', get name(){return worldText('玲瓏棋盤');}, emoji: '🎮', price: 999},
   {id: 'ring', name: '同心戒', emoji: '💍', price: 1314}
 ].map(Object.freeze));
 
@@ -56,7 +57,7 @@ export function validateGift(g) {
 }
 
 export function defaultWallet() {
-  return {currency: 'spirit_stone', balance: WALLET_START, ledger: [{id: 'start', at: 0, amount: WALLET_START, kind: 'start', note: '啟用靈石袋', who: ''}], owned: [], gifts: [], received: [], inventory: [], journal: []};
+  return {currency: 'spirit_stone', balance: WALLET_START, ledger: [{id: 'start', at: 0, amount: WALLET_START, kind: 'start', get note(){return worldText('啟用靈石袋');}, who: ''}], owned: [], gifts: [], received: [], inventory: [], journal: []};
 }
 /** New amounts are exact integer lower-grade stones. Only existing catalogue
  * prices, imported records and refunds may opt into legacy decimal tails.
@@ -96,4 +97,4 @@ const GUESS = [[/花|玫瑰|rose|flower/i, '💐'], [/奶茶|茶/, '🧋'], [/�
 export const guessEmoji = name => GUESS.find(([re]) => re.test(String(name)))?.[1] || '🎁';
 
 /** How much the ledger kinds read as. */
-export const LEDGER_KINDS = Object.freeze({start: '啟用靈石袋', redpacket: '福緣靈囊', transfer: '靈石轉贈', refund: '退回', shop: '萬寶閣', gift: '贈禮', topup: '靈石', adjust: '手動調整', purchase: '萬寶閣'});
+export const LEDGER_KINDS = Object.freeze({get start(){return worldText('啟用靈石袋');}, get redpacket(){return worldText('福緣靈囊');}, get transfer(){return worldText('靈石轉贈');}, refund: '退回', get shop(){return worldText('萬寶閣');}, gift: '贈禮', get topup(){return worldText('靈石');}, adjust: '手動調整', get purchase(){return worldText('萬寶閣');}});

@@ -144,9 +144,9 @@ test('every shipped protocol example passes the exact parser', () => {
   }
   assert.ok(count>=19);
 });
-test('versioned worldbook contains exact injected prompt and all examples parse', () => {
+test('versioned worldbook carries multi-world protocol and all examples parse', () => {
   const book=preset(`TavernPocket_Worldbook_v${PHONE_VERSION}.json`);
-  assert.equal(book.entries['0'].content,PHONE_PROMPT);
+  assert.match(book.entries['0'].content,/三模式協定/);assert.ok(book.entries['0'].content.includes(PHONE_PROMPT.split('\n').slice(2).join('\n')));
   assert.equal(book.entries['0'].constant,true);
   assert.equal(book.entries['0'].disable,false);
   let events=0;

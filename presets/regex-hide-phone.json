@@ -1,6 +1,6 @@
 {
   "id": "9b30c203-7f7c-4d94-98f7-bd3b4e87d71f",
-  "scriptName": "傳音玉符 v0.15.0 — 隱藏手機與 CSB 資料協定",
+  "scriptName": "傳音玉符 v0.16.0 — 隱藏手機與 CSB 資料協定",
   "findRegex": "/<phone>\\s*(?:\\{(?:(?!<\\/?phone>)[\\s\\S])*?\\}|\\[(?:(?!<\\/?phone>)[\\s\\S])*?\\])\\s*<\\/phone>|<CSB_UPDATE>\\s*\\{(?:(?!<\\/?CSB_UPDATE>)[\\s\\S])*?\\}\\s*<\\/CSB_UPDATE>/g",
   "replaceString": "",
   "trimStrings": [],
@@ -18,7 +18,7 @@
   "extensions": {
     "tavern_pocket": {
       "owner": "tavern-pocket-protocol",
-      "version": "0.15.0"
+      "version": "0.16.0"
     }
   }
 }

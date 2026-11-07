@@ -1,0 +1,6 @@
+{
+  "checks": [],
+  "errors": [],
+  "externalRequests": [],
+  "failure": "browserType.launch: Failed to launch chromium because executable doesn't exist at /tmp/moxu-chromium"
+}

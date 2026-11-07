@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {createView, esc, btn, field, input, select, textArea, toggle, heading, help, groupTitle, plate} from './common.js';
 import {icon, glyph} from './icons.js';
 import {APPS} from './apps.js';
@@ -7,7 +8,7 @@ const roles = [['system', '系統'], ['user', '使用者'], ['assistant', '助�
 // Preset kinds: chat (phone replies, 朋友圈, and bringing chats into the story), drawing
 // (<img> tags in the chat text). A chat rule says where it is used: 私聊, 群聊, 朋友圈.
 const KINDS = [['chat', '聊天', 'chat'], ['draw', '繪圖', 'draw']];
-const USES = [['dm', '私聊'], ['group', '群聊'], ['moments', '朋友圈'], ['call', '電話'], ['forum', '論道臺'], ['peek', '查手機']];
+const USES = [['dm', '私聊'], ['group', '群聊'], ['moments', '朋友圈'], ['call', '電話'], ['forum', worldText('論道臺')], ['peek', '查手機']];
 // Drawing rules: which engines an entry is sent with (none ticked or all ticked: every engine).
 const ENGINE_USES = [['nai', 'NovelAI'], ['gpt', 'GPT 生圖'], ['comfy', 'ComfyUI']];
 const engineScope = e => e.engines?.length ? ' · 只給 ' + ENGINE_USES.filter(([k]) => e.engines.includes(k)).map(([, l]) => l).join('、') : '';

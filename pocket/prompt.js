@@ -1,8 +1,9 @@
+import {worldText,onWorldChange} from '../core/world.js';
 import {PHONE_VERSION} from './events.js';
 import {SPIRIT_CURRENCY_RULE, SPIRIT_MAX} from '../core/currency.js';
 
 /** This exact protocol is shared by automatic prompt injection and the worldbook. */
-export const PHONE_PROMPT = `[傳音玉符 ${PHONE_VERSION}：正文玉符同步]
+const buildPhonePrompt=()=>worldText`[傳音玉符 ${PHONE_VERSION}：正文玉符同步]
 ${SPIRIT_CURRENCY_RULE}
 玉符裡的千里傳音、浮光錄、論道臺、修行札記、靈石袋與萬寶閣是故事中的虛擬服務。手機操作、私訊、購買收據與交易資料只在手機介面顯示，正文保留故事敘述與原有狀態欄。新的角色手機事件優先使用完整的小寫 phone 標籤包住的嚴格 JSON 區塊（格式見下方實例）；插件會從原始回覆同步資料，顯示時隱藏此區塊。不要把相同手機內容另抄成聊天卡片、收據或正文對話，也不要為了補協定而省略本來的故事回覆。舊自然指令格式仍可解析，同一動作只選一種格式。沒有手機操作就不用輸出 phone 區塊。原生玉符內的聊天、朋友圈、通話各自使用該介面的指令。
 介面使用繁體中文；事件中的聊天內容、照片說明、商品名稱與描述使用繁體中文，imagePrompt 保持英文繪圖標籤；JSON 欄位、事件 ID、模型名稱及原始引用保持原格式。
@@ -36,6 +37,8 @@ image 只能是已知 HTTP(S) 或 / 開頭的安全站內位址，不使用 data
 以下僅示範隱藏資料格式；實際內容依劇情生成，不要重印這個示例或另在正文抄寫訊息：
 <phone>{"id":"scene7-wx1","app":"wechat","action":"message","from":"{{char}}","to":"{{user}}","text":"到家跟我說。"}</phone>
 [/傳音玉符 正文玉符同步]`;
+export let PHONE_PROMPT=buildPhonePrompt();
+onWorldChange(()=>{PHONE_PROMPT=buildPhonePrompt();});
 
 export const PHONE_EXAMPLES = Object.freeze({
   contact: [

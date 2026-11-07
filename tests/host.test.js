@@ -325,7 +325,7 @@ test('invalid model or worldbook selection leaves existing settings intact',asyn
   await assert.rejects(f.api.pocketAction('settings.save',{profileId:'missing',worldbooks:['Racing']}),/找不到/);
   await assert.rejects(f.api.pocketAction('settings.save',{profileId:'main',worldbooks:['missing']}),/有效世界書/);
   const state=await f.api.pocketState();assert.equal(state.settings.profileId,'phone');assert.deepEqual(state.settings.worldbooks,['Cafe']);assert.equal(state.settings.inject,false);
-  assert.ok(f.host.promptPlan().every(p=>p.key==='sttts.entry.memory'));assert.doesNotMatch(f.host.promptPlan().map(p=>p.text).join(''),/PUBLIC_INSTAGRAM_SENTINEL/);
+  assert.ok(f.host.promptPlan().every(p=>['sttts.entry.memory','sttts.entry.world'].includes(p.key)));assert.doesNotMatch(f.host.promptPlan().map(p=>p.text).join(''),/PUBLIC_INSTAGRAM_SENTINEL/);
  }finally{f.host.dispose();}
 });
 
@@ -386,7 +386,7 @@ test('main story prompt includes public phone state and inventory while excludin
  try{
   await f.api.pocketAction('diary.save',{title:'PRIVATE_TITLE_SENTINEL',text:'PRIVATE_DIARY_SENTINEL'});
   await f.api.pocketAction('ig.post',{text:'PUBLIC_INSTAGRAM_SENTINEL'});
-  await f.host.sync();const plan=f.host.promptPlan(),text=plan.map(p=>p.text).join('\n');assert.equal(plan.length,2);
+  await f.host.sync();const plan=f.host.promptPlan(),text=plan.map(p=>p.text).join('\n');assert.equal(plan.length,3);
   assert.match(text,/PUBLIC_INSTAGRAM_SENTINEL/);assert.match(text,/INVENTORY_SENTINEL/);
   assert.doesNotMatch(text,/PRIVATE_DIARY_SENTINEL|PRIVATE_TITLE_SENTINEL/);
  }finally{f.host.dispose();}
@@ -427,5 +427,20 @@ test('new inline narrative acquisition is available to current story and never c
   assert.equal(m.abilities.length,1);assert.equal(m.abilities[0].name,'時間停止能力');assert.equal(f.backend.wallet().balance,520);
   assert.match(f.host.promptPlan().map(p=>p.text).join(''),/時間停止能力/);await f.host.sync();assert.equal((await f.api.pocketMemoryState()).abilities.length,1);
   f.c.chat.push({name:'Alice',is_user:false,mes:'我在萬寶商城購買了讀心能力。'});await f.host.sync();assert.equal((await f.api.pocketMemoryState()).abilities.length,1);
+ }finally{f.host.dispose();}
+});
+
+test('shop-specific model overrides phone profile and can follow the tavern without changing phone choice',async()=>{
+ const f=fixture();f.backend.getState=()=>structuredClone(f.backend.settings);f.backend.save=s=>{f.backend.settings=s;};
+ const response=JSON.stringify({items:[{name:'雨傘',description:'遮雨',price:25}]});
+ try{
+  await f.api.pocketAction('settings.save',{profileId:'phone',worldbooks:['Cafe'],inject:true});
+  f.c.ConnectionManagerRequestService.sendRequest=async(...args)=>{f.profileCalls.push(args);return {content:response};};
+  await f.api.pocketAction('shopModel.select',{id:'profile:main'});
+  await f.api.pocketAction('shop.generate',{query:'雨傘'});assert.equal(f.profileCalls[0][0],'main');assert.equal(f.settings[KEY].profileId,'phone');
+  assert.match(JSON.stringify(f.profileCalls[0][1]),/CAFE_LORE/);
+  let rawCalls=0;f.c.generateRaw=async request=>{rawCalls++;assert.match(JSON.stringify(request.prompt),/雨傘/);return response;};
+  await f.api.pocketAction('shopModel.select',{id:'tavern'});await f.api.pocketAction('shop.generate',{query:'雨傘'});
+  assert.equal(rawCalls,1);assert.equal(f.profileCalls.length,1);assert.equal((await f.api.pocketState()).shopModel.selected,'tavern');assert.equal(f.settings[KEY].profileId,'phone');
  }finally{f.host.dispose();}
 });

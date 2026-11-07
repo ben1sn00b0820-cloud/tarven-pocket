@@ -1,9 +1,12 @@
+import {worldText} from '../core/world.js';
 import {createView, esc, btn, field, input, select, toggle, heading, size, groupTitle, help, copyText} from './common.js';
 import {buildReport} from '../core/diagnostics.js';
 import {saveFile} from '../download.js';
 import {icon, GLYPH_NAMES} from './icons.js';
 import {APPS} from './apps.js';
 import {wallpapers, skins} from './wallpapers.js';
+
+import {WORLD_MODES,worldProfile} from '../core/world.js';
 
 const MARKS = {ok: '✓', warn: '!', error: '✕', info: '·'};
 const IMAGE_TYPES = 'image/png,image/jpeg,image/webp,image/avif,image/gif';
@@ -69,13 +72,13 @@ export function settingsApp(ctx) {
     const st = api.syncStatus?.();
     if (!st) return '';
     const time = at => new Date(at).toLocaleString('zh-TW', {hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'});
-    const state = !st.available ? '在酒館裡開啟傳音玉符時才能同步'
+    const state = !st.available ? worldText('在酒館裡開啟傳音玉符時才能同步')
       : st.busy ? '正在同步……'
       : st.error ? '同步失敗：' + st.error
       : st.lastAt ? '上次同步 ' + time(st.lastAt) : st.pending ? '有改動，馬上同步' : '還沒同步過';
     const remote = st.remote?.savedAt ? `酒館裡的是${st.remote.deviceName ? ' ' + st.remote.deviceName + ' ' : ''}在 ${time(st.remote.savedAt)} 存的` : '';
     return groupTitle('儲存到酒館')
-      + `<div class="group">${toggle('syncEnabled', '儲存到酒館', st.enabled, '聊天記錄、朋友圈、備忘錄和相簿存進酒館裡你賬號的資料夾（data/你的使用者名稱/user/files）。換一臺裝置、換個瀏覽器開啟酒館，傳音玉符裡的東西都還在；清了瀏覽器資料也不會丟。有改動幾秒後自動儲存，開啟傳音玉符時自動讀取別的裝置的新內容。兩臺裝置都改了同一段聊天或同一條朋友圈時，會合併成一份（訊息和評論都保留）；只有一邊改過就直接用那一邊的。金鑰不會存進去。')}
+      + `<div class="group">${toggle('syncEnabled', '儲存到酒館', st.enabled, worldText('聊天記錄、朋友圈、備忘錄和相簿存進酒館裡你賬號的資料夾（data/你的使用者名稱/user/files）。換一臺裝置、換個瀏覽器開啟酒館，傳音玉符裡的東西都還在；清了瀏覽器資料也不會丟。有改動幾秒後自動儲存，開啟傳音玉符時自動讀取別的裝置的新內容。兩臺裝置都改了同一段聊天或同一條朋友圈時，會合併成一份（訊息和評論都保留）；只有一邊改過就直接用那一邊的。金鑰不會存進去。'))}
         ${st.enabled ? `<div class="setting-row"><span class="row-text"><strong data-sync-state>${esc(state)}</strong>${remote ? `<small>${esc(remote)}</small>` : ''}</span>${btn('sync-now', icon('refresh') + '立即同步', 'chip-button', st.busy || !st.available ? 'disabled' : '')}</div>` : ''}</div>`
       ;
   }
@@ -113,7 +116,9 @@ export function settingsApp(ctx) {
     if (v.disposed || ticket !== epoch) return;
     const s = api.getState();
     const wallName = phone.wallpaper.kind === 'builtin' ? wallpapers[phone.wallpaper.key]?.name : '自定義照片';
-    v.draw(heading('玉符設定', '', 'Settings')
+    v.draw(heading(worldText('玉符設定'), '', 'Settings')
+      + groupTitle('世界模式')
+      + `<div class="group pad">${field('世界與貨幣',select('worldMode',s.general.worldMode,Object.entries(WORLD_MODES)))}<p class="hint">${esc(worldProfile().hint)} 隨時切換軟件名稱、貨幣與 AI 規則。既有餘額、價格與記錄保留數字原值，不自動換匯。</p></div>`
       + groupTitle('外觀')
       + `<div class="group pad">
           <div class="field"><span>主題風格</span><div class="skin-options">${Object.entries(skins).map(([key, s]) => `<button class="skin-choice" data-action="skin" data-value="${key}" aria-pressed="${(phone.skin || 'sky') === key}"><span style="background:${s.preview[0]}"><b style="background:${s.preview[3]}"></b><i style="background:${s.preview[1]}"></i><i style="background:${s.preview[2]}"></i></span>${s.name}</button>`).join('')}</div></div>
@@ -129,12 +134,12 @@ export function settingsApp(ctx) {
       + groupTitle('繪圖')
       + `<div class="group">${toggle('drawEnabled', '正文出圖', s.draw.enabled, '開啟後，繪圖預設會加進聊天請求，讓模型在正文裡寫出圖示籤。')}${toggle('drawAuto', '新回覆自動出圖', s.draw.auto, '只自動畫不花錢的：NovelAI 免費檔內的圖、ComfyUI 的圖；GPT 生圖在「每張先問」關掉後也會自動畫。其餘的正文裡顯示“點選生成”。用哪個引擎畫在繪圖 App 頂上選。')}${toggle('drawFold', '正文圖片預設收起', s.draw.fold, '正文裡只留一個小縮圖，點開再看。每張圖也能單獨收起或展開。')}${toggle('drawGuard', '免費檔守衛', s.draw.guard, '步數不超過 28、尺寸不超過 1024×1024，不會發出扣 Anlas 的請求。')}</div>`
       + groupTitle('分割槽')
-      + (() => { const space = api.phoneSpace?.() || {}; return `<div class="group">${toggle('partition', '按角色卡分開', s.chat.partition === 'card', '開啟後，每張角色卡（群聊是每個群）一部手機：聊天記錄、朋友圈、論道臺、查手機各管各的，換卡就換手機；聯絡人只有這張卡的角色、在這張卡劇情裡說過話的角色，和在這張卡里手動加的聯絡人。「我」跟著酒館給這張卡鎖定的人設走。\n\n開啟之前就有的聊天和動態沒有歸屬，每張卡都看得到；不想要的可以刪掉。關掉分割槽後，所有東西又會一起顯示。')}
+      + (() => { const space = api.phoneSpace?.() || {}; return `<div class="group">${toggle('partition', '按角色卡分開', s.chat.partition === 'card', worldText('開啟後，每張角色卡（群聊是每個群）一部手機：聊天記錄、朋友圈、論道臺、查手機各管各的，換卡就換手機；聯絡人只有這張卡的角色、在這張卡劇情裡說過話的角色，和在這張卡里手動加的聯絡人。「我」跟著酒館給這張卡鎖定的人設走。\n\n開啟之前就有的聊天和動態沒有歸屬，每張卡都看得到；不想要的可以刪掉。關掉分割槽後，所有東西又會一起顯示。'))}
           <div class="setting-row"><span>現在是</span><small>${space.key ? esc(space.name || '這張角色卡') + (s.chat.partition === 'card' ? ' 的手機' : '') : '沒有開啟角色卡'}</small></div></div>`; })()
       + groupTitle('手機')
       + `<div class="group">${toggle('lockOnOpen', '開啟時顯示鎖屏', phone.lockOnOpen, '鎖屏可隨時跳過，是外掛內的外觀，不是手機安全鎖。')}<button class="list-row" data-action="lock"><span><strong>看一眼鎖屏</strong></span>${icon('lock')}</button></div>`
       + groupTitle('儲存')
-      + `<div class="group">
+      + worldText`<div class="group">
           <div class="setting-row"><span>本地資料</span><small>${library ? size(library.bytes) + ' / ' + size(library.limit) : '無法讀取'}</small></div>
           <div class="setting-row"><span>相簿裡的繪圖</span><small>${drawn ? drawn.count + ' 張 · ' + size(drawn.bytes) : '無法讀取'}</small></div>
           ${chatPictures ? `<div class="setting-row"><span>當前聊天的正文圖片</span><small>${chatPictures.count} 張 · 存在酒館</small></div>` : ''}</div>
@@ -143,7 +148,7 @@ export function settingsApp(ctx) {
         ${syncGroup()}
         ${groupTitle('備份與恢復')}<div class="group"><button class="list-row" data-action="backup"><span><strong>備份到檔案</strong><small>設定、角色資料、聊天記錄和相簿存成一個檔案，換裝置或誤刪時能找回</small></span>${icon('next')}</button><label class="list-row file-button"><span><strong>從檔案恢復</strong><small>選一個 傳音玉符 備份檔案</small></span>${icon('next')}<input type="file" data-backup-file accept=".json,application/json" aria-label="選擇備份檔案"></label></div>
         ${groupTitle('幫助')}<div class="group"><button class="list-row" data-action="self-check"><span><strong>自檢</strong><small>出問題時看看是哪裡不對，可以把報告發給幫你的人</small></span>${icon('next')}</button></div>
-        <div class="actions">${btn('about', '關於 傳音玉符', 'text-button')}</div>`);
+        <div class="actions">${btn('about', worldText('關於 傳音玉符'), 'text-button')}</div>`);
   }
 
   v.back = () => { if (!appearance && !check && !backup && !restore) return false; appearance = check = backup = restore = null; render().catch(e => ctx.notify(e.message)); return true; };
@@ -155,6 +160,7 @@ export function settingsApp(ctx) {
       if (key === 'glyph') appearance.icons[el.dataset.iconApp] = el.value === 'default' ? null : {kind: 'glyph', key: el.value};
       return;
     }
+    if (key === 'worldMode') { api.updateGeneral({worldMode:el.value}); await render(); return; }
     if (key === 'syncEnabled') { api.saveSync({enabled: el.checked}); await render(); return; }
     if (['floatingEnabled', 'wallpaperMotion', 'fastMode'].includes(key)) api.updateGeneral({[key]: el.checked});
     else if (key === 'drawEnabled') api.saveDraw({enabled: el.checked});
@@ -259,7 +265,7 @@ export function settingsApp(ctx) {
       }
       case 'save-report': {
         const text = check?.report?.text || '', stamp = new Date().toLocaleString('zh-TW', {hour12: false}).replace(/[/:]/g, '-');
-        await v.busy(el, async () => ctx.notify('已下載 ' + await saveFile(ctx.doc, new Blob([text], {type: 'text/plain;charset=utf-8'}), `傳音玉符 自檢 ${stamp}`)));
+        await v.busy(el, async () => ctx.notify('已下載 ' + await saveFile(ctx.doc, new Blob([text], {type: 'text/plain;charset=utf-8'}), worldText`傳音玉符 自檢 ${stamp}`)));
         break;
       }
       case 'clear-drawn':
@@ -268,7 +274,7 @@ export function settingsApp(ctx) {
       case 'clear-chat-pictures':
         if (await ctx.confirm('清除當前聊天的正文圖片？', '圖片檔案會從酒館刪除，出圖示籤還在，之後可以點“點選生成”重新畫。相簿裡的副本不受影響。')) { const r = await v.busy(el, () => api.clearChatPictures()); await render(); ctx.notify(`已清除 ${r.count} 張` + (r.failed ? `，${r.failed} 張沒刪掉` : '')); }
         break;
-      case 'about': ctx.help('傳音玉符\n酒館裡的傳音玉符：角色庫、劇情時間、聊天、繪圖（NovelAI、GPT 生圖、ComfyUI）、相簿和備忘錄。\n\n金鑰和本地資料儲存在當前瀏覽器與酒館地址。首頁日期與時間跟隨劇情；訊號與電量依瀏覽器提供的裝置狀態顯示。'); break;
+      case 'about': ctx.help(worldText('傳音玉符\n酒館裡的傳音玉符：角色庫、劇情時間、聊天、繪圖（NovelAI、GPT 生圖、ComfyUI）、相簿和備忘錄。\n\n金鑰和本地資料儲存在當前瀏覽器與酒館地址。首頁日期與時間跟隨劇情；訊號與電量依瀏覽器提供的裝置狀態顯示。')); break;
     }
   });
   render().catch(e => ctx.notify(e.message));

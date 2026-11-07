@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {buildWorldbookIndex,searchWorldbookIndex,readWorldbookIndexEntry,selectWorldbookContext} from './worldbook-index.js';
 import {stripStatusPanels} from './status.js';
 import {parseSpiritText, SPIRIT_MAX, SPIRIT_CURRENCY_RULE} from '../core/currency.js';
@@ -166,6 +167,18 @@ function validateProfile(c, id) {
     return profile;
 }
 
+/** Explicit task connection; no changes to the host's active connection. */
+export async function generateProfileText(c,{profileId,messages,maxTokens=4096,includePreset=false}){
+ validateProfile(c,profileId);
+ const length=Math.min(32768,Math.max(256,Number(maxTokens)||4096));
+ let result;
+ try{result=await c.ConnectionManagerRequestService.sendRequest(profileId,messages,length,{stream:false,extractData:true,includePreset,includeInstruct:includePreset});}
+ catch{throw Error('所選模型請求失敗，請檢查連線、模型名稱與額度');}
+ const content=result?.content;
+ if(typeof content!=='string'||!content.trim())throw Error('所選模型未回傳文字，請更換模型或檢查輸出額度');
+ return content;
+}
+
 /**
  * prompt: caller's public phone state/protocol/action instructions, never private
  * diaries. Explicit profiles add active character fields and the last 12K chat
@@ -242,7 +255,7 @@ function parseCatalogue(response) {
         if (typeof item.text !== 'string' || !item.text.trim() || item.text.trim().length > 1000) fail(`${label}描述須為 1–1000 字元，商品尚未更新。`);
         let amount;
         try { amount = parseSpiritText(item.amount, {zero: false, max: SPIRIT_MAX}); }
-        catch { fail(`${label}價格須為 1–${SPIRIT_MAX} 枚下品靈石，或能精確換算的明確中品／極品數量，商品尚未更新。`); }
+        catch { fail(worldText`${label}價格須為 1–${SPIRIT_MAX} 枚下品靈石，或能精確換算的明確中品／極品數量，商品尚未更新。`); }
         return { title: item.title.trim(), text: item.text.trim(), amount };
     });
     // Allocate identities only after every item passes validation. Model IDs
@@ -253,7 +266,7 @@ function parseCatalogue(response) {
 /** Generate merchandise only; this never spends money or appends chat events. */
 export async function generateShopCatalogue(c, { prompt = '', maxTokens = 1800, ...options } = {}) {
     if (typeof prompt !== 'string') fail('商城背景指令格式錯誤。');
-    const instruction = `${prompt}\n${CATALOGUE_MARKER}\n請根據目前角色、最近劇情與傳音玉符所選世界書，生成 1–8 件此刻合理出現在萬寶閣的商品，建議 4–6 件。名稱使用繁體中文，每件描述建議 30–80 字，交代物件用途及與劇情的關係；可為衣物、食物、道具、禮物或此世界合理的物件。${SPIRIT_CURRENCY_RULE} amount 必須是 1–${SPIRIT_MAX} 的 JSON 整數。不要聲稱使用者已購買或已扣款。不要生成付款、轉帳、手機事件或任何圖片網址。\n只回傳以下形狀的完整 JSON，無前後文、無 Markdown：{"items":[{"title":"商品名稱（1–100 字元）","text":"商品描述（1–1000 字元）","amount":12}]}。不生成 id；商品 ID 由手機系統配置。`;
+    const instruction = worldText`${prompt}\n${CATALOGUE_MARKER}\n請根據目前角色、最近劇情與傳音玉符所選世界書，生成 1–8 件此刻合理出現在萬寶閣的商品，建議 4–6 件。名稱使用繁體中文，每件描述建議 30–80 字，交代物件用途及與劇情的關係；可為衣物、食物、道具、禮物或此世界合理的物件。${SPIRIT_CURRENCY_RULE} amount 必須是 1–${SPIRIT_MAX} 的 JSON 整數。不要聲稱使用者已購買或已扣款。不要生成付款、轉帳、手機事件或任何圖片網址。\n只回傳以下形狀的完整 JSON，無前後文、無 Markdown：{"items":[{"title":"商品名稱（1–100 字元）","text":"商品描述（1–1000 字元）","amount":12}]}。不生成 id；商品 ID 由手機系統配置。`;
     const response = await generatePhoneResponse(c, { ...options, prompt: instruction, maxTokens });
     return parseCatalogue(response);
 }

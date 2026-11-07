@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {formatSpiritAmount} from '../core/currency.js';
 import {sourceScope} from './source-sync.js';
 import {renderActivityCards} from './cards.js';
@@ -13,7 +14,7 @@ const paid = new Set(['transfer', 'redpacket', 'gift']);
 const staleError = () => Object.assign(Error('對話已切換，手機紀錄沒有寫入其他對話。'), {code: 'STALE'});
 const userName = c => c.name1 || '我';
 const person = (name, c) => name === 'me' || name === '{{user}}' ? userName(c) : clip(name, 80);
-const labels = {wechat: '千里傳音', instagram: '浮光錄', forum: '論道臺', shop: '萬寶閣'};
+const labels = {get wechat(){return worldText('千里傳音');}, get instagram(){return worldText('浮光錄');}, get forum(){return worldText('論道臺');}, get shop(){return worldText('萬寶閣');}};
 const actions = {message: '訊息', photo: '照片', voice: '語音', post: '貼文', story: '限時動態', comment: '回覆', dm: '私訊', like: '按讚', transfer: '轉帳', redpacket: '紅包', gift: '禮物', payment_status: '交易狀態', purchase: '購買', catalogue: '商品目錄'};
 const stateLabels = {sent: '待領取', accepted: '已收下', opened: '已領取', returned: '已退回', purchased: '已購買'};
 

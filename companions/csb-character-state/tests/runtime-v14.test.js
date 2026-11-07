@@ -17,7 +17,7 @@ test('auxiliary prompt failures are fail-open and the registered lifecycle relea
     globalThis.MutationObserver=class{constructor(callback){this.callback=callback;this.live=false;observers.push(this);}observe(){this.live=true;}disconnect(){this.live=false;}};
     globalThis.SillyTavern={getContext:()=>c};delete globalThis.CSBCharacterState;delete globalThis.csbCharacterStateIntercept;delete globalThis.CSBCharacterStateRuntime;
     const api=module.initialize(),lifecycle=globalThis.CSBCharacterStateRuntime;
-    assert.equal(lifecycle.version,'1.5.0');assert.equal(lifecycle.intercept,module.intercept);assert.equal(lifecycle.dispose,module.dispose);
+    assert.equal(lifecycle.version,'1.6.0');assert.equal(lifecycle.intercept,module.intercept);assert.equal(lifecycle.dispose,module.dispose);
     assert.equal(observers.length,1);assert.equal(observers[0].live,true);
     assert.equal(module.initialize(),api);assert.equal(observers.length,1);
     let aborted=0;

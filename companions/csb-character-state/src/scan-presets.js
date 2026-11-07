@@ -92,6 +92,10 @@ export async function importScanPresets(host,input){
 const scanPresetHostRequests=new WeakSet();
 export async function generateWithScanPreset(host,args,preset){
   const context=host.context();
+  if(preset.model&&preset.model!=='tavern'){
+    if(typeof host.adapter.generateScanModel!=='function')throw Error('自選模型尚未接入，請由小手機開啟角色資訊');
+    return host.adapter.generateScanModel(context,args,preset);
+  }
   if(preset.route==='host'){
     const generate=host.adapter.generateScanHost??context.generateQuietPrompt;
     if(typeof generate!=='function')throw Error('此酒館未提供 generateQuietPrompt，無法沿用完整提示預設；請更新酒館或明確選擇「標準抽取」。');

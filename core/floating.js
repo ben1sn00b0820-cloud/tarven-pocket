@@ -1,3 +1,4 @@
+import {worldText} from './world.js';
 // ST-iPhonie floating ball. Plain DOM (no shadow root) so that dock/organizer scripts can clone its look
 // and forward clicks to it; every rule in floating.css is scoped under #sttts-floating.
 const SPARK = '<svg class="spark" viewBox="-10 -10 20 20" fill="currentColor" aria-hidden="true"><path d="M0-10C1-2 2-1 10 0 2 1 1 2 0 10-1 2-2 1-10 0-2-1-1-2 0-10z"/></svg>';
@@ -24,8 +25,8 @@ export class FloatingLauncher {
     this.root = document.createElement('div');
     this.root.id = 'sttts-floating';
     this.root.setAttribute('role', 'group');
-    this.root.setAttribute('aria-label', '傳音玉符');
-    this.root.innerHTML = `<div class="float" data-side="${this.side}" data-mode="rest" data-phase="idle" ><span class="pulse"></span><button class="orb" type="button" aria-label="打開傳音玉符，可拖曳">${JADE}<span class="edge-mark"></span></button>${SPARK}</div>`;
+    this.root.setAttribute('aria-label', worldText('傳音玉符'));
+    this.root.innerHTML = worldText`<div class="float" data-side="${this.side}" data-mode="rest" data-phase="idle" ><span class="pulse"></span><button class="orb" type="button" aria-label="打開傳音玉符，可拖曳">${JADE}<span class="edge-mark"></span></button>${SPARK}</div>`;
     this.box = this.root.querySelector('.float');
     this.orb = this.root.querySelector('.orb');
     this.abort = new AbortController();
@@ -85,7 +86,7 @@ export class FloatingLauncher {
   setMode(mode) {
     this.mode = mode === 'docked' ? 'docked' : 'rest';
     this.box.dataset.mode = this.mode;
-    const label = '打開傳音玉符，可拖曳';
+    const label = worldText('打開傳音玉符，可拖曳');
     this.orb.setAttribute('aria-label', label);
     this.orb.title = this.mode === 'docked' ? label : this.message || label;
     this.arm();

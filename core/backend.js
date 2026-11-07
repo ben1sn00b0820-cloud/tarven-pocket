@@ -1,3 +1,5 @@
+import {worldText} from './world.js';
+import {setWorldMode,WORLD_MODES} from './world.js';
 import { MomentStore } from './moments-store.js';
 import { AppStore } from './app-store.js';
 import { FORUM_LIMITS, buildForumRequest, cleanPost as cleanForumPost, cleanReply as cleanForumReply, startingHeat } from './forum.js';
@@ -67,13 +69,14 @@ function inactivePlayer() {
 
 /** Framework-independent operations. Host callbacks own SillyTavern persistence and rendering. */
 // Audio files are named after who said what: 诺亚 - 午安，格林小姐.
-const audioName = (role, said) => [String(role || '').trim(), String(said || '').replace(/\s+/g, ' ').trim().slice(0, 30)].filter(Boolean).join(' - ') || '傳音玉符 语音';
+const audioName = (role, said) => [String(role || '').trim(), String(said || '').replace(/\s+/g, ' ').trim().slice(0, 30)].filter(Boolean).join(' - ') || worldText('傳音玉符 语音');
 
 export class PhoneBackend {
     constructor({ settings, persist = () => {}, notify = () => {}, change = () => {}, unknown = () => {},
         providers = new Providers(), cache, library, keyStore, sink, novelai, chats, indexedDB = globalThis.indexedDB, syncStorage = () => globalThis.localStorage,
         imageFetch = (...args) => globalThis.fetch(...args), tavernHeaders = () => globalThis.SillyTavern?.getContext?.()?.getRequestHeaders?.() || {} } = {}) {
         this.settings = normalizeSettings(settings);
+        setWorldMode(this.settings.general.worldMode);
         validateSettings(this.settings);
         this.persist = persist;
         this.notify = notify;
@@ -146,7 +149,7 @@ export class PhoneBackend {
         const vibeGroups = want.includes('vibes') ? clone(this.settings.draw.vibe.groups) : null;
         const blob = await writeBackup({ version, settings, library, chats, moments, keys, vibeGroups });
         const day = new Date(), pad = n => String(n).padStart(2, '0');
-        return { blob, name: `傳音玉符 备份 ${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}` };
+        return { blob, name: worldText`傳音玉符 备份 ${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}` };
     }
     /** What a backup file holds, to show before restoring. */
     async inspectBackup(file) {
@@ -232,6 +235,7 @@ export class PhoneBackend {
         // The host callback completes before the service acknowledges a new settings revision.
         this.persist(clone(copy));
         this.settings = copy;
+        setWorldMode(copy.general.worldMode);
         this.revision++;
         this.emit('settings', { state: this.getState() });
         return this.getState();
@@ -242,6 +246,7 @@ export class PhoneBackend {
         for (const key of ['voiceEnabled', 'cacheEnabled', 'floatingEnabled', 'waveformEnabled', 'wallpaperMotion', 'stripVoice']) if (key in patch) {
             if (typeof patch[key] !== 'boolean') throw Error('開關設定無效'); next.general[key] = patch[key];
         }
+        if ('worldMode' in patch) { if (!Object.hasOwn(WORLD_MODES,patch.worldMode)) throw Error('世界模式無效'); next.general.worldMode=patch.worldMode; }
         if ('defaultLanguage' in patch) {
             if (typeof patch.defaultLanguage !== 'string' || !patch.defaultLanguage.trim() || patch.defaultLanguage.length > 40) throw Error('預設語言無效');
             next.general.defaultLanguage = patch.defaultLanguage.trim();
@@ -384,14 +389,14 @@ export class PhoneBackend {
     walletEntry(w, amount, {kind, note = '', who = '', id = crypto.randomUUID()} = {}) {
         let next;
         try { next = addWalletAmount(w.balance, amount, {signed: true}); }
-        catch { throw Object.assign(Error(amount < 0 ? `靈石不足：現有 ${formatSpiritAmount(w.balance)}，需要 ${formatSpiritAmount(-amount)}` : '靈石餘額超過上限'), {code: amount < 0 ? 'BROKE' : 'WALLET_LIMIT'}); }
-        if (!Number.isFinite(amount) || !Number.isFinite(next) || next < 0 || next > WALLET_LIMITS.balance) throw Object.assign(Error(amount < 0 ? `靈石不足：現有 ${formatSpiritAmount(w.balance)}，需要 ${formatSpiritAmount(-amount)}` : '靈石袋餘額超過上限'), {code: amount < 0 ? 'BROKE' : 'WALLET_LIMIT'});
+        catch { throw Object.assign(Error(amount < 0 ? worldText`靈石不足：現有 ${formatSpiritAmount(w.balance)}，需要 ${formatSpiritAmount(-amount)}` : worldText('靈石餘額超過上限')), {code: amount < 0 ? 'BROKE' : 'WALLET_LIMIT'}); }
+        if (!Number.isFinite(amount) || !Number.isFinite(next) || next < 0 || next > WALLET_LIMITS.balance) throw Object.assign(Error(amount < 0 ? worldText`靈石不足：現有 ${formatSpiritAmount(w.balance)}，需要 ${formatSpiritAmount(-amount)}` : worldText('靈石袋餘額超過上限')), {code: amount < 0 ? 'BROKE' : 'WALLET_LIMIT'});
         w.balance = next;
         w.ledger.unshift({id, at: Date.now(), amount, kind, note: String(note).slice(0, 60), who: String(who).slice(0, 40)});
         w.ledger.length = Math.min(w.ledger.length, WALLET_LIMITS.ledger);
     }
     walletJournalSlot(w) {
-        if (w.journal.length >= WALLET_LIMITS.journal) throw Error('靈石袋交易記錄已滿，請匯出備份後管理記錄；本次沒有扣款');
+        if (w.journal.length >= WALLET_LIMITS.journal) throw Error(worldText('靈石袋交易記錄已滿，請匯出備份後管理記錄；本次沒有扣款'));
     }
     walletCommit(next) {
         this.save(next);
@@ -597,7 +602,7 @@ export class PhoneBackend {
                 this.walletJournalSlot(w);
                 const back = state === 'returned' ? walletAmount(m.kind === 'gift' ? m.gift.price : m.amount, {legacy: true}) : 0;
                 // Imported story cards are observations, not proof that this wallet actually paid the amount.
-                if (back && m.source && !w.journal.some(r => r.id === 'send:' + m.paymentId && r.status === 'done')) throw Error('這筆劇情付款沒有靈石袋扣款記錄，不能再次退款');
+                if (back && m.source && !w.journal.some(r => r.id === 'send:' + m.paymentId && r.status === 'done')) throw Error(worldText('這筆劇情付款沒有靈石袋扣款記錄，不能再次退款'));
                 if (back) this.walletEntry(w, back, {kind: 'refund', note: m.kind === 'gift' ? m.gift.name : m.text, who: actor, id: key});
                 w.journal.push({id: key, flow: 'claim', status: 'pending', at: Date.now(), amount: back, threadId, messageId, actor, action: state, notice: false});
                 this.walletCommit(next);
@@ -660,7 +665,7 @@ export class PhoneBackend {
     /** One sync with the tavern: takes what changed there, writes what changed here. */
     async syncNow({ deviceName = '' } = {}) {
         this.assertOpen();
-        if (!this.syncFiles) throw Error('在酒館裡開啟傳音玉符時才能儲存到酒館');
+        if (!this.syncFiles) throw Error(worldText('在酒館裡開啟傳音玉符時才能儲存到酒館'));
         if (this.syncState.busy) return this.syncState.running;
         clearTimeout(this.syncTimer);
         const stores = {

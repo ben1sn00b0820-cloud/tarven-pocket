@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {createView, esc, btn, field, input, select, textArea, toggle, heading, groupTitle, avatar, avatarPicture, empty, help, copyText} from './common.js';
 import {icon} from './icons.js';
 import {openImageViewer} from '../image-viewer.js';
@@ -185,8 +186,8 @@ export function chatApp(ctx) {
       + `<div class="group pad"><div class="field"><span>頭像</span><div class="actions" style="margin:0">${btn('avatar-pick', icon('image') + '換頭像', 'secondary', 'data-key="me"')}</div><small class="hint">${esc(avatarState('me'))}</small></div>${field('名字', input('me-name', p.name, 'text', `maxlength="40" placeholder="${esc(api.userName?.() || '我')}（跟隨酒館裡的使用者名稱）"`))}${field('個性簽名', input('me-signature', p.signature, 'text', 'maxlength="80" placeholder="寫一句話"'))}
         <div class="field"><span>狀態</span><div class="deco-row">${Object.entries(PROFILE_STATUS).map(([k, l]) => `<button type="button" class="status-chip" data-action="me-set" data-key="status" data-value="${k}" aria-pressed="${p.status === k}"><i class="qq-dot" data-status="${k}"></i>${l}</button>`).join('')}</div></div>
         ${field('自定義狀態', input('me-statusText', p.statusText, 'text', 'maxlength="20" placeholder="例如：摸魚中、在聽歌"'))}</div>`
-      + groupTitle('靈石袋與商城')
-      + `<div class="group"><button class="list-row" data-action="me-wallet">${icon('wallet')}<span><strong>靈石袋</strong><small>靈石 ${esc(yuan(w.balance))} · 明細和收到的禮物</small></span>${icon('next')}</button><button class="list-row" data-action="me-shop">${icon('shop')}<span><strong>商城</strong><small>更好看的氣泡、掛件、背景，送給角色的禮物</small></span>${icon('next')}</button></div>`
+      + groupTitle(worldText('靈石袋與商城'))
+      + worldText`<div class="group"><button class="list-row" data-action="me-wallet">${icon('wallet')}<span><strong>靈石袋</strong><small>靈石 ${esc(yuan(w.balance))} · 明細和收到的禮物</small></span>${icon('next')}</button><button class="list-row" data-action="me-shop">${icon('shop')}<span><strong>商城</strong><small>更好看的氣泡、掛件、背景，送給角色的禮物</small></span>${icon('next')}</button></div>`
       + groupTitle('個性裝扮')
       + `<div class="group pad"><div class="field"><span>聊天氣泡</span>${chips('bubble', BUBBLES, p.bubble)}</div><div class="field"><span>頭像掛件</span>${chips('frame', FRAMES, p.frame)}</div><div class="field"><span>聊天背景</span>${chips('background', BACKGROUNDS, p.background)}</div>
         <div class="actions" style="margin-top:0">${btn('me-bg-photo', icon('image') + (p.backgroundPhoto ? '換一張照片當背景' : '用相簿裡的照片當背景'), 'secondary')}${p.backgroundPhoto ? btn('me-bg-clear', '不用照片', 'text-button') : ''}</div></div>`
@@ -238,7 +239,7 @@ export function chatApp(ctx) {
   }
   function lineHTML(m) {
     const mid = `data-mid="${esc(m.id)}"`;
-    if (m.kind === 'system' && m.source?.id && m.text?.startsWith('[待確認付款]') && api.pocketConfirmPayment) return `<div class="tp-payment-draft" ${mid}><strong>${icon('swap')}待確認付款</strong><p>${esc(m.text.slice('[待確認付款]'.length).trim())}</p><small>目前尚未扣除千里傳音靈石袋餘額。</small>${btn('pocket-confirm-payment', '確認付款', 'primary', mid)}</div>`;
+    if (m.kind === 'system' && m.source?.id && m.text?.startsWith('[待確認付款]') && api.pocketConfirmPayment) return worldText`<div class="tp-payment-draft" ${mid}><strong>${icon('swap')}待確認付款</strong><p>${esc(m.text.slice('[待確認付款]'.length).trim())}</p><small>目前尚未扣除千里傳音靈石袋餘額。</small>${btn('pocket-confirm-payment', '確認付款', 'primary', mid)}</div>`;
     if (m.kind === 'system') return `<div class="sys">${icon('book')}${esc(m.text)}</div>`;
     if (m.kind === 'pat') return `<div class="note-line" ${mid}>${esc(patText(m))}</div>`;
     if (m.kind === 'notice') return `<div class="note-line" ${mid}>${/红包/.test(m.text) ? '<span class="pk-dot" aria-hidden="true"></span>' : ''}${esc(noticeText(m))}</div>`;
@@ -284,7 +285,7 @@ export function chatApp(ctx) {
     v.draw(`<div class="chat-thread${selecting ? ' selecting' : ''}" data-bubble="${esc(look.bubble)}" data-bg="${esc(look.backgroundPhoto ? 'photo' : look.background)}">
       <div class="th-head" data-engine="${group ? 'none' : engine(thread.members[0])}">${threadAvatar(thread, 38)}<div class="th-title">${group ? `<strong>${esc(thread.name)}</strong>` : `<button class="tp-thread-person" data-action="profile" data-name="${esc(thread.members[0])}" aria-label="檢視 ${esc(thread.name)} 的資料"><strong>${esc(thread.name)}</strong></button>`}<small>${esc(sub)}</small></div>
         ${btn('bring', selecting ? '取消' : icon('book') + '<span class="bring-label">帶進劇情</span>', 'chip-button', selecting ? '' : 'aria-label="帶進劇情" title="帶進劇情"')}${!group && api.callDial ? btn('call', icon('phone'), 'round-button call-go', 'aria-label="文字通話"') : ''}${btn('thread-menu', icon('more'), 'round-button', 'aria-label="更多"')}</div>
-      <div class="msgs" role="log" aria-live="polite">${list.length ? list.map((m, i) => messageHTML(m, i, list)).join('') : `<p class="chat-empty">${live ? '發幾條訊息都行，發完點右下角的氣泡按鈕讓對方回覆；輸入框空著時傳送鍵就會變成它。也可以直接點它，讓對方先開口。' : '在酒館裡開啟傳音玉符時，聯絡人才會回覆。'}</p>`}
+      <div class="msgs" role="log" aria-live="polite">${list.length ? list.map((m, i) => messageHTML(m, i, list)).join('') : `<p class="chat-empty">${live ? '發幾條訊息都行，發完點右下角的氣泡按鈕讓對方回覆；輸入框空著時傳送鍵就會變成它。也可以直接點它，讓對方先開口。' : worldText('在酒館裡開啟傳音玉符時，聯絡人才會回覆。')}</p>`}
         ${bring?.threadId === threadId ? `<div class="sys">${icon('book')}${bring.count} 條訊息會帶進下一次正文 ${btn('cancel-bring', '取消', 'text-button')}</div>` : ''}
         ${typing() ? `<div class="msg" data-engine="${group ? 'none' : engine(thread.members[0])}">${avatar(group ? '…' : thread.members[0], group ? 'none' : engine(thread.members[0]), 34)}<div class="m-body"><div class="chat-bubble typing" aria-label="對方正在輸入"><i></i><i></i><i></i></div></div></div>` : ''}</div>
       ${selecting
@@ -401,8 +402,8 @@ export function chatApp(ctx) {
     return d;
   }
   const value = (d, key) => d.body.querySelector(`[data-field=${key}]`)?.value.trim() || '';
-  const unitChoices = Object.entries(SPIRIT_UNIT_LABELS);
-  const amountFields = (key, initial = '') => field('數量', input(key, initial, 'text', 'inputmode="decimal" maxlength="20" placeholder="輸入數量"')) + field('靈石品級', select(key + '-unit', 'lower', unitChoices)) + '<p class="hint">1 極品 = 1000 中品；1 中品 = 100 下品。送出時依選擇的品級換算。</p>';
+  const unitChoices = () => Object.entries(SPIRIT_UNIT_LABELS);
+  const amountFields = (key, initial = '') => field('數量', input(key, initial, 'text', 'inputmode="decimal" maxlength="20" placeholder="輸入數量"')) + field(worldText('靈石品級'), select(key + '-unit', 'lower', unitChoices())) + '<p class="hint">1 極品 = 1000 中品；1 中品 = 100 下品。送出時依選擇的品級換算。</p>';
   const amountOf = (text, unit = 'lower') => parseSpiritAmount(text, unit, {zero: false});
 
   async function sendPhoto() {
@@ -507,14 +508,14 @@ export function chatApp(ctx) {
   // ---------- Red packets and transfers ----------
   function openPacket(m) {
     const mine = m.from === 'me', opened = m.state === 'opened';
-    const status = opened ? (m.openedBy === 'me' ? '已存入靈石' : `${esc(you(m.openedBy))} 已領取`) : mine ? '等對方領取' : '';
+    const status = opened ? (m.openedBy === 'me' ? worldText('已存入靈石') : `${esc(you(m.openedBy))} 已領取`) : mine ? '等對方領取' : '';
     const d = sheet(`${you(m.from)}的紅包`, `<div class="packet-open${opened || mine ? ' shown' : ''}">${avatar(m.from === 'me' ? '我' : m.from, mine ? 'none' : engine(m.from), 54)}
       <p class="po-from">${esc(mine ? '你發出的紅包' : m.from + ' 發出的紅包')}</p><p class="po-wish">${esc(m.text || BLESSING)}</p>
       ${opened || mine ? `<p class="po-amount">${esc(yuan(m.amount))}</p><p class="po-state">${status}</p>` : btn('packet-open', '開', 'packet-coin', 'aria-label="拆開紅包"')}</div>`, {
       'packet-open': async () => {
         d.close();
         await api.takeSent(threadId, m.id, true);
-        ctx.notify(`領到 ${yuan(m.amount)}，已存入靈石`);
+        ctx.notify(worldText`領到 ${yuan(m.amount)}，已存入靈石`);
       }
     });
   }
@@ -524,7 +525,7 @@ export function chatApp(ctx) {
     const settle = next => async () => {
       d.close();
       await api.takeSent(threadId, m.id, next === 'accepted');
-      if (next === 'accepted') ctx.notify(`收下 ${yuan(m.amount)}，已存入靈石`);
+      if (next === 'accepted') ctx.notify(worldText`收下 ${yuan(m.amount)}，已存入靈石`);
     };
     const d = sheet(mine ? '轉賬' : `${m.from}的轉賬`, `<div class="transfer-open"><span class="to-ico">${icon(waiting ? 'swap' : m.state === 'accepted' ? 'check' : 'undo')}</span><p class="po-state">${esc(state)}</p><p class="po-amount">${esc(yuan(m.amount))}</p>${m.text ? `<p class="po-wish">${esc(m.text)}</p>` : ''}</div>
       ${!mine && waiting ? `<div class="actions">${btn('transfer-accept', '收款', 'primary')}</div><div class="actions">${btn('transfer-return', '退還', 'text-button')}</div>` : ''}`, {
@@ -539,7 +540,7 @@ export function chatApp(ctx) {
     const paymentId = crypto.randomUUID();
     const w = api.wallet(), gifts = api.shopCatalog().gifts;
     let picked = null;
-    const d = sheet(`送禮物給${thread.members[0]}`, `<p class="wallet-line">${icon('wallet')}靈石 ${esc(yuan(w.balance))}</p>
+    const d = sheet(`送禮物給${thread.members[0]}`, worldText`<p class="wallet-line">${icon('wallet')}靈石 ${esc(yuan(w.balance))}</p>
       <div class="gift-grid">${gifts.map(g => `<button type="button" class="gift-item" data-action="gift-pick" data-id="${esc(g.id)}" aria-pressed="false"${g.price > w.balance ? ' data-short' : ''}><span class="gi-emoji" aria-hidden="true">${esc(g.emoji)}</span><strong>${esc(g.name)}</strong><small>${esc(yuan(g.price))}</small></button>`).join('')}</div>
       ${field('附言', input('note', '', 'text', 'maxlength="60" placeholder="可以不寫"'))}
       ${toggle('bring', '帶進劇情', false, '開啟後，下一次正文回覆會知道你送了這份禮物（和聊天裡的「帶進劇情」一樣，用一次）。')}
@@ -560,10 +561,10 @@ export function chatApp(ctx) {
   }
   function openGift(m) {
     const mine = m.from === 'me', waiting = m.state === 'sent', g = m.gift || {};
-    const state = {sent: mine ? '等對方收下' : '要收下嗎？', accepted: mine ? '對方收下了' : '你收下了', returned: mine ? '對方退還了，錢已退回靈石' : '你退還了'}[m.state] || '';
+    const state = {sent: mine ? '等對方收下' : '要收下嗎？', accepted: mine ? '對方收下了' : '你收下了', returned: mine ? worldText('對方退還了，錢已退回靈石') : '你退還了'}[m.state] || '';
     const d = sheet(mine ? '你送的禮物' : `${m.from}送的禮物`, `<div class="gift-open"><span class="go-emoji" aria-hidden="true">${esc(g.emoji || '🎁')}</span><p class="go-name">${esc(g.name)}</p>${mine && g.price ? `<p class="po-amount">${esc(yuan(g.price))}</p>` : ''}${m.text ? `<p class="po-wish">${esc(m.text)}</p>` : ''}<p class="po-state">${esc(state)}</p></div>
       ${!mine && waiting ? `<div class="actions">${btn('gift-accept', '收下', 'primary')}</div><div class="actions">${btn('gift-return', '退還', 'text-button')}</div>` : ''}`, {
-      'gift-accept': async () => { d.close(); await api.takeSent(threadId, m.id, true); ctx.notify(`收下了「${g.name}」，在靈石袋的「收到的禮物」裡`); },
+      'gift-accept': async () => { d.close(); await api.takeSent(threadId, m.id, true); ctx.notify(worldText`收下了「${g.name}」，在靈石袋的「收到的禮物」裡`); },
       'gift-return': async () => { d.close(); await api.takeSent(threadId, m.id, false); }
     });
   }
@@ -572,7 +573,7 @@ export function chatApp(ctx) {
   const when = at => { if (!at) return ''; const t = new Date(at); return `${t.getMonth() + 1}月${t.getDate()}日 ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; };
   function openWallet() {
     const w = api.wallet(), kinds = api.shopCatalog().ledgerKinds;
-    const d = sheet('靈石袋', `<div class="wallet-card"><small>靈石</small><strong>${esc(yuan(w.balance))}</strong><span>領到的紅包、收下的轉賬存進來；發紅包、轉賬、買裝扮和禮物從這裡出。</span></div>
+    const d = sheet(worldText('靈石袋'), worldText`<div class="wallet-card"><small>靈石</small><strong>${esc(yuan(w.balance))}</strong><span>領到的紅包、收下的轉賬存進來；發紅包、轉賬、買裝扮和禮物從這裡出。</span></div>
       <div class="actions">${btn('wallet-edit', '修改餘額', 'primary')}${btn('wallet-shop', icon('shop') + '去商城', 'secondary')}</div>
       ${groupTitle('已購物品')}${w.inventory?.length ? `<div class="gift-grid received">${w.inventory.map(r => `<div class="gift-item"><span class="gi-emoji" aria-hidden="true">${esc(r.emoji)}</span><strong>${esc(r.name)}</strong><small>${esc(yuan(r.price))} · ${esc(when(r.at))}</small><small>${esc(r.description)}</small></div>`).join('')}</div>` : '<p class="hint">劇情商城買下的物品會儲存在這裡。</p>'}
       ${groupTitle('收到的禮物')}${w.received.length ? `<div class="gift-grid received">${w.received.map(r => `<div class="gift-item"><span class="gi-emoji" aria-hidden="true">${esc(r.emoji)}</span><strong>${esc(r.name)}</strong><small>${esc(r.from)} 送的</small></div>`).join('')}</div>` : '<p class="hint">還沒有收到禮物。角色送的禮物，點開收下就會放在這裡。</p>'}
@@ -582,7 +583,7 @@ export function chatApp(ctx) {
     });
   }
   function editWalletBalance() {
-    const d = sheet('修改靈石袋餘額', `${field('餘額（靈石）', input('balance', api.wallet().balance, 'text', 'maxlength="80" placeholder="例如：1 極品 2 中品 3 下品"'), '未寫品級時以整數下品計算；調整會寫入收支明細，舊帳尾數保持原值。')}
+    const d = sheet(worldText('修改靈石袋餘額'), `${field(worldText('餘額（靈石）'), input('balance', api.wallet().balance, 'text', 'maxlength="80" placeholder="例如：1 極品 2 中品 3 下品"'), worldText('未寫品級時以整數下品計算；調整會寫入收支明細，舊帳尾數保持原值。'))}
       ${field('備註', input('note', '', 'text', 'maxlength="60" placeholder="例如：本章初始資金"'))}
       <div class="actions">${btn('wallet-save', '儲存餘額', 'primary')}</div>`, {
       'wallet-save': async () => { if (value(d, 'balance') !== String(api.wallet().balance)) await api.walletSetBalance(parseSpiritText(value(d, 'balance')), value(d, 'note')); d.close(); ctx.notify('餘額已更新，調整已記入明細'); openWallet(); }
@@ -618,7 +619,7 @@ export function chatApp(ctx) {
       }).join('')}</div>`).join('');
       const gifts = `<div class="gift-grid">${c.gifts.map(g => `<div class="gift-item${g.own ? ' own' : ''}"><span class="gi-emoji" aria-hidden="true">${esc(g.emoji)}</span><strong>${esc(g.name)}</strong><small>${esc(yuan(g.price))}</small>${g.note ? `<small class="gi-note">${esc(g.note)}</small>` : ''}${g.own ? `<span class="gi-tools">${btn('gift-edit', '改', 'text-button', `data-id="${esc(g.id)}"`)}${btn('gift-delete', '刪除', 'text-button', `data-id="${esc(g.id)}"`)}</span>` : ''}</div>`).join('')}</div>
         <div class="actions">${btn('gift-new', icon('add') + '自定義禮物', 'secondary')}</div><p class="hint">送禮物：在私聊裡點「+」→「禮物」。</p>`;
-      d.body.innerHTML = `<p class="wallet-line">${icon('wallet')}靈石 ${esc(yuan(w.balance))}</p><div class="segmented" style="margin:0 0 10px">${[['decor', '裝扮'], ['gifts', '禮物']].map(([k, l]) => `<button data-action="shop-tab" data-tab="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div>${tab === 'gifts' ? gifts : decor}`;
+      d.body.innerHTML = worldText`<p class="wallet-line">${icon('wallet')}靈石 ${esc(yuan(w.balance))}</p><div class="segmented" style="margin:0 0 10px">${[['decor', '裝扮'], ['gifts', '禮物']].map(([k, l]) => `<button data-action="shop-tab" data-tab="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div>${tab === 'gifts' ? gifts : decor}`;
     }
     draw();
   }
@@ -627,7 +628,7 @@ export function chatApp(ctx) {
     const g = gift || {name: '', emoji: '🎁', price: 20, note: ''};
     const d = sheet(gift ? '改禮物' : '自定義禮物', `${field('名字', input('gift-name', g.name, 'text', 'maxlength="20" placeholder="比如：手寫賀卡、演唱會門票"'))}
       ${field('圖示', input('gift-emoji', g.emoji, 'text', 'maxlength="4" placeholder="一個表情，比如 🎫"'))}
-      ${field('價格（靈石）', input('gift-price', g.price, 'text', 'maxlength="40" placeholder="例如：2 中品靈石"'))}
+      ${field(worldText('價格（靈石）'), input('gift-price', g.price, 'text', worldText('maxlength="40" placeholder="例如：2 中品靈石"')))}
       ${field('說明', input('gift-note', g.note, 'text', 'maxlength="60" placeholder="可以不寫"'))}
       <div class="actions">${btn('gift-save', '儲存', 'primary')}</div>`, {
       'gift-save': async () => {
@@ -660,11 +661,11 @@ export function chatApp(ctx) {
       const presets = Array.isArray(state.presets) ? state.presets : [];
       const catalogue = state.catalogue || {}, modelNames = catalogue.modelNames || {};
       const models = Array.isArray(catalogue.models) ? catalogue.models.map(model => Array.isArray(model) ? model : typeof model === 'string' ? [model, modelNames[model] || model] : [model.id || model.value, model.name || model.label || model.id || model.value]) : [];
-      models.unshift(['', '沿用千里傳音生圖模型']);
+      models.unshift(['', worldText('沿用千里傳音生圖模型')]);
       if (draft.model && !models.some(([model]) => model === draft.model)) models.unshift([draft.model, modelNames[draft.model] || draft.model]);
       const presetChoices = [['', '不套用預設・使用下方設定'], ...presets.map(p => [p.id, p.name])];
       if (draft.presetId && !presets.some(p => p.id === draft.presetId)) presetChoices.push([draft.presetId, `${draft.presetName || '原圖片預設'}（已移除）`]);
-      d.body.innerHTML = `<div class="tp-photo-editor" data-photo-editor="${esc(m.id)}">
+      d.body.innerHTML = worldText`<div class="tp-photo-editor" data-photo-editor="${esc(m.id)}">
         <p class="tp-photo-editor-intro">${esc(m.from)}的照片。修改只套用到這張圖片；重新生成成功後才會替換千里傳音中的原圖。</p>
         <div class="tp-photo-editor-pickers">${field('圖片預設', select('photo-preset', draft.presetId || '', presetChoices))}${field('NovelAI 模型', select('photo-model', draft.model, models))}</div>
         <p class="tp-photo-editor-hint">選擇預設會帶入模型、畫師串及正負面提示詞，保留這張圖片的場景。</p>
@@ -707,7 +708,7 @@ export function chatApp(ctx) {
             return;
           }
           if (d.live) d.close();
-          if (!v.disposed && mode === 'thread' && threadId === id) ctx.notify(regenerate ? '新圖片已加入千里傳音，原圖保留在相簿' : '這張圖片的提示詞已儲存');
+          if (!v.disposed && mode === 'thread' && threadId === id) ctx.notify(regenerate ? worldText('新圖片已加入千里傳音，原圖保留在相簿') : '這張圖片的提示詞已儲存');
         }).catch(err => {
           // The backend issues a new guard only while the original narrative and
           // photo still exist. Never read a fresh token from a newly switched chat.
@@ -984,7 +985,7 @@ export function chatApp(ctx) {
       case 'pocket-confirm-payment': {
         const payment = find(), id = threadId;
         if (!payment?.source?.id || !payment.text?.startsWith('[待確認付款]')) break;
-        if (!await ctx.confirm('確認從千里傳音靈石袋付款？', payment.text.slice('[待確認付款]'.length).trim())) break;
+        if (!await ctx.confirm(worldText('確認從千里傳音靈石袋付款？'), payment.text.slice('[待確認付款]'.length).trim())) break;
         el.disabled = true;
         try { await api.pocketConfirmPayment(id, payment.source.id); ctx.notify('付款已處理'); }
         catch (error) { ctx.notify(error.message || String(error), {error: true}); }
@@ -1002,7 +1003,7 @@ export function chatApp(ctx) {
       case 'me-set': api.saveChatOptions({profile: {[el.dataset.key]: el.dataset.value}}); render(); break;
       case 'me-buy': {
         const left = api.wallet().balance, price = Number(el.dataset.price);
-        if (!await ctx.confirm(`買下「${el.dataset.name}」？`, `${yuan(price)}，靈石還有 ${yuan(left)}。買下以後一直能用。`)) break;
+        if (!await ctx.confirm(`買下「${el.dataset.name}」？`, worldText`${yuan(price)}，靈石還有 ${yuan(left)}。買下以後一直能用。`)) break;
         api.buyDecoration(el.dataset.key, el.dataset.value);
         api.saveChatOptions({profile: {[el.dataset.key]: el.dataset.value}});
         render(); ctx.notify('買下並換上了');
@@ -1072,7 +1073,7 @@ export function chatApp(ctx) {
         render();
         try {
           await api.pocketResolvePhoto(id, m.id, {generate: true, engine: 'nai', allowPaid: true, retry: true, ...(m.photoId || m.image ? {regenerate: true} : {})});
-          if (!v.disposed) ctx.notify('角色圖片已加入千里傳音與相簿');
+          if (!v.disposed) ctx.notify(worldText('角色圖片已加入千里傳音與相簿'));
         } finally {
           generatingPhotos.delete(key);
           if (!v.disposed && mode === 'thread' && threadId === id) render();
@@ -1086,7 +1087,7 @@ export function chatApp(ctx) {
       case 'bring': selecting = selecting ? null : new Set(); panel = null; render(); break;
       case 'bring-go': {
         const count = selecting.size;
-        if (!live) throw Error('在酒館裡開啟傳音玉符時才能帶進劇情');
+        if (!live) throw Error(worldText('在酒館裡開啟傳音玉符時才能帶進劇情'));
         await api.chatBring(threadId, [...selecting]);
         selecting = null;
         ctx.notify(`下一次正文會帶上這 ${count} 條訊息`);

@@ -70,6 +70,7 @@ function restoreOpen(root,set){
   for(const d of root.querySelectorAll('.csb-panel,.csb-character'))if(set.has(detailPath(d))){d.open=true;d.csbEnsureBody?.();}
   for(const d of root.querySelectorAll('details'))if(set.has(detailPath(d)))d.open=true;
 }
+export function setScanModelAdapter(adapter={}){if(controller)Object.assign(controller.adapter,adapter);}
 export function setMessageFormatter(formatter=null){
   if(formatter!==null&&typeof formatter!=='function')throw TypeError('訊息格式化介面必須是函式');
   messageFormatter=formatter;schedule();
@@ -184,7 +185,7 @@ export function initialize(){
   started=true;epoch++;generation=createGenerationGuard({context,document,readHostState:readHostGeneration});loadHostGeneration();controller=new StateController({context,getMvu:()=>globalThis.Mvu,isBusy});
   bridge=createCharacterStateBridge({context,snapshot:readPublicSnapshot,openEditor:showEditor,openManager:showManager,openScanner:showScanner,mountView:mountInformation,setInlineCards:enabled=>guardedController().setInlineCards(enabled),setPresence:(id,mode)=>guardedController().setPresence(id,mode),setCurrentPresence:(id,present)=>guardedController().setCurrentPresence(id,present),deleteCharacter:id=>guardedController().deleteCharacter(id),restoreCharacter:id=>guardedController().restoreCharacter(id),onError:report});
   globalThis.CSBCharacterState=bridge.api;globalThis.csbCharacterStateIntercept=intercept;
-  lifecycle=Object.freeze({version:'1.5.0',dispose,initialize,setMessageFormatter,intercept});globalThis.CSBCharacterStateRuntime=lifecycle;
+  lifecycle=Object.freeze({version:'1.6.0',dispose,initialize,setMessageFormatter,setScanModelAdapter,intercept});globalThis.CSBCharacterStateRuntime=lifecycle;
   if(typeof globalThis.MutationObserver==='function'){observer=new MutationObserver(chatMutated);observeChat();}
   controller.scanner.onStatus=message=>{
     if(!started||/^AI 正在分析|^第 \d+\/\d+ 批.*重試/.test(message))return;

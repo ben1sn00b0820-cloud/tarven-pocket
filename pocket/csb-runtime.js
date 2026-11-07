@@ -1,8 +1,9 @@
+import {worldText} from '../core/world.js';
 import {sourceScope} from './source-sync.js';
 
 /** One controller owns both the phone and inline status. Older standalone copies
  * are retired only through their exported lifecycle, never by replacing globals. */
-export function createCharacterStateRuntime({context, notice = () => {}, formatMessage,
+export function createCharacterStateRuntime({context, scanModelAdapter, notice = () => {}, formatMessage,
   globals = globalThis, document = globals.document,
   load = () => import('../companions/csb-character-state/index.js'),
   loadExternal = url => import(url)} = {}) {
@@ -20,8 +21,8 @@ export function createCharacterStateRuntime({context, notice = () => {}, formatM
     if(!alive)return false;
     if(!api()&&typeof globals.csbCharacterStateIntercept!=='function'&&!document?.getElementById?.('csb-launcher'))return true;
     const lifecycle=globals.CSBCharacterStateRuntime;
-    if(lifecycle?.version==='1.5.0'&&typeof lifecycle.setMessageFormatter==='function'){
-      lifecycle.setMessageFormatter(formatMessage||null);ensureStyle();return false;
+    if(lifecycle?.version==='1.6.0'&&typeof lifecycle.setMessageFormatter==='function'){
+      lifecycle.setMessageFormatter(formatMessage||null);lifecycle.setScanModelAdapter?.(scanModelAdapter);ensureStyle();return false;
     }
     if(lifecycle&&typeof lifecycle.dispose==='function'){
       lifecycle.dispose();
@@ -52,7 +53,7 @@ export function createCharacterStateRuntime({context, notice = () => {}, formatM
     return false;
   }
   async function start() {
-    if (!alive) throw Error('傳音玉符已停用。');
+    if (!alive) throw Error(worldText('傳音玉符已停用。'));
     if(owned&&api()===ownedApi)return ownedApi;
     if (pending) return pending;
     pending = (async () => {
@@ -67,6 +68,7 @@ export function createCharacterStateRuntime({context, notice = () => {}, formatM
       if (!initialized || !module.ownsRuntime?.()) return api();
       owned = module; ownedApi = initialized;
       module.setMessageFormatter?.(formatMessage || null);
+      module.setScanModelAdapter?.(scanModelAdapter);
       ensureStyle();
       return ownedApi;
     })();

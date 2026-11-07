@@ -1,8 +1,8 @@
 import {safePhotoUrl} from '../core/photo-url.js';
-import {legacyWalletAmount, parseSpiritText, SPIRIT_MAX} from '../core/currency.js';
+import {legacyWalletAmount, parseSpiritText, parseStoryAmount, SPIRIT_MAX} from '../core/currency.js';
 
 /** Strict, side-effect-free narrative → phone protocol. Never guesses events from prose. */
-export const PHONE_VERSION = '0.15.0';
+export const PHONE_VERSION = '0.16.0';
 export const PHONE_LIMITS = Object.freeze({message: 2_000_000, block: 100_000, events: 256, name: 40, text: 4000, longText: 20_000, members: 20, amount: SPIRIT_MAX});
 const WX = new Set(['contact', 'message', 'group_message', 'group_create', 'photo', 'voice', 'location', 'pat', 'dice', 'transfer', 'redpacket', 'gift', 'recall']);
 const IG = new Set(['post', 'story', 'dm', 'comment', 'like']);
@@ -263,7 +263,7 @@ function readCommandAmount(source, start) {
   const tail = source.slice(start, start + 241);
   // Deliberately capture malformed numeric punctuation as well: a bad grouped
   // value such as 1,00下品 must fail as a whole, never become a transfer of 1.
-  const term = /\d[\d.,]*[ \t]*(?:枚[ \t]*)?(?:極品|极品|中品|下品|靈石|灵石)(?:靈石|灵石)?/y;
+  const term = /\d[\d.,]*[ \t]*(?:枚[ \t]*)?(?:(?:極品|极品|中品|下品|靈石|灵石)(?:靈石|灵石)?|(?:兩|两)?(?:銀子|银子|金子|白銀|黃金)|文銅錢|銅錢|铜钱|百元|萬元|万元)/y;
   let match = term.exec(tail);
   if (match) {
     let end = term.lastIndex;
@@ -279,7 +279,7 @@ function readCommandAmount(source, start) {
         break;
       }
     }
-    try { return {value: parseSpiritText(tail.slice(0, end), {zero: false, max: PHONE_LIMITS.amount}), end: start + end}; }
+    try { return {value: parseStoryAmount(tail.slice(0, end), {zero: false, max: PHONE_LIMITS.amount}), end: start + end}; }
     catch { return null; }
   }
   const legacy = /^(\d+(?:\.\d{1,2})?)(?:[ \t]*元)?/.exec(tail.slice(0, 40));
@@ -295,7 +295,7 @@ function parseNaturalPhoneCommands(source, options = {}, roleOrigin = false) {
   const result={events:[],errors:[],matches:[]};
   if((roleOrigin?options.isUser!==false:options.isUser!==true)||typeof source!=='string'||source.length>PHONE_LIMITS.message)return result;
   const protectedSpans=protectedCommandSpans(source),messageKey=options.messageKey??source;
-  const starts=/(千里傳音|千里传音|微信)(傳給|传给|轉帳給|轉賬給|转账给|紅包給|红包给)|(浮光錄|浮光录|Instagram|IG)(傳給|传给|私訊給|私信给|發限動|发限动|限時動態|限时动态|發文|发文|發帖|发帖)|(論道臺|論道台|论道台|论坛|論壇)(發文|发文|發帖|发帖|回覆|回复)/gi;
+  const starts=/(千里傳音|千里传音|微信|飛鴿傳書|飞鸽传书)(傳給|传给|轉帳給|轉賬給|转账给|紅包給|红包给)|(浮光錄|浮光录|浮生錄|浮生录|Instagram|IG)(傳給|传给|私訊給|私信给|發限動|发限动|限時動態|限时动态|發文|发文|發帖|发帖)|(論道臺|論道台|论道台|论坛|論壇|茶館|茶馆)(發文|发文|發帖|发帖|回覆|回复)/gi;
   let spanIndex=0,consumed=0,ordinal=0;
   for(const head of source.matchAll(starts)) {
     const appStart=head.index;if(appStart<consumed)continue;

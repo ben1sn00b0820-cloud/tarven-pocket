@@ -1,3 +1,4 @@
+import {worldText} from '../core/world.js';
 import {createView, esc, btn, heading, empty, size, field, input, textArea} from './common.js';
 import {icon} from './icons.js';
 import {openImageViewer} from '../image-viewer.js';
@@ -29,7 +30,7 @@ export function galleryApp(ctx) {
     const rows = await api.listPhotos();
     if (v.disposed || ticket !== epoch) return;
     clear();
-    v.draw(heading('留影閣', importButton, `Album · ${rows.length}`) + (rows.length
+    v.draw(heading(worldText('留影閣'), importButton, `Album · ${rows.length}`) + (rows.length
       ? `<div class="photo-grid">${rows.map(r => `<button data-action="photo" data-id="${esc(r.id)}" aria-label="檢視 ${esc(r.name)}"><img loading="lazy" data-photo="${esc(r.id)}" alt="${esc(r.name)}"></button>`).join('')}</div>`
       : empty('留住喜歡的畫面', '從本地匯入照片，也可以設為手機桌布。', 'image')));
     for (const row of rows) {
@@ -86,7 +87,7 @@ export function notesApp(ctx) {
     }
     const rows = await api.listNotes();
     if (v.disposed || ticket !== epoch) return;
-    v.draw(heading('隨行箋', btn('add-note', icon('add'), 'round-button', 'aria-label="新增備忘錄"'), `Memo · ${rows.length}`) + (rows.length
+    v.draw(heading(worldText('隨行箋'), btn('add-note', icon('add'), 'round-button', 'aria-label="新增備忘錄"'), `Memo · ${rows.length}`) + (rows.length
       ? `<div class="notes-grid">${rows.map((n, i) => `<button class="note-card" style="--nc:${color(n.id)};--r:${(hash(n.id) % 5 - 2) * .6}deg" data-action="edit-note" data-id="${esc(n.id)}"><strong>${esc(n.title || '未命名')}</strong><small>${esc(n.text.slice(0, 80) || '空白備忘錄')}</small><small>${dateLabel(n.updatedAt)}</small></button>`).join('')}</div>`
       : empty('隨手記下這一刻', '備忘錄只由你手動記錄，不讀取聊天，也不會注入提示詞。', 'edit')));
   }
